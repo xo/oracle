@@ -28,10 +28,6 @@ func TestParseDSN(t *testing.T) {
 			Config{User: "u", Host: "h", Service: "a/b", Instance: "i"},
 		},
 		{
-			"oracle://u@h/s?skip_nls=true",
-			Config{User: "u", Host: "h", Service: "s", SkipNLS: true},
-		},
-		{
 			"oracle://u:p%40ss@h?sid=XE",
 			Config{User: "u", Password: "p@ss", Host: "h", SID: "XE"},
 		},
@@ -108,7 +104,6 @@ func TestParseDSNErrors(t *testing.T) {
 		{"oracle://u:p@h/s?SERVICE%20NAME=x", ErrUnknownKey},
 		{"oracle://u:p@h/s?tls=true", ErrUnknownKey},
 		{"oracle://u:p@h/s?sid=a&sid=b", ErrRepeatedKey},
-		{"oracle://u:p@h/s?skip_nls=maybe", ErrInvalidValue},
 		{"oracle://u:p@h:0/s", ErrInvalidValue},
 		{"oracle://u:p@h:x/s", ErrInvalidValue},
 		{"oracle://u:p@h/a/b/c", ErrInvalidValue},

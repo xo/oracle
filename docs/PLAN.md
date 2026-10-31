@@ -25,12 +25,13 @@ conclusion.
 | [D14](#d14-the-driver-logs-only-to-a-logger-that-the-caller-passes) | Decided |
 | [D15](#d15-unit-tests-play-back-recorded-tns-exchanges) | Decided |
 | [D16](#d16-a-decimal-is-an-apddecimal) | Decided. Amends hard rule 2 of AGENTS.md |
-| [D17](#d17-ci-leaves-out-19c) | Decided. Amends D7 |
+| [D17](#d17-ci-leaves-out-19c) | Decided. Amends D7, amended by D23 |
 | [D18](#d18-four-upstream-pull-requests-are-written-again-here) | Decided |
 | [D19](#d19-the-driver-reads-dbms_output) | Decided |
 | [D20](#d20-the-driver-reads-tnsnamesora-with-a-parser-of-its-own) | Decided |
 | [D21](#d21-four-upstream-features-are-taken) | Decided |
 | [D22](#d22-a-lob-is-read-in-pieces-until-its-rows-close) | Decided |
+| [D23](#d23-no-test-runs-on-19c) | Decided. Amends D17 |
 
 ## Purpose
 
@@ -247,7 +248,8 @@ Ken decided on 2026-10-31 that the oracle job of CI leaves out 19c. Its image
 is built by `dbrun build` from an installer that Oracle does not publish, and
 its first start takes about 15 minutes. A change that touches the protocol is
 tested on 19c through `dbrun` on a machine that has the image. The workflow
-names no other release, and reads the rest from `dbrun list`.
+names no other release, and reads the rest from `dbrun list`. D23 drops the
+test on 19c.
 
 ## D18. Four upstream pull requests are written again here
 
@@ -300,6 +302,15 @@ with an error. A LOB reads through the connection of its rows, and after
 `rows.Close` `database/sql` can give that connection to another goroutine,
 so a later read would race with it. The `Clob.Read` of `go-ora` had that
 race.
+
+## D23. No test runs on 19c
+
+Status: Decided. Amends D17.
+
+Ken decided on 2026-11-01 that no test runs on 19c, not even a change to the
+protocol. The tests on 18c and 26ai cover what lies between, so 19c repeats
+them. No exchange is recorded on 19c. `oracle-adb-19c` is another image, and
+the tests still run on it.
 
 ## Open questions for Ken
 

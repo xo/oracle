@@ -21,7 +21,7 @@ holds the fix. Each needs a test against an old release before it is closed.
 | --- | --- | --- |
 | sijms/go-ora#759 | panic on connect to 11g, reading bytes 41 to 45 of a 32 byte ACCEPT packet | `internal/tns/accept_packet.go` reads them only when the packet is 45 bytes or longer. Checked |
 | sijms/go-ora#774 | ORA-01017 for a password longer than 30 characters | `data_type_nego.go` sends 234 as the logon types byte, which holds `O9LOGON_LONG_PASSWORD`. The fault is in `v2` only. Checked |
-| sijms/go-ora#686 | `isEqualLoc` is always true | `types/utils.go` compares the zone name and offset. Checked |
+| sijms/go-ora#686 | `isEqualLoc` is always true | Step 9 deleted `isEqualLoc`, since a `DATE` no longer takes the zone of the server and nothing compares zones. Checked |
 | sijms/go-ora#764 | v3.0.1 cannot log in, fixed by commit `1f57ed4` | `1f57ed4` is in this history. Checked |
 
 ## Faults to fix
@@ -46,18 +46,20 @@ blocks a connection, P2 is a fault with a workaround.
 | sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Fixed in step 9. `CheckNamedValue` returns `driver.ErrSkip` for a named type of a basic kind that the driver does not know, so `database/sql` converts it by its kind. `time.Duration` still binds as an interval. `TestNamedTypes` holds it, on 26ai, without sijms/go-ora#747 |
 | sijms/go-ora#671 | P2 | `RefCursor.Query` on a cursor the procedure never opened breaks the connection | Return an error before the round trip | Not reproduced. The execute returns ORA-01001, and the connection stays usable. `TestUnopenedRefCursor` holds it, on 26ai |
 | sijms/go-ora#698 | P2 | A `MERGE` that violates a key returns a timeout and not ORA-00001 | Needs a trace | Fixed in step 9. On 11g, which is before TTC 7, the driver read the errors of an array DML as three empty fields, so a batch that failed waited for bytes that never came. 26ai returned ORA-00001 already. `TestSummaryArrayDMLError` holds the 11g reply, and `TestBatchError` holds it on 11g and 26ai |
+| sijms/go-ora#655 | P1 | A `TIMESTAMP WITH LOCAL TIME ZONE` is wrong when `DBTIMEZONE` is a region, and the zone `+00:00` is not `time.UTC` | Read the zone of the database right | Fixed in step 9. The negotiation of data types sends a region in the form of a `TIMESTAMP WITH TIME ZONE`, and the driver read it as an offset of 121 hours, so a value of a database in `Europe/London` read five days off. An offset of zero is `time.UTC` now. The issue also asks for the value in the zone of the session. The driver gives the same instant in the zone of the database, as DESIGN says, since it learns the zone of the session only by a query. `TestDBTimeZone` holds the images, and `TestLocalTimeZone` holds the values on 11g with `+00:00`, `-05:00` and `Europe/London` |
+| sijms/go-ora#672 | P2 | A `DATE` reads in a fixed offset, so a date in winter gets the offset of summer | Read a `DATE` in UTC, as DESIGN says | Fixed in step 9. The driver gave a `DATE` and a `TIMESTAMP` the offset of `SYSTIMESTAMP`, which a query at each logon read. They are in UTC now, the wall clock of the value, and the query is gone. sijms/go-ora#687 asks for the zone of the server, which a fixed offset cannot give, and is the same fault. sijms/go-ora#568 compares a `DATE` with a bind, which works, since a bind sends its wall clock. `TestLocalTimeZone` holds all three |
 | sijms/go-ora#729 | P2 | A server that requires native network encryption or checksums refuses the client with ORA-12269 | Implement the negotiation | Fixed in step 9 (D21). The refusal did not reproduce: on `oracle-nne-26ai`, whose server requires AES256 and SHA256, the driver negotiates both, with the client at any level. With `encryption=required` on 11g, the driver panicked: it gave AES the IV of 20 bytes that a server before the new version sends, which the 12.1 report in the issue also points at. AES takes an IV of zeros there, as in `v2`. `TestNetworkEncryption` requires both services from the client and finds both in `V$SESSION_CONNECT_INFO`, on 11g, 18c, 26ai and `oracle-nne-26ai` |
 
 ## Faults that need a reproduction first
 
 sijms/go-ora#724 and sijms/go-ora#697 (a malformed TTC packet), sijms/go-ora#706
-and sijms/go-ora#700 (EOF under load), sijms/go-ora#704 (`CONTAINERS(DUAL)`),
-sijms/go-ora#683 (a lower case user name), sijms/go-ora#687, sijms/go-ora#672,
-sijms/go-ora#655 and sijms/go-ora#568 (time zones of DATE, TIMESTAMP WITH LOCAL
-TIME ZONE and a zero `time.Time`), sijms/go-ora#635 and sijms/go-ora#688
-(ORA-12564), sijms/go-ora#680 (a TLS cipher on RDS), sijms/go-ora#615 and
-sijms/go-ora#673. Each needs a test against a release that `dbrun` starts
-before it is a fault.
+and sijms/go-ora#700 (EOF under load), sijms/go-ora#635 and sijms/go-ora#688 (ORA-12564), sijms/go-ora#680 (a TLS
+cipher on RDS), sijms/go-ora#615 and sijms/go-ora#673. Each needs a test
+against a release that `dbrun` starts before it is a fault. Step 9 reproduced
+sijms/go-ora#683, #687, #672, #655 and #568, which the table above and the
+section below hold. It did not reproduce sijms/go-ora#704: in the root
+container of 18c and 26ai, `SELECT * FROM CONTAINERS(DUAL)` returns a row for
+the root and one for the PDB, as `system` and as `sys`.
 
 ## Features
 
@@ -67,8 +69,9 @@ sijms/go-ora#664 (streaming LOBs and rows), sijms/go-ora#666 (scrollable
 cursors), sijms/go-ora#611 (skip the NLS query at connect), sijms/go-ora#584
 (`v$session.terminal`), sijms/go-ora#560 (`/ as sysdba`), sijms/go-ora#530 (OCI
 IAM tokens), sijms/go-ora#640 (pool settings), sijms/go-ora#618 (TimesTen) and
-sijms/go-ora#403 (ASM). Step 9 built #611 as the key `skip_nls`, which
-`TestSkipNLS` holds. It made a handshake that fails after the dial try the
+sijms/go-ora#403 (ASM). Step 9 built #611 as the key `skip_nls`, and
+then deleted the query, and the key with it, so a logon runs no query.
+`TestLogonRunsNoQuery` holds it. It made a handshake that fails after the dial try the
 next address, as a gateway or a VPN that accepts the dial and resets the
 connection needs (#619), which also serves the failover of a descriptor of
 many addresses (#707), and `TestFailover` holds both. #530 asked for the
@@ -97,7 +100,10 @@ sijms/go-ora#690 is about the `v2` `go.mod`. This module requires nothing.
 sijms/go-ora#609 expects `rows.Err` to return `sql.ErrNoRows`, which
 `database/sql` returns only from `Row.Scan`. sijms/go-ora#602 is Oracle 8i,
 which is older than any release this project tests. sijms/go-ora#685 and
-sijms/go-ora#682 are questions.
+sijms/go-ora#682 are questions. sijms/go-ora#683 is a user with a lower case
+name: the server reads a name in upper case unless it is quoted, as in SQL,
+and the quoted name logs on. `TestLogonRefused` holds it, with a user named
+`"go_logon"`.
 
 ## Pull requests
 

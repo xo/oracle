@@ -102,8 +102,18 @@ The tenth part of step 9 is done (`284844c`, pushed). A fetch of rows with
 LOB values holds the values of about 4 MiB (#664), and AES takes a zero IV
 on a server before 12c (#729).
 
-The eleventh part of step 9 is staged. `Clob`, `Blob` and `BFile` have
+The eleventh part of step 9 is done (`63282cc`, pushed). `Clob`, `Blob` and `BFile` have
 `NewReader(ctx)`, which reads a LOB in pieces of 1 MiB (#681 and #559, D22).
 `ScanColumn` gives the locator to an `oracle.Clob` or an `oracle.Blob`, and
 loads the value for any other destination. A read after the rows close
 fails with `ErrRowsClosed`. With this, D21 is done.
+
+The twelfth part of step 9 is staged. A refused logon on 23ai and later gives
+ORA-01017, where the driver read the reply to the protocol negotiation twice
+and gave "message code error". `Query` of a statement that is not a query
+gives no rows, where `Next` failed with ORA-01002. A `DATE` is in UTC (#672),
+and the zone of the database reads right when it is a region (#655). The logon
+runs no query, so `skip_nls` is gone (#611), and the exchanges of 11g, 18c,
+21c, 23ai and 26ai are recorded again. Ken decided that no test runs on 19c
+(D23), so its exchanges are deleted. #683 is not a fault: a lower case user name logs
+on quoted.

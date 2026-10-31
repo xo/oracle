@@ -584,3 +584,79 @@ func TestOptions(t *testing.T) {
 		t.Errorf("options that ask for nothing: %v", err)
 	}
 }
+
+// TestQueryNotAQuery runs statements that are not queries through Query,
+// which gives rows with no columns and no row. Next asked the server to fetch
+// from them, which gave ORA-01002 or ORA-01003.
+func TestQueryNotAQuery(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	db.ExecContext(ctx, "DROP TABLE go_query_dml")
+	t.Cleanup(func() { db.Exec("DROP TABLE go_query_dml") })
+	for _, q := range []string{
+		"CREATE TABLE go_query_dml (n NUMBER)",
+		"INSERT INTO go_query_dml VALUES (1)",
+		"UPDATE go_query_dml SET n = 2",
+		"BEGIN NULL; END;",
+		"DELETE FROM go_query_dml",
+	} {
+		rows, err := db.QueryContext(ctx, q)
+		if err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+		for rows.Next() {
+			t.Errorf("%s: a row", q)
+		}
+		if err := rows.Err(); err != nil {
+			t.Errorf("%s: %v", q, err)
+		}
+		rows.Close()
+	}
+	usable(t, db)
+}
+
+// TestLocalTimeZone reads a TIMESTAMP WITH LOCAL TIME ZONE, whose wall clock
+// is in the zone of the database. A zone of a region, such as Europe/London,
+// was read as an offset of 121 hours, and the zone +00:00 was not time.UTC,
+// sijms/go-ora#655. A DATE and a TIMESTAMP are in UTC, where they took the
+// zone of the operating system of the server, sijms/go-ora#672.
+func TestLocalTimeZone(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	var dbtz string
+	if err := db.QueryRowContext(ctx, "SELECT DBTIMEZONE FROM dual").Scan(&dbtz); err != nil {
+		t.Fatal(err)
+	}
+	for _, at := range []time.Time{
+		time.Date(2009, 1, 10, 23, 0, 0, 0, time.UTC),
+		time.Date(2009, 7, 10, 23, 0, 0, 0, time.UTC),
+	} {
+		var ltz, date, ts time.Time
+		lit := at.Format("2006-01-02 15:04:05")
+		err := db.QueryRowContext(ctx, `SELECT
+			CAST(TIMESTAMP '`+lit+` +00:00' AS TIMESTAMP WITH LOCAL TIME ZONE),
+			TO_DATE('`+lit+`', 'YYYY-MM-DD HH24:MI:SS'),
+			TIMESTAMP '`+lit+`'
+			FROM dual`).Scan(&ltz, &date, &ts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ltz.Equal(at) {
+			t.Errorf("DBTIMEZONE %s: got %v, want %v", dbtz, ltz, at)
+		}
+		if dbtz == "+00:00" && ltz.Location() != time.UTC {
+			t.Errorf("DBTIMEZONE %s: got the zone %v, want UTC", dbtz, ltz.Location())
+		}
+		if date != at || ts != at {
+			t.Errorf("got %v and %v, want %v", date, ts, at)
+		}
+		// a time.Time binds as its wall clock, in any zone, so it equals
+		// the DATE of that wall clock, sijms/go-ora#568
+		wall := time.Date(at.Year(), at.Month(), at.Day(), at.Hour(), 0, 0, 0, time.FixedZone("X", 7*60*60))
+		var n int
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dual WHERE TO_DATE('"+lit+"', 'YYYY-MM-DD HH24:MI:SS') = :1", wall).Scan(&n)
+		if err != nil || n != 1 {
+			t.Errorf("a DATE equals a bind of its wall clock: got %d, %v", n, err)
+		}
+	}
+}

@@ -121,9 +121,11 @@ none of the key names of `go-ora`, such as `SSL VERIFY` or `SERVICE NAME`.
 | `program`, `proxy_user` | The program that the session reports, and a proxy user | none |
 | `unix_socket` | A Unix socket in place of TCP | none |
 | `alias`, `tns_admin` | An alias of `tnsnames.ora`, in place of the host, the port and the path, and the folder of the file | none, and `$TNS_ADMIN` |
-| `skip_nls` | `true` skips the query of the NLS settings at logon, which the driver does not use | `false` |
 
 A user named `SYS` gets no privilege by its name. Write `privilege=sysdba`.
+
+The server reads a user name in upper case unless the name is quoted, as in
+SQL. A user created as `"scott"` logs on as `oracle://%22scott%22:pass@host/service`.
 
 `ParseDSN` returns a `Config`. A caller that needs more than a DSN can say,
 such as a `*tls.Config`, a `Dialer` or a `*slog.Logger`, changes the `Config`
@@ -158,6 +160,15 @@ of a column decides the Go type that a scan into `*any` gets:
 | `BINARY_FLOAT`, `BINARY_DOUBLE` | `float64` |
 | `INTERVAL YEAR TO MONTH` | `oracle.IntervalYM` |
 | `INTERVAL DAY TO SECOND` | `time.Duration` |
+| `DATE`, `TIMESTAMP` | `time.Time` in UTC |
+| `TIMESTAMP WITH TIME ZONE` | `time.Time` in its zone |
+| `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` in the zone of the database |
+
+A `DATE` and a `TIMESTAMP` hold no zone, so the driver returns the wall clock
+of the value in UTC, whatever the zone of the server. To read one as the time
+in a zone, such as `Europe/Prague`, call `time.Date` with the fields of the
+value and that zone. A `time.Time` binds as its wall clock, and the server
+reads it in the zone of the session. `oracle.TimestampTZ` binds with its zone.
 
 A decimal scans into a `*string`, a `*float64` or an `*int64` too. Both
 interval types bind as arguments. `docs/DESIGN.md`, under Values, holds the
@@ -389,6 +400,7 @@ oracle/
 | `go_ora.SetNTSAuth`, `SetKerberosAuth` | `Config.NTS` and `Config.Kerberos` on the connector |
 | `go_ora.BuildUrl`, `BuildJDBC` | `Config.DSN` |
 | The package `go_ora` | The package `oracle` |
+| A `DATE` in the zone of the server | A `DATE` in UTC |
 
 The DSN is not compatible. See Connection options.
 

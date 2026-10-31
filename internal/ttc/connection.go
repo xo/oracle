@@ -61,38 +61,18 @@ type Querier interface {
 
 // ///
 
-type NLSData struct {
-	Calender        string `db:"p_nls_calendar,,40,out"`
-	Comp            string `db:"p_nls_comp,,40,out"`
-	Language        string
-	LengthSemantics string `db:"p_nls_length_semantics,,40,out"`
-	NCharConvExcep  string `db:"p_nls_nchar_conv_excep,,40,out"`
-	NCharConvImp    string
-	DateLang        string `db:"p_nls_date_lang,,40,out"`
-	Sort            string `db:"p_nls_sort,,40,out"`
-	Currency        string `db:"p_nls_currency,,40,out"`
-	DateFormat      string `db:"p_nls_date_format,,40,out"`
-	TimeFormat      string
-	IsoCurrency     string `db:"p_nls_iso_currency,,40,out"`
-	NumericChars    string `db:"p_nls_numeric_chars,,40,out"`
-	DualCurrency    string `db:"p_nls_dual_currency,,40,out"`
-	UnionCurrency   string
-	Timestamp       string `db:"p_nls_timestamp,,48,out"`
-	TimestampTZ     string `db:"p_nls_timestamp_tz,,56,out"`
-	TTimezoneFormat string
-	NTimezoneFormat string
-	Territory       string
-	Charset         string
-}
 type Connection struct {
-	State             ConnectionState
-	LogonMode         LogonMode
-	autoCommit        bool
-	logger            *slog.Logger
-	connOption        *config.ConnectionConfig
-	session           *tns.Session
-	tcpNego           *TCPNego
-	dataNego          *DataTypeNego
+	State      ConnectionState
+	LogonMode  LogonMode
+	autoCommit bool
+	logger     *slog.Logger
+	connOption *config.ConnectionConfig
+	session    *tns.Session
+	tcpNego    *TCPNego
+	dataNego   *DataTypeNego
+	// negotiated is true when the replies of the negotiations that a fast
+	// logon sends with its first message have been read.
+	negotiated        bool
 	authObject        *AuthObject
 	SessionProperties map[string]string
 	dBVersion         *DBVersion
@@ -102,7 +82,6 @@ type Connection struct {
 	sStrConv          *charset.Converter
 	nStrConv          *charset.Converter
 	cStrConv          *charset.Converter
-	NLSData           NLSData
 	goTypeCoder       map[reflect.Type]codec.OracleParameterCoder
 	oracleTypeCoder   map[uint16]codec.OracleParameterCoder
 	nameTypeCoder     map[string]codec.OracleParameterCoder
@@ -116,34 +95,21 @@ type Connection struct {
 		date      int64
 		timestamp int64
 	}
-	bad                      bool
-	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
-	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
-	dbServerTimeZoneExplicit *time.Location
-	temporaryLocs            []types.Locator
-	token                    []byte
-	tokenPrivateKey          []byte
-	connectionCookie         *ConnectionCookie
-	cookies                  *cookieJar
+	bad bool
+	// dbTimeZone is the zone of the database, which a TIMESTAMP WITH LOCAL
+	// TIME ZONE is in, and dbTimeZoneErr the error of a zone that did not
+	// load
+	dbTimeZone       *time.Location
+	dbTimeZoneErr    error
+	temporaryLocs    []types.Locator
+	token            []byte
+	tokenPrivateKey  []byte
+	connectionCookie *ConnectionCookie
+	cookies          *cookieJar
 	// lobFetch is the mode of LOBs of the DSN. connOption.Lob is the mode of
 	// the statement that runs, which an option can change (D109)
 	lobFetch config.LobFetch
 	newKey   []byte
-}
-
-type ConnectionProperties struct {
-	cusTyp map[string]types.Object
-	maxLen struct {
-		varchar   int
-		nvarchar  int
-		raw       int
-		number    int
-		date      int
-		timestamp int
-	}
-	dbTimeZone               *time.Location // equivalent to database timezone used for timestamp with local timezone
-	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
-	dbServerTimeZoneExplicit *time.Location
 }
 
 func (conn *Connection) buildParameterCoderMap(drv *Registry) {
@@ -151,77 +117,6 @@ func (conn *Connection) buildParameterCoderMap(drv *Registry) {
 	conn.nameTypeCoder = drv.nameTypeCoder
 	conn.oracleTypeCoder = drv.oracleTypeCoder
 
-}
-
-// NLS return NLS properties of the connection.
-// this function is left from v1. but v2 is using another method
-func (conn *Connection) NLS() (*NLSData, error) {
-	// we read from sys.nls_session_parameters ONCE
-	cmdText := `
-	BEGIN
-		SELECT 
-			MAX(CASE WHEN PARAMETER='NLS_CALENDAR' THEN VALUE END) AS NLS_CALENDAR,
-			MAX(CASE WHEN PARAMETER='NLS_COMP' THEN VALUE END) AS NLS_COMP,
-			MAX(CASE WHEN PARAMETER='NLS_LENGTH_SEMANTICS' THEN VALUE END) AS NLS_LENGTH_SEMANTICS,
-			MAX(CASE WHEN PARAMETER='NLS_NCHAR_CONV_EXCP' THEN VALUE END) AS NLS_NCHAR_CONV_EXCP,
-			MAX(CASE WHEN PARAMETER='NLS_DATE_LANGUAGE' THEN VALUE END) AS NLS_DATE_LANGUAGE,
-			MAX(CASE WHEN PARAMETER='NLS_SORT' THEN VALUE END) AS NLS_SORT,
-			MAX(CASE WHEN PARAMETER='NLS_CURRENCY' THEN VALUE END) AS NLS_CURRENCY,
-			MAX(CASE WHEN PARAMETER='NLS_DATE_FORMAT' THEN VALUE END) AS NLS_DATE_FORMAT,
-			MAX(CASE WHEN PARAMETER='NLS_ISO_CURRENCY' THEN VALUE END) AS NLS_ISO_CURRENCY,
-			MAX(CASE WHEN PARAMETER='NLS_NUMERIC_CHARACTERS' THEN VALUE END) AS NLS_NUMERIC_CHARACTERS,
-			MAX(CASE WHEN PARAMETER='NLS_DUAL_CURRENCY' THEN VALUE END) AS NLS_DUAL_CURRENCY,
-			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_FORMAT,
-			MAX(CASE WHEN PARAMETER='NLS_TIMESTAMP_TZ_FORMAT' THEN VALUE END) AS NLS_TIMESTAMP_TZ_FORMAT
-			into :p_nls_calendar, :p_nls_comp, :p_nls_length_semantics, :p_nls_nchar_conv_excep, 
-				:p_nls_date_lang, :p_nls_sort, :p_nls_currency, :p_nls_date_format, :p_nls_iso_currency,
-				:p_nls_numeric_chars, :p_nls_dual_currency, :p_nls_timestamp, :p_nls_timestamp_tz
-		FROM
-			sys.nls_session_parameters
-		;
-	END;`
-	stmt := NewStmt(cmdText, conn)
-	defer func(stmt *Stmt) {
-		_ = stmt.Close()
-	}(stmt)
-	_, err := stmt.Exec([]driver.Value{&conn.NLSData})
-	if err != nil {
-		return nil, err
-	}
-
-	/*
-		for _, par := range stmt.Pars {
-			if par.Name == "p_nls_calendar" {
-				conn.NLSData.Calender = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_comp" {
-				conn.NLSData.Comp = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_length_semantics" {
-				conn.NLSData.LengthSemantics = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_nchar_conv_excep" {
-				conn.NLSData.NCharConvExcep = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_date_lang" {
-				conn.NLSData.DateLang = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_sort" {
-				conn.NLSData.Sort = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_currency" {
-				conn.NLSData.Currency = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_date_format" {
-				conn.NLSData.DateFormat = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_iso_currency" {
-				conn.NLSData.IsoCurrency = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_numeric_chars" {
-				conn.NLSData.NumericChars = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_dual_currency" {
-				conn.NLSData.DualCurrency = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_timestamp" {
-				conn.NLSData.Timestamp = conn.strConv.Decode(par.BValue)
-			} else if par.Name == "p_nls_timestamp_tz" {
-				conn.NLSData.TimestampTZ = conn.strConv.Decode(par.BValue)
-			}
-		}
-	*/
-
-	return &conn.NLSData, nil
 }
 
 // Prepare take a query string and create a stmt object
@@ -426,6 +321,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if conn.isFastLoginEnabled() {
 		logger.Debug("fast authentication")
 		session.ResetBuffer()
+		conn.negotiated = false
 		cookie := lookupCookie(conn)
 		if cookie != nil {
 			conn.connectionCookie = cookie
@@ -478,13 +374,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 
 	err = conn.doAuth()
 	if errors.Is(err, tns.ErrConnReset) {
+		// a server that refuses the logon sends a reset and then the error,
+		// after the replies of the negotiations or in place of them
 		if conn.isFastLoginEnabled() {
-			err = conn.tcpNego.readMessage()
-			if err != nil {
-				return err
-			}
-			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
-			conn.dbTimeZone, err = conn.dataNego.read()
+			err = conn.readNegotiation()
 			if err != nil {
 				return err
 			}
@@ -538,40 +431,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	// nothing reads the NLS settings, and skip_nls saves the round trip,
-	// sijms/go-ora#611
-	if len(conn.NLSData.Language) == 0 && !conn.connOption.SkipNLS {
-		_, err = conn.NLS()
-		if err != nil {
-			logger.Debug("reading the NLS parameters", "error", err)
-		}
-	}
-	conn.getDBServerTimeZone(ctx)
 	return nil
-}
-
-func (conn *Connection) getDBServerTimeZone(ctx context.Context) {
-
-	if conn.connOption.DatabaseInfo.Location != "" {
-		loc, err := time.LoadLocation(conn.connOption.DatabaseInfo.Location)
-		if err == nil {
-			conn.dbServerTimeZone = loc
-			return
-		}
-		conn.logger.Debug("loading the location", "error", err)
-	}
-
-	if conn.dbServerTimeZoneExplicit != nil {
-		conn.dbServerTimeZone = conn.dbServerTimeZoneExplicit
-		return
-	}
-
-	var current time.Time
-	err := conn.QueryRowContext(ctx, "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
-	if err != nil {
-		conn.dbServerTimeZone = time.UTC
-	}
-	conn.dbServerTimeZone = current.Location()
 }
 
 // Begin is the form of BeginTx with no context, which database/sql does not
@@ -727,6 +587,29 @@ func (conn *Connection) isFastLoginEnabled() bool {
 }
 
 // doAuth a login step that occur during open connection
+// readNegotiation reads the replies of the protocol and data type
+// negotiations that a fast logon sends with its first message, once. A logon
+// with a cookie gets no reply to the protocol negotiation.
+func (conn *Connection) readNegotiation() error {
+	if conn.negotiated {
+		return nil
+	}
+	if conn.connectionCookie == nil {
+		err := conn.tcpNego.readMessage()
+		if err != nil {
+			return err
+		}
+		conn.tcpNego.ServerFlags |= 2
+	}
+	conn.dataNego = buildTypeNego(conn.tcpNego, conn)
+	err := conn.dataNego.read()
+	if err != nil {
+		return err
+	}
+	conn.negotiated = true
+	return nil
+}
+
 func (conn *Connection) doAuth() error {
 	conn.logger.Debug("authenticate")
 	authObject := &AuthObject{
@@ -758,15 +641,7 @@ func (conn *Connection) doAuth() error {
 		}
 
 		if conn.isFastLoginEnabled() {
-			if conn.connectionCookie == nil {
-				err = conn.tcpNego.readMessage()
-				if err != nil {
-					return err
-				}
-				conn.tcpNego.ServerFlags |= 2
-			}
-			conn.dataNego = buildTypeNego(conn.tcpNego, conn)
-			conn.dbTimeZone, err = conn.dataNego.read()
+			err = conn.readNegotiation()
 			if err != nil {
 				return err
 			}
@@ -783,15 +658,7 @@ func (conn *Connection) doAuth() error {
 		return err
 	}
 	if (len(conn.connOption.UserID) == 0 || len(conn.connOption.Password) == 0) && conn.isFastLoginEnabled() {
-		if conn.connectionCookie == nil {
-			err = conn.tcpNego.readMessage()
-			if err != nil {
-				return err
-			}
-			conn.tcpNego.ServerFlags |= 2
-		}
-		conn.dataNego = buildTypeNego(conn.tcpNego, conn)
-		conn.dbTimeZone, err = conn.dataNego.read()
+		err = conn.readNegotiation()
 		if err != nil {
 			return err
 		}
@@ -848,12 +715,12 @@ func (conn *Connection) loadNLSData() error {
 	if err != nil {
 		return err
 	}
+	// the NLS settings, which nothing reads
 	for range length {
-		nlsKey, nlsVal, nlsCode, err := conn.session.ReadKeyVal()
+		_, _, _, err := conn.session.ReadKeyVal()
 		if err != nil {
 			return err
 		}
-		conn.NLSData.SaveNLSValue(string(nlsKey), string(nlsVal), nlsCode)
 	}
 	_, err = conn.session.ReadInt(4, true, true)
 	return err
@@ -894,13 +761,12 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 		if err != nil {
 			return err
 		}
-		// get nls data
+		// the NLS settings, which nothing reads
 		for range length {
-			nlsKey, nlsVal, nlsCode, err := session.ReadKeyVal()
+			_, _, _, err := session.ReadKeyVal()
 			if err != nil {
 				return err
 			}
-			conn.NLSData.SaveNLSValue(string(nlsKey), string(nlsVal), nlsCode)
 		}
 		flag, err := session.ReadInt(4, true, true)
 		if err != nil {
@@ -969,93 +835,6 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 		}
 	}
 	return nil
-}
-
-// SaveNLSValue a helper function that convert between nls key and code
-func (nls *NLSData) SaveNLSValue(key, value string, code int) {
-	key = strings.ToUpper(key)
-	if len(key) > 0 {
-		switch key {
-		case "AUTH_NLS_LXCCURRENCY":
-			code = 0
-		case "AUTH_NLS_LXCISOCURR":
-			code = 1
-		case "AUTH_NLS_LXCNUMERICS":
-			code = 2
-		case "AUTH_NLS_LXCDATEFM":
-			code = 7
-		case "AUTH_NLS_LXCDATELANG":
-			code = 8
-		case "AUTH_NLS_LXCTERRITORY":
-			code = 9
-		case "SESSION_NLS_LXCCHARSET":
-			code = 10
-		case "AUTH_NLS_LXCSORT":
-			code = 11
-		case "AUTH_NLS_LXCCALENDAR":
-			code = 12
-		case "AUTH_NLS_LXLAN":
-			code = 16
-		case "AL8KW_NLSCOMP":
-			code = 50
-		case "AUTH_NLS_LXCUNIONCUR":
-			code = 52
-		case "AUTH_NLS_LXCTIMEFM":
-			code = 57
-		case "AUTH_NLS_LXCSTMPFM":
-			code = 58
-		case "AUTH_NLS_LXCTTZNFM":
-			code = 59
-		case "AUTH_NLS_LXCSTZNFM":
-			code = 60
-		case "SESSION_NLS_LXCNLSLENSEM":
-			code = 61
-		case "SESSION_NLS_LXCNCHAREXCP":
-			code = 62
-		case "SESSION_NLS_LXCNCHARIMP":
-			code = 63
-		}
-	}
-	switch code {
-	case 0:
-		nls.Currency = value
-	case 1:
-		nls.IsoCurrency = value
-	case 2:
-		nls.NumericChars = value
-	case 7:
-		nls.DateFormat = value
-	case 8:
-		nls.DateLang = value
-	case 9:
-		nls.Territory = value
-	case 10:
-		nls.Charset = value
-	case 11:
-		nls.Sort = value
-	case 12:
-		nls.Calender = value
-	case 16:
-		nls.Language = value
-	case 50:
-		nls.Comp = value
-	case 52:
-		nls.UnionCurrency = value
-	case 57:
-		nls.TimeFormat = value
-	case 58:
-		nls.Timestamp = value
-	case 59:
-		nls.TTimezoneFormat = value
-	case 60:
-		nls.NTimezoneFormat = value
-	case 61:
-		nls.LengthSemantics = value
-	case 62:
-		nls.NCharConvExcep = value
-	case 63:
-		nls.NCharConvImp = value
-	}
 }
 
 func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, error) {
@@ -1315,8 +1094,7 @@ func (conn *Connection) dataTypeNegotiation() error {
 	if err != nil {
 		return err
 	}
-	conn.dbTimeZone, err = conn.dataNego.read()
-	return err
+	return conn.dataNego.read()
 }
 
 func (conn *Connection) protocolNegotiation() error {
@@ -1395,12 +1173,8 @@ func (conn *Connection) SendTimeAsUTC() bool {
 	return conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion == conn.dataNego.serverTZVersion
 }
 
-func (conn *Connection) DBTimeZone() *time.Location {
-	return conn.dbTimeZone
-}
-
-func (conn *Connection) DBServerTimeZone() *time.Location {
-	return conn.dbServerTimeZone
+func (conn *Connection) DBTimeZone() (*time.Location, error) {
+	return conn.dbTimeZone, conn.dbTimeZoneErr
 }
 
 func (conn *Connection) TTCVersion() uint8 {

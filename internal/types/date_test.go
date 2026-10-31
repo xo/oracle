@@ -34,3 +34,30 @@ func TestDateBindType(t *testing.T) {
 		}
 	}
 }
+
+// TestDBTimeZone reads images of DBTIMEZONE: +00:00 and Europe/London as 11g
+// and 26ai sent them, and -05:00 in the same form. A region was read as an
+// offset of 121 hours, sijms/go-ora#655.
+func TestDBTimeZone(t *testing.T) {
+	london, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Skip(err)
+	}
+	for _, test := range []struct {
+		image []byte
+		want  *time.Location
+	}{
+		{[]byte{0x80, 0x00, 0x00, 0x00, 0x3c, 0x3c, 0x3c, 0x80, 0x00, 0x00, 0x00}, time.UTC},
+		{[]byte{0x80, 0x00, 0x85, 0xc4, 0xb5, 0x3c, 0x3c, 0x80, 0x00, 0x00, 0x00}, london},
+		{[]byte{0x80, 0x00, 0x00, 0x00, 0x37, 0x3c, 0x3c, 0x80, 0x00, 0x00, 0x00}, time.FixedZone("-05:00", -5*60*60)},
+	} {
+		got, err := DBTimeZone(test.image)
+		if err != nil {
+			t.Fatal(err)
+		}
+		at := time.Date(2025, 7, 1, 12, 0, 0, 0, time.UTC)
+		if got.String() != test.want.String() || at.In(got).Format(time.RFC3339) != at.In(test.want).Format(time.RFC3339) {
+			t.Errorf("% x: got %v, want %v", test.image, got, test.want)
+		}
+	}
+}

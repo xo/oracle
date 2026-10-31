@@ -268,7 +268,9 @@ func (resultSet *ResultSet) Next(dest []driver.Value) error {
 	noOfRowsToFetch := len(resultSet.rows) // dataSet.parent.noOfRowsToFetch()
 	hasBLOB := resultSet.parent.hasBLOB()
 	hasLONG := resultSet.parent.hasLONG()
-	if !hasMoreRows && noOfRowsToFetch == 0 {
+	// a statement that is not a query, which Query can run, has no columns
+	// and no rows to fetch
+	if !hasMoreRows && noOfRowsToFetch == 0 || len(resultSet.Columns()) == 0 {
 		return io.EOF
 	}
 	// fetch at the first row when the execute brought none, as it does for a

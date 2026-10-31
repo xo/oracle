@@ -309,7 +309,6 @@ The other keys:
 | `program`, `proxy_user` | What the session reports | `PROGRAM`, `PROXY CLIENT NAME` |
 | `unix_socket` | A Unix socket in place of TCP | `UNIX SOCKET` |
 | `alias`, `tns_admin` | An alias of `tnsnames.ora` and the folder of the file, which is `$TNS_ADMIN` when the key is absent (D20) | none |
-| `skip_nls` | `true` skips the query of the NLS settings at logon, which nothing reads (sijms/go-ora#611) | none |
 
 A user named `SYS` gets no privilege by its name. The DSN names it with
 `privilege=sysdba`.
@@ -375,6 +374,19 @@ which a `TIMESTAMP` bind would convert, and a `TIMESTAMP` that goes into a
 `DATE` column loses its fraction, as Oracle truncates it. The zone of a
 `time.Time` is dropped, and the server reads its wall clock in the zone of
 the session. `TimestampTZ` binds with its zone.
+
+`go-ora` gave a `DATE` and a `TIMESTAMP` the zone of the operating system of
+the server, which a query of `SYSTIMESTAMP` found at each logon. That zone is a
+fixed offset, so a date in winter read with the offset of summer
+(sijms/go-ora#672). They are in UTC now, and the logon runs no query: the
+query of the NLS settings, which nothing read, is gone too (sijms/go-ora#611).
+A `TIMESTAMP WITH LOCAL TIME ZONE` is the wall clock of the zone of the
+database, which the negotiation of data types sends as an offset or as a
+region, in the form of a `TIMESTAMP WITH TIME ZONE`. `go-ora` read a region as
+an offset of more than 100 hours (sijms/go-ora#655). A region that the time
+zone database of Go lacks makes a read of such a value fail with an error.
+`TestLocalTimeZone` holds it, on 11g with `+00:00`, `-05:00` and
+`Europe/London`.
 
 A `bool` binds as a `BOOLEAN` on 23ai and later, and as the `NUMBER` 1 or 0
 before, whose SQL has no `BOOLEAN`. `go-ora` bound no `bool`.
@@ -555,8 +567,8 @@ was `TestIssues`, holds the integration tests of `go-ora`.
 
 In step 9 the root package and `integration` passed on 11g, 18c, 21c, 23ai,
 26ai, and the two Autonomous Database releases, `oracle-adb-19c` and
-`oracle-adb-26ai`. 19c is left out (D17), because its first start takes
-longer than the work can wait. `dbrun dsn` prints the URL of an Autonomous
+`oracle-adb-26ai`. 19c is left out (D17, D23), because 18c and 26ai cover
+it. `dbrun dsn` prints the URL of an Autonomous
 Database with the TLS options of `go-ora`, `ssl=true&ssl+verify=false`, which
 this parser refuses. A test gives it `sslmode=require` in their place.
 `oracle-nne-26ai` is a server that requires native network encryption and

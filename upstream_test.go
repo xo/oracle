@@ -487,46 +487,38 @@ func TestLobReader(t *testing.T) {
 	usable(t, db)
 }
 
-// TestSkipNLS is sijms/go-ora#611: a logon ran a query of the NLS settings
-// that nothing reads, where the logon itself did not send them, as 11g does
-// not. skip_nls leaves it out.
-func TestSkipNLS(t *testing.T) {
+// TestLogonRunsNoQuery is sijms/go-ora#611: a logon ran a query of the NLS
+// settings that nothing read, and a query of SYSTIMESTAMP that gave a DATE
+// the zone of the server. It runs neither now.
+func TestLogonRunsNoQuery(t *testing.T) {
 	dsn := os.Getenv("ORACLE_DSN")
 	if dsn == "" {
 		t.Skip("ORACLE_DSN is empty")
 	}
-	for _, skip := range []bool{false, true} {
-		cfg, err := oracle.ParseDSN(dsn)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cfg.SkipNLS = skip
-		h := new(records)
-		cfg.Logger = slog.New(h)
-		c, err := oracle.NewConnector(cfg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		db := sql.OpenDB(c)
-		var n int
-		if err := db.QueryRowContext(t.Context(), "SELECT 1 FROM dual").Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		db.Close()
-		ran := false
-		h.mu.Lock()
-		for _, r := range h.recs {
-			r.Attrs(func(a slog.Attr) bool {
-				if a.Key == "query" && strings.Contains(a.Value.String(), "nls_session_parameters") {
-					ran = true
-				}
-				return true
-			})
-		}
-		h.mu.Unlock()
-		if skip && ran {
-			t.Error("skip_nls=true: the NLS query ran")
-		}
+	cfg, err := oracle.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := new(records)
+	cfg.Logger = slog.New(h)
+	c, err := oracle.NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := sql.OpenDB(c)
+	defer db.Close()
+	if err := db.PingContext(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.recs {
+		r.Attrs(func(a slog.Attr) bool {
+			if a.Key == "query" {
+				t.Errorf("the logon ran %s", a.Value)
+			}
+			return true
+		})
 	}
 }
 

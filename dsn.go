@@ -201,10 +201,6 @@ type Config struct {
 	// UnixSocket is a Unix socket to dial in place of TCP.
 	UnixSocket string
 
-	// SkipNLS skips the query of the NLS settings of the session that a
-	// logon runs, which saves a round trip. The driver does not use them.
-	SkipNLS bool
-
 	// Client is what the connect packet says about the client.
 	Client Client
 
@@ -255,7 +251,6 @@ const (
 	keyProgram        = "program"
 	keyProxyUser      = "proxy_user"
 	keyUnixSocket     = "unix_socket"
-	keySkipNLS        = "skip_nls"
 )
 
 // keys holds every key that a DSN can hold.
@@ -267,7 +262,7 @@ var keys = []string{
 	keyAuth, keyPrivilege, keyToken, keyTokenKey,
 	keyEncryption, keyChecksum,
 	keyLanguage, keyTerritory, keyCharset,
-	keyProgram, keyProxyUser, keyUnixSocket, keySkipNLS,
+	keyProgram, keyProxyUser, keyUnixSocket,
 }
 
 // ParseDSN parses a DSN of the form
@@ -427,11 +422,6 @@ func (cfg *Config) set(key string, vals []string) error {
 		cfg.ProxyUser = v
 	case keyUnixSocket:
 		cfg.UnixSocket = v
-	case keySkipNLS:
-		cfg.SkipNLS, err = strconv.ParseBool(v)
-		if err != nil {
-			err = fmt.Errorf("%q is not a boolean: %w", v, ErrInvalidValue)
-		}
 	}
 	return err
 }
@@ -538,9 +528,6 @@ func (cfg Config) DSN() string {
 	add(keyProgram, cfg.Program)
 	add(keyProxyUser, cfg.ProxyUser)
 	add(keyUnixSocket, cfg.UnixSocket)
-	if cfg.SkipNLS {
-		add(keySkipNLS, "true")
-	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }

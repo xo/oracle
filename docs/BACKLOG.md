@@ -16,8 +16,7 @@ reshaped it in place. Its names are still the ones of `go-ora`: `Connection`,
 `Stmt`, `DataSet`, `ParameterInfo`, `Transaction`. `DESIGN.md`, under The root
 package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
 type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
-list of authentication services, out of band breaks or the location of the
-server, which `go-ora` read. Add each when a caller needs it.
+list of authentication services or out of band breaks, which `go-ora` read. Add each when a caller needs it.
 
 ### Report SELECT CAST(:1 AS JSON) on 21c
 
@@ -52,12 +51,6 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 `setFieldValue` and `setNull`, and `TestCreateNewType` with the dead function
 that it tested. The vectors of `converters/other_types_test.go` moved to
 `internal/types/vectors_test.go`.
-
-### Delete the NLS query of a logon
-
-`skip_nls` (sijms/go-ora#611) skips a query of the NLS settings that nothing
-reads. Delete the query outright when the exchanges of every release can be
-recorded again, 19c among them.
 
 ### Write four upstream pull requests again
 

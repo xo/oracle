@@ -497,9 +497,13 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	return &result
 }
 
-func (nego *DataTypeNego) read() (zone *time.Location, err error) {
+// read reads the reply of the data type negotiation, with the zone of the
+// database.
+func (nego *DataTypeNego) read() (err error) {
 	var msg uint8
 	session := nego.conn.session
+	var zone *time.Location
+	var zoneErr error
 	msg, err = session.ReadByte()
 	if err != nil {
 		return
@@ -518,11 +522,7 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 			err = errors.New("incorrect format for DBTimeZone")
 			return
 		}
-		tzHours := int(tzBytes[4]) - 60
-		tzMin := int(tzBytes[5]) - 60
-		tzSec := int(tzBytes[6]) - 60
-		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHours, tzMin),
-			tzHours*60*60+tzMin*60+tzSec)
+		zone, zoneErr = types.DBTimeZone(tzBytes)
 		if nego.CompileTimeCaps[37]&2 == 2 {
 			nego.serverTZVersion, _ = session.ReadInt(4, false, true)
 		}
@@ -549,12 +549,17 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 		level++
 	}
 	logger := nego.conn.logger
-	if zone != nil {
+	switch {
+	case zoneErr != nil:
+		// a TIMESTAMP WITH LOCAL TIME ZONE returns the error
+		logger.Debug("the database time zone did not load", "error", zoneErr)
+	case zone != nil:
 		logger.Debug("database time zone", "zone", zone)
-	} else {
+	default:
 		logger.Debug("no database time zone in the negotiation, so UTC")
-		nego.conn.dbTimeZone = time.UTC
+		zone = time.UTC
 	}
+	nego.conn.dbTimeZone, nego.conn.dbTimeZoneErr = zone, zoneErr
 
 	nego.conn.session.TTCVersion = nego.conn.dataNego.CompileTimeCaps[7]
 	nego.conn.session.UseBigScn = nego.Server.ServerCompileTimeCaps[7] >= 8

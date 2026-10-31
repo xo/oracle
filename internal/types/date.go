@@ -10,9 +10,10 @@ import (
 
 type Date struct {
 	Basic
-	AsUTC            bool
-	DBTimeZone       *time.Location
-	DBServerTimeZone *time.Location
+	AsUTC bool
+	// DBTimeZone is the zone of the database, which the wall clock of a
+	// TIMESTAMP WITH LOCAL TIME ZONE is in. Nil is UTC.
+	DBTimeZone *time.Location
 }
 
 func (date *Date) MaxLen() int64 {
@@ -166,13 +167,8 @@ func (date *Date) decode() (output time.Time, err error) {
 		var zone *time.Location
 		var timeInZone bool
 		if date.bValue[11]&0x80 != 0 {
-			regionCode := (int(date.bValue[11]) & 0x7F) << 6
-			regionCode += (int(date.bValue[12]) & 0xFC) >> 2
+			zone, _ = regionZone(date.bValue[11], date.bValue[12])
 			timeInZone = date.bValue[12]&0x1 == 1
-			name, found := oracleZones[regionCode]
-			if found {
-				zone, _ = time.LoadLocation(name)
-			}
 		} else {
 			timeInZone = date.bValue[11]&0x40 == 0x40
 		}
@@ -186,20 +182,45 @@ func (date *Date) decode() (output time.Time, err error) {
 			output = output.In(zone)
 		}
 	}
+	// a DATE and a TIMESTAMP hold no zone, and stay in UTC
 	switch date.dataType {
-	case DATE, TIMESTAMP, TimestampDTY:
-		if date.DBServerTimeZone != nil && !isEqualLoc(date.DBServerTimeZone, time.UTC) {
-			output = time.Date(output.Year(), output.Month(), output.Day(),
-				output.Hour(), output.Minute(), output.Second(), output.Nanosecond(), date.DBServerTimeZone)
-		}
 	case TimestampLTZ, TimestampLTZDTY:
-		if date.DBTimeZone != nil && !isEqualLoc(date.DBTimeZone, time.UTC) {
+		if date.DBTimeZone != nil {
 			output = time.Date(output.Year(), output.Month(), output.Day(),
 				output.Hour(), output.Minute(), output.Second(), output.Nanosecond(), date.DBTimeZone)
 		}
-
 	}
 	return
+}
+
+// regionZone returns the zone of a region of Oracle, whose code is in the 2
+// bytes of a zone with the high bit of hi set.
+func regionZone(hi, lo byte) (*time.Location, error) {
+	code := int(hi&0x7F)<<6 | int(lo&0xFC)>>2
+	name, ok := oracleZones[code]
+	if !ok {
+		return nil, fmt.Errorf("the time zone region %d is not known", code)
+	}
+	return time.LoadLocation(name)
+}
+
+// DBTimeZone returns the zone of the database from the image of 11 bytes that
+// the data type negotiation sends. It holds a region in bytes 2 and 3, as a
+// TIMESTAMP WITH TIME ZONE does, or an offset in bytes 4 to 6. An offset of
+// zero is UTC, sijms/go-ora#655.
+func DBTimeZone(image []byte) (*time.Location, error) {
+	if len(image) < 7 {
+		return nil, errors.New("the image of the database time zone is short")
+	}
+	if image[2]&0x80 != 0 {
+		return regionZone(image[2], image[3])
+	}
+	hours, mins, secs := int(image[4])-60, int(image[5])-60, int(image[6])-60
+	offset := hours*60*60 + mins*60 + secs
+	if offset == 0 {
+		return time.UTC, nil
+	}
+	return time.FixedZone(fmt.Sprintf("%+03d:%02d", hours, mins), offset), nil
 }
 func (date *Date) Scan(value any) (err error) {
 	return date.SetValue(value)

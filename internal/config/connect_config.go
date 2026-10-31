@@ -55,9 +55,7 @@ type ConnectionConfig struct {
 	AdvNegoServiceInfo
 	// Logger receives the packets and events of the connection. Nil logs
 	// nothing (D14).
-	Logger *slog.Logger
-	// SkipNLS skips the query of the NLS settings at logon.
-	SkipNLS             bool
+	Logger              *slog.Logger
 	PrefetchRows        int
 	Lob                 LobFetch
 	LobReadMode         LobReadMode

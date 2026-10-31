@@ -14,8 +14,9 @@ type Conn interface {
 	NewLobStreamer() types.LobStreamer
 	ParameterCoder(input any) (OracleParameterCoder, error)
 	SendTimeAsUTC() bool
-	DBTimeZone() *time.Location
-	DBServerTimeZone() *time.Location
+	// DBTimeZone returns the zone of the database, or the error of a zone
+	// that the driver could not load.
+	DBTimeZone() (*time.Location, error)
 	MaxRawLength() int64
 	// ServerRelease returns the major release of the server, such as 11 or
 	// 23.

@@ -39,9 +39,13 @@ func (param *DateParameter) Encode(input any, conn Conn) error {
 }
 
 func (param *DateParameter) Decode(conn Conn) (any, error) {
-	decoder := types.Date{
-		DBTimeZone:       conn.DBTimeZone(),
-		DBServerTimeZone: conn.DBServerTimeZone(),
+	decoder := types.Date{}
+	if param.DataType == types.TimestampLTZ || param.DataType == types.TimestampLTZDTY {
+		zone, err := conn.DBTimeZone()
+		if err != nil {
+			return nil, err
+		}
+		decoder.DBTimeZone = zone
 	}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)

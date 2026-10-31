@@ -233,7 +233,6 @@ func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 		conn.LobReadMode = config.LobReadModeNone
 	}
 	conn.UnixAddress = cfg.UnixSocket
-	conn.SkipNLS = cfg.SkipNLS
 	conn.TokenFile, conn.TokenPrivateKeyFile = cfg.Token, cfg.TokenKey
 	conn.ProxyClientName = cfg.ProxyUser
 	if cfg.Language != "" {
