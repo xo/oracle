@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 )
 
 type Clob struct {
@@ -61,7 +61,7 @@ func (clob *Clob) SetValue(input any) error {
 				return err
 			}
 		} else {
-			clob.Conv = converters.NewStringConverter(0x7D0)
+			clob.Conv = charset.New(0x7D0)
 		}
 	}
 	switch input := input.(type) {

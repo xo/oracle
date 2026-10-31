@@ -3,13 +3,13 @@ package codec
 import (
 	"time"
 
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
 )
 
 type Conn interface {
-	converters.StringCoder
+	charset.StringCoder
 	Session() tns.SessionReadWriter
 	NewLobStreamer() types.LobStreamer
 	ParameterCoder(input any) (OracleParameterCoder, error)

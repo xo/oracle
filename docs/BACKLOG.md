@@ -114,35 +114,6 @@ started it. The oracle job in the workflow lists 19c and fails on a runner
 until `dbmeta` can start it there. Decide with Ken whether to publish the image
 or to leave 19c out of CI.
 
-### Shrink the charset tables
-
-An earlier analysis of the upstream `v3` code found that 88 percent of it, 11.3
-of 12.7 MB, was one generated file, `converters/string_conversion_new.go`, now
-`internal/converters/string_conversion_new.go`. It is
-a `switch` over 236 Oracle charset IDs that returns a converter with inline
-`[]int` and `map[int]int` literals. A minimal program that imports the driver
-built to 23.6 MB, or 20.2 MB stripped.
-
-That analysis chose a lossless compaction and not `golang.org/x/text`, because
-Oracle's variants of ZHS16GBK, JA16SJIS, EBCDIC and the shift-in and shift-out
-charsets can differ from the standard mappings. It serialised each table as
-varints, deflated one stream per charset into one `go:embed` blob of about 2.0
-MB, and decoded a charset on first use. It checked that all 236 were
-byte-identical to the old tables. The binary fell to 13.0 MB, or 9.5 MB
-stripped. That work was never committed and this repository does not carry it.
-Redo it here, and re-check losslessness after every format change. Time the
-first use of a charset, which was not measured. Ways to shrink the blob further
-are delta coding the values, deriving `eBuffer` as the inverse of `dBuffer`
-where they agree, and one solid compressed stream.
-
-`buildTypeNego` in `data_type_nego.go` is a 144 KB symbol. It is probably a
-large literal table that can be data.
-
-### Fix Clone dropping the leading table
-
-`StringConverter.Clone()` does not copy the `leading` table, so a clone of an
-EUC style charset, such as 0x35C and 0x35F, decodes wrongly. Add a test.
-
 ### Fix the root level leftovers
 
 Only `./internal/codec/oson/...` and a few other unit tests run with no server. Most

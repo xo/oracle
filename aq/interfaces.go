@@ -3,15 +3,15 @@ package aq
 import (
 	"time"
 
+	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
-	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
 )
 
 type (
 	Conn interface {
-		converters.StringCoder
+		charset.StringCoder
 		Session() tns.SessionReadWriter
 		NewLobStreamer() types.LobStreamer
 		ProcessTCCResponse(msgCode uint8) error

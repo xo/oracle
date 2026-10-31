@@ -7,7 +7,6 @@ import (
 
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/config"
-	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/internal/types"
 )
@@ -125,13 +124,14 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case oraTypes.ROWID:
 		par.MaxLen = 128
 	case oraTypes.DATE:
-		par.MaxLen = int64(converters.MaxLenDate)
+		// a DATE column takes the buffer of a TIMESTAMP, 11 bytes
+		par.MaxLen = oraTypes.MaxLenTimestamp
 	case oraTypes.IBFLOAT:
 		par.MaxLen = 4
 	case oraTypes.IBDOUBLE:
 		par.MaxLen = 8
 	case oraTypes.TimestampTZDTY:
-		par.MaxLen = int64(converters.MaxLenTimestamp)
+		par.MaxLen = oraTypes.MaxLenTimestampTZ
 	case oraTypes.IntervalYMDTY:
 		fallthrough
 	case oraTypes.IntervalDSDTY:

@@ -23,7 +23,7 @@ import (
 
 	"github.com/xo/oracle/internal/trace"
 
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 )
 
 var readBufferSize = 0x4000
@@ -56,7 +56,7 @@ type Session struct {
 	HasFSAPCapability bool
 	Summary           *SummaryObject
 	states            []SessionState
-	StrConv           *converters.StringConverter
+	StrConv           *charset.Converter
 	breakConn         bool
 	Connected         bool
 	SSL               struct {

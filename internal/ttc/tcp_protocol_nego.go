@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 )
 
 type TCPNego struct {
@@ -74,7 +74,7 @@ func (nego *TCPNego) readMessage() error {
 	tracer.Print("Server Charset: ", nego.ServerCharset)
 	// create string converter object
 	if nego.conn.sStrConv == nil {
-		nego.conn.sStrConv = converters.NewStringConverter(nego.ServerCharset)
+		nego.conn.sStrConv = charset.New(nego.ServerCharset)
 		if nego.conn.sStrConv == nil {
 			return fmt.Errorf("the server use charset with id: %d which is not supported by the driver", nego.ServerCharset)
 		}
@@ -103,7 +103,7 @@ func (nego *TCPNego) readMessage() error {
 	num3 := int(6 + (numArray[5]) + (numArray[6]))
 	nego.ServerNCharset = int(binary.BigEndian.Uint16(numArray[(num3 + 3):(num3 + 5)]))
 	if nego.conn.nStrConv == nil {
-		nego.conn.nStrConv = converters.NewStringConverter(nego.ServerNCharset)
+		nego.conn.nStrConv = charset.New(nego.ServerNCharset)
 		if nego.conn.nStrConv == nil {
 			return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", nego.ServerNCharset)
 		}

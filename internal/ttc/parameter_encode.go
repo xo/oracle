@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"reflect"
 
+	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
-	"github.com/xo/oracle/internal/converters"
 	oraTypes "github.com/xo/oracle/internal/types"
 )
 
@@ -108,7 +108,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		if err != nil {
 			return err
 		}
-		par.MaxLen = par.MaxCharLen * int64(converters.MaxBytePerChar(conv.LangID))
+		par.MaxLen = par.MaxCharLen * int64(charset.MaxBytesPerChar(conv.LangID))
 	}
 
 	//else {

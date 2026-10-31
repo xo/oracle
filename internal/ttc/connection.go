@@ -22,7 +22,7 @@ import (
 	"github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/auth"
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/tns"
 )
 
@@ -100,9 +100,9 @@ type Connection struct {
 	sessionID         int
 	serialID          int
 	transactionID     []byte
-	sStrConv          *converters.StringConverter
-	nStrConv          *converters.StringConverter
-	cStrConv          *converters.StringConverter
+	sStrConv          *charset.Converter
+	nStrConv          *charset.Converter
+	cStrConv          *charset.Converter
 	NLSData           NLSData
 	goTypeCoder       map[reflect.Type]codec.OracleParameterCoder
 	oracleTypeCoder   map[uint16]codec.OracleParameterCoder
@@ -256,11 +256,11 @@ func (conn *Connection) getDefaultCharsetID() int {
 
 	return conn.tcpNego.ServerCharset
 }
-func (conn *Connection) DefaultStringCoder() (*converters.StringConverter, error) {
+func (conn *Connection) DefaultStringCoder() (*charset.Converter, error) {
 	return conn.StringCoder(conn.getDefaultCharsetID(), 1)
 }
 
-func (conn *Connection) StringCoder(charsetID, charsetForm int) (*converters.StringConverter, error) {
+func (conn *Connection) StringCoder(charsetID, charsetForm int) (*charset.Converter, error) {
 	errStringCoder := fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
 	if charsetID == 0 {
 		if charsetForm == 1 {
@@ -290,17 +290,17 @@ func (conn *Connection) StringCoder(charsetID, charsetForm int) (*converters.Str
 	if conn.nStrConv != nil && charsetID == conn.nStrConv.LangID {
 		return conn.nStrConv, nil
 	}
-	temp := converters.NewStringConverter(charsetID)
+	temp := charset.New(charsetID)
 	if temp == nil {
 		return nil, errStringCoder
 	}
 	return temp, nil
 }
 
-func (conn *Connection) ServerStringCoder() *converters.StringConverter {
+func (conn *Connection) ServerStringCoder() *charset.Converter {
 	return conn.sStrConv
 }
-func (conn *Connection) ServerNStringCoder() *converters.StringConverter {
+func (conn *Connection) ServerNStringCoder() *charset.Converter {
 	return conn.nStrConv
 }
 func (conn *Connection) Logoff() error {
@@ -444,10 +444,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 				ServerRuntimeCaps:     cookie.ServerRuntimeCaps,
 			}
 			if conn.sStrConv == nil {
-				conn.sStrConv = converters.NewStringConverter(cookie.ServerCharset)
+				conn.sStrConv = charset.New(cookie.ServerCharset)
 			}
 			if conn.nStrConv == nil {
-				conn.nStrConv = converters.NewStringConverter(cookie.ServerNCharset)
+				conn.nStrConv = charset.New(cookie.ServerNCharset)
 			}
 			session.StrConv = conn.sStrConv
 			session.PutBytes(0x22, 1, 0, 0)
@@ -656,7 +656,7 @@ func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
 	return &Connection{
 		State:           Closed,
 		connOption:      temp,
-		cStrConv:        converters.NewStringConverter(cfg.CharsetID),
+		cStrConv:        charset.New(cfg.CharsetID),
 		autoCommit:      true,
 		oracleTypeCoder: nil,
 		cusTyp:          map[string]types.Object{},

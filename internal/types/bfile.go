@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 )
 
 type BFile struct {
@@ -17,7 +17,7 @@ type BFile struct {
 	lobBase
 	//dirName  string
 	//fileName string
-	Conv     *converters.StringConverter
+	Conv     *charset.Converter
 	isOpened bool
 }
 
@@ -46,7 +46,7 @@ func (file *BFile) SetValue(input any) error {
 	}
 	var fileName, dirName []byte
 	if file.Conv == nil {
-		file.Conv = converters.NewStringConverter(0x7D0)
+		file.Conv = charset.New(0x7D0)
 	}
 	switch input := input.(type) {
 	case BFile:

@@ -3,12 +3,12 @@ package types
 import (
 	"fmt"
 
-	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/charset"
 )
 
 type String struct {
 	Basic
-	Conv        *converters.StringConverter
+	Conv        *charset.Converter
 	UseNCharset bool
 }
 
@@ -17,7 +17,7 @@ func (str *String) Value() (any, error) {
 		return nil, nil
 	}
 	if str.Conv == nil {
-		str.Conv = converters.NewStringConverter(0x7D0)
+		str.Conv = charset.New(0x7D0)
 	}
 	return str.Conv.Decode(str.bValue), nil
 }
@@ -32,7 +32,7 @@ func (str *String) SetValue(input any) error {
 		return nil
 	}
 	if str.Conv == nil {
-		str.Conv = converters.NewStringConverter(0x7D0)
+		str.Conv = charset.New(0x7D0)
 	}
 	switch data := input.(type) {
 	case String:

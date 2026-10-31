@@ -99,7 +99,7 @@ func (param *ArrayParameter) Encode(input any, conn Conn) (err error) {
 			param.UpdateParameterInfo(coder.ParameterInfo())
 			if param.DataType == types.NCHAR {
 				param.MaxLen = conn.MaxStringLength()
-				param.MaxCharLen = param.MaxLen // / converters.MaxBytePerChar(par.CharsetID)
+				param.MaxCharLen = param.MaxLen // / charset.MaxBytesPerChar(par.CharsetID)
 			}
 			if param.DataType == types.RAW {
 				param.MaxLen = conn.MaxRawLength()

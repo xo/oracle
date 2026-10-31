@@ -16,7 +16,7 @@ type BasicParameter struct {
 	MaxCharLen  int64
 	ToID        []byte
 	ArraySize   int
-	//Coder        converters.StringCoder
+	//Coder        charset.StringCoder
 	IsUDTPar     bool
 	IsArrayPar   bool
 	BValue       []byte

@@ -402,10 +402,27 @@ key never reach the logger (D14).
 
 ## Charsets
 
-The 236 charset tables move to `internal/charset` in the compact form that
-`BACKLOG.md` describes: one blob of varints, deflated one charset at a time,
-read with `go:embed`, and decoded on first use. The work is in the backlog, and
-it is a separate change from this design.
+Step 8 built this on 2026-10-31. The tables of the 236 Oracle charsets were a
+generated Go file of 11 MB, a `switch` of literals. They are now
+`internal/charset/charsets.bin`, a blob of 2.0 MB that `go:embed` holds: the
+tables as varints, one deflate stream for each charset, behind an index. A
+charset is decoded the first time it is used, which takes about 1.4 ms for
+ZHS16GBK, one of the largest. A test dumped every table of the generated code,
+and every charset that the blob gives was equal to its dump, byte for byte,
+before the generated file went.
+
+A program that imports the driver and opens a database built to 22.6 MB, or
+19.3 MB stripped, before, and to 12.5 MB, or 9.2 MB stripped, after.
+
+`Converter.Clone` did not copy the `leading` table, so a clone of an EUC
+charset, such as 0x35C or 0x35F, decoded wrongly. It copies it now, and
+`TestCloneKeepsLeading` holds it.
+
+`internal/converters` is split. The charsets are `internal/charset`, with
+`charset.Converter`, `charset.New` and `charset.MaxBytesPerChar`. The NUMBER
+and float code of `converters` had no user outside its own tests, because
+`internal/types` holds its own, so it is gone with its tests and its
+generator.
 
 ## Go 1.27 idioms
 
@@ -487,7 +504,7 @@ each item names its fix.
 | `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration`, done. One file for each area, and not for each upstream issue, is still to do |
 | `internal/utils` | Delete. `Max` is the built in `max`. `CreateQuasiLocator`, `GetValue`, `GetType` and the `Ty` variables repeat code of `internal/types` and `internal/ttc`. `ExtractTag` moves to the code of user defined types |
 | `internal/lazyinit` | Delete. `sync.OnceValue` does the same |
-| `internal/converters` | `internal/charset`, the charsets, and the NUMBER and date encoders into `internal/types` (step 8) |
+| `internal/converters` | `internal/charset`, done in step 8. Its NUMBER code had no user, and is gone |
 | `internal/configurations` | `internal/config` |
 | `internal/types` | Stays, as the package of the Oracle values |
 | `internal/trace` | Goes with D14, when `Config.Logger` replaces it |
@@ -599,8 +616,8 @@ Then, with Ken's agreement on the names:
   names `negoService`, `Negotiator`, `terminalReader` and `ValueWriter`, and
   `ValueStreamReader` and `ValueStreamer` had no user and are gone.
 
-Left: `internal/converters` until step 8 splits it, and one file of
-integration tests for each area.
+Left: one file of integration tests for each area. Step 8 split
+`internal/converters`.
 
 ### JSON
 

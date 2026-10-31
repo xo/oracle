@@ -5,8 +5,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/config"
-	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/trace"
 	ora_types "github.com/xo/oracle/internal/types"
 )
@@ -66,7 +66,7 @@ func (lob *LobStream) DatabaseVersionNumber() int {
 	return int(lob.conn.dBVersion.Number)
 }
 
-func (lob *LobStream) StringCoder() converters.StringCoder {
+func (lob *LobStream) StringCoder() charset.StringCoder {
 	return lob.conn
 }
 

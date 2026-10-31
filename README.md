@@ -242,7 +242,7 @@ oracle/
 ├── internal/
 │   ├── auth/          # Encryption, checksums, Kerberos, NTS, NTLM
 │   ├── codec/         # Type encoding and decoding, and OSON
-│   ├── converters/    # Charsets, NUMBER, dates
+│   ├── charset/       # The Oracle charsets, compacted
 │   ├── configurations/ # The configuration of a connection, and wallets
 │   ├── tns/           # TNS packets and the session
 │   ├── types/         # The values of each Oracle type

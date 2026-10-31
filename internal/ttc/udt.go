@@ -83,21 +83,21 @@ package ttc
 // 		switch strings.ToUpper(attTypeName.String) {
 // 		case "NUMBER":
 // 			param.DataType = NUMBER
-// 			param.MaxLen = converters.MAX_LEN_NUMBER
+// 			param.MaxLen = charset.MAX_LEN_NUMBER
 // 		case "VARCHAR2":
 // 			param.DataType = NCHAR
 // 			param.CharsetForm = 1
 // 			param.ContFlag = 16
 // 			param.MaxCharLen = int(length.Int64)
 // 			param.CharsetID = conn.tcpNego.ServerCharset
-// 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
+// 			param.MaxLen = int(length.Int64) * charset.MaxBytesPerChar(param.CharsetID)
 // 		case "NVARCHAR2":
 // 			param.DataType = NCHAR
 // 			param.CharsetForm = 2
 // 			param.ContFlag = 16
 // 			param.MaxCharLen = int(length.Int64)
 // 			param.CharsetID = conn.tcpNego.ServernCharset
-// 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
+// 			param.MaxLen = int(length.Int64) * charset.MaxBytesPerChar(param.CharsetID)
 // 		case "TIMESTAMP":
 // 			fallthrough
 // 		case "DATE":
@@ -115,14 +115,14 @@ package ttc
 // 			param.ContFlag = 16
 // 			param.CharsetID = conn.tcpNego.ServerCharset
 // 			param.MaxCharLen = int(length.Int64)
-// 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
+// 			param.MaxLen = int(length.Int64) * charset.MaxBytesPerChar(param.CharsetID)
 // 		case "NCLOB":
 // 			param.DataType = OCIClobLocator
 // 			param.CharsetForm = 2
 // 			param.ContFlag = 16
 // 			param.CharsetID = conn.tcpNego.ServernCharset
 // 			param.MaxCharLen = int(length.Int64)
-// 			param.MaxLen = int(length.Int64) * converters.MaxBytePerChar(param.CharsetID)
+// 			param.MaxLen = int(length.Int64) * charset.MaxBytesPerChar(param.CharsetID)
 // 		default:
 // 			// search for type in registered types
 // 			found := false

@@ -53,9 +53,12 @@ breaks an import cycle. `DESIGN.md`, under Where the cleanup stands, lists
 what is left. The tests pass, and `integration` on 26ai gives the same 42
 passes and 3 failures.
 
-Step 11 is done (`ba43353`). Step 7 is done and staged: JSON binds and scans
-through `encoding/json/v2`, and OSON converts JSON text to and from its bytes.
-`TestJSON` passes on 21c and 26ai, inline and streamed, and the integration
-tests on 26ai give the same 42 passes and 3 failures.
+Step 11 is done (`ba43353`), and step 7, JSON on `encoding/json/v2`, is done
+(`83f010d`).
 
-The next step is step 8: compact the charsets, and split `internal/converters`.
+Step 8 is done and staged. The charsets are a compressed blob of 2.0 MB in
+`internal/charset`, equal to the old tables byte for byte, and a program that
+imports the driver is 12.5 MB, 9.2 MB stripped, where it was 22.6 MB and 19.3
+MB. The integration tests on 26ai give the same 42 passes and 3 failures.
+
+The next step is step 9: fix the upstream faults in `UPSTREAM.md`.

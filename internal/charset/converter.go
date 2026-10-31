@@ -1,4 +1,4 @@
-package converters
+package charset
 
 import (
 	"encoding/binary"
@@ -6,7 +6,7 @@ import (
 	"unsafe"
 )
 
-type StringConverter struct {
+type Converter struct {
 	LangID    int
 	CharWidth int
 	eReplace  int
@@ -17,7 +17,7 @@ type StringConverter struct {
 	leading   map[int]int
 }
 
-func MaxBytePerChar(charsetID int) int {
+func MaxBytesPerChar(charsetID int) int {
 	switch charsetID {
 	case 0x33D, 0x348, 0x34D, 0x34E, 0x352, 0x353, 0x35D, 0x361, 0x362, 0x363, 0x364, 0x3E0:
 		return 3 // TLBConv12Byte
@@ -48,8 +48,8 @@ func MaxBytePerChar(charsetID int) int {
 	}
 }
 
-func (conv *StringConverter) Clone() *StringConverter {
-	return &StringConverter{
+func (conv *Converter) Clone() *Converter {
+	return &Converter{
 		LangID:    conv.LangID,
 		CharWidth: conv.CharWidth,
 		eReplace:  conv.eReplace,
@@ -57,10 +57,11 @@ func (conv *StringConverter) Clone() *StringConverter {
 		dBuffer:   conv.dBuffer,
 		dBuffer2:  conv.dBuffer2,
 		eBuffer:   conv.eBuffer,
+		leading:   conv.leading,
 	}
 }
 
-func (conv *StringConverter) Encode(input string) []byte {
+func (conv *Converter) Encode(input string) []byte {
 	if len(input) == 0 {
 		return nil
 	}
@@ -113,7 +114,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 	}
 }
 
-func (conv *StringConverter) toUnicodeChar(ch, leading int) int {
+func (conv *Converter) toUnicodeChar(ch, leading int) int {
 	index1, index2 := (ch>>8)&0xFF+leading, ch&0xFF
 	char1 := conv.dBuffer[index1]
 	if char1 == 0xFFFF {
@@ -126,7 +127,7 @@ func (conv *StringConverter) toUnicodeChar(ch, leading int) int {
 	return output
 }
 
-func (conv *StringConverter) Decode(input []byte) string {
+func (conv *Converter) Decode(input []byte) string {
 	if len(input) == 0 {
 		return ""
 	}

@@ -150,7 +150,7 @@ func (message *Message) read(conn Conn) error {
 		if tempTime != nil {
 			message.EnqTime = tempTime.(time.Time)
 		}
-		//message.EnqTime, err = converters.DecodeDate(temp)
+		//message.EnqTime, err = charset.DecodeDate(temp)
 		//if err != nil {
 		//	return err
 		//}
