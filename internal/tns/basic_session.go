@@ -69,7 +69,6 @@ func (session *basicSession) GetInt64(size int, compress bool, bigEndian bool) (
 		ret = int64(binary.BigEndian.Uint64(temp))
 	} else {
 		copy(temp[:size], rb)
-		// temp = append(pck.buffer[pck.index: pck.index + size], temp...)
 		ret = int64(binary.LittleEndian.Uint64(temp))
 	}
 	if negFlag {
@@ -105,9 +104,6 @@ func (session *basicSession) GetClr() (output []byte, err error) {
 	var tempBuffer bytes.Buffer
 	if chunkSize == 0xFE {
 		for chunkSize > 0 {
-			//if session.IsBreak() {
-			//	break
-			//}
 			if session.UseBigClrChunks {
 				chunkSize, err = session.GetInt(4, true, true)
 			} else {
@@ -132,41 +128,6 @@ func (session *basicSession) GetClr() (output []byte, err error) {
 	}
 	output = tempBuffer.Bytes()
 	return
-	// var size uint8
-	// var rb []byte
-	// size, err = session.GetByte()
-	// if err != nil {
-	// 	return
-	// }
-	// if size == 0 || size == 0xFF {
-	// 	output = nil
-	// 	err = nil
-	// 	return
-	// }
-	// if size != 0xFE {
-	// 	output, err = session.read(int(size))
-	// 	return
-	// }
-	//
-	// for {
-	// 	var size1 int
-	// 	if session.UseBigClrChunks {
-	// 		size1, err = session.GetInt(4, true, true)
-	// 	} else {
-	// 		size, err = session.GetByte()
-	// 		size1 = int(size)
-	// 	}
-	// 	if err != nil || size1 == 0 {
-	// 		break
-	// 	}
-	// 	rb, err = session.read(size1)
-	// 	if err != nil {
-	// 		return
-	// 	}
-	// 	tempBuffer.Write(rb)
-	// }
-	// output = tempBuffer.Bytes()
-	// return
 }
 
 // GetDlc read variable length bytearray from input buffer
@@ -275,12 +236,7 @@ func (session *basicSession) PutInt(number any, size uint8, bigEndian bool, comp
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
-			//if num < 0 {
-			//	num = num * -1
-			//	size = size & 0x80
-			//}
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp[:size])
 		}
@@ -343,7 +299,6 @@ func (session *basicSession) PutUint(number any, size uint8, bigEndian, compress
 	// if the size is one byte no compression occur only one byte written
 	if size == 1 {
 		session.outBuffer.WriteByte(uint8(num))
-		// session.OutBuffer = append(session.OutBuffer, uint8(num))
 		return
 	}
 	if compress {
@@ -355,12 +310,9 @@ func (session *basicSession) PutUint(number any, size uint8, bigEndian, compress
 		}
 		if size == 0 {
 			session.outBuffer.WriteByte(0)
-			// session.OutBuffer = append(session.OutBuffer, 0)
 		} else {
 			session.outBuffer.WriteByte(size)
 			session.outBuffer.Write(temp)
-			// session.OutBuffer = append(session.OutBuffer, size)
-			// session.OutBuffer = append(session.OutBuffer, temp...)
 		}
 	} else {
 		temp := make([]byte, size)
@@ -384,7 +336,6 @@ func (session *basicSession) PutUint(number any, size uint8, bigEndian, compress
 			}
 		}
 		session.outBuffer.Write(temp)
-		// session.OutBuffer = append(session.OutBuffer, temp...)
 	}
 }
 
@@ -452,20 +403,6 @@ func (session *basicSession) PutString(data string) {
 
 // PutKeyVal write key, val (in form of bytearray) and flag number to output buffer
 func (session *basicSession) PutKeyVal(key []byte, val []byte, num uint8) {
-	//if len(key) == 0 {
-	//	//session.PutBytes(0)
-	//	session.outBuffer.WriteByte(0)
-	//} else {
-	//	session.PutUint(len(key), 4, true, true)
-	//	session.PutClr(key)
-	//}
-	//if len(val) == 0 {
-	//	//session.PutBytes(0)
-	//	session.outBuffer.WriteByte(0)
-	//} else {
-	//	session.PutUint(len(val), 4, true, true)
-	//	session.PutClr(val)
-	//}
 	session.PutDlc(key)
 	session.PutDlc(val)
 	session.PutInt(num, 4, true, true)

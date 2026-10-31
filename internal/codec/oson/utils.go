@@ -79,56 +79,10 @@ op = 62 and length = 11
 2- parse input
 */
 
-//	func ReadJsonString(input []byte) error {
-//		var output = make(map[string]interface{})
-//		err := json.Unmarshal(input, &output)
-//		fmt.Println(output)
-//		return err
-//		//inObject := false
-//		//inArray := false
-//		//inExp := false
-//		//keys := make([][]byte, 0, 20)
-//		//values := make([][]byte, 0, 20)
-//		//exp := make([]byte, 0, 50)
-//		//for i := 0; i < len(input); i++ {
-//		//	c := input[i]
-//		//	switch c {
-//		//	case '{':
-//		//		inObject = true
-//		//	case '}':
-//		//		inObject = false
-//		//
-//		//	case '[':
-//		//		inArray = true
-//		//	case ']':
-//		//		inArray = false
-//		//	case '"':
-//		//		inExp = !inExp
-//		//	case ':':
-//		//		keys = append(keys, exp)
-//		//		exp = nil
-//		//	case ',':
-//		//		values = append(values, exp)
-//		//		exp = nil
-//		//	case '%':
-//		//	case '\\':
-//		//	default:
-//		//		if inExp {
-//		//			exp = append(exp, c)
-//		//		}
-//		//	}
-//		//}
-//	}
-//
-// var tyDictionary = reflect.TypeOf((*map[string]interface{})(nil)).Elem()
 var jsonEncoder map[reflect.Type]FieldCreator
 
 //var jsonDecoder map[int]FieldDecoder
 
-//	func RegisterCoder(tyValue reflect.Type, value FieldCreator) error {
-//		jsonEncoder[tyValue] = value
-//		return nil
-//	}
 func Encode(mainObj any) ([]byte, error) {
 	header := &header{
 		flags: 0x2106,
@@ -173,9 +127,6 @@ func Encode(mainObj any) ([]byte, error) {
 		return nil, err
 	}
 	header.nodeDataLen = len(objectData)
-	//if _sort {
-	//	keys.Sort()
-	//}
 
 	buffer := bytes.NewBuffer(nil)
 	err = header.write(buffer)
@@ -645,24 +596,3 @@ func Decode(data []byte) (any, error) {
 	//	throw new NotSupportedException();
 	//}
 }
-
-//func EncodeJsonString(input string, _sort bool) ([]byte, error) {
-//	input = strings.TrimSpace(input)
-//	var err error
-//	if strings.HasPrefix(input, "[") {
-//		var output []interface{}
-//		err = json.Unmarshal([]byte(input), &output)
-//		if err != nil {
-//			return nil, err
-//		}
-//		return Encode(output, _sort)
-//	} else {
-//		var output = make(map[string]interface{})
-//		err = json.Unmarshal([]byte(input), &output)
-//		if err != nil {
-//			return nil, err
-//		}
-//		return Encode(output, _sort)
-//	}
-//
-//}

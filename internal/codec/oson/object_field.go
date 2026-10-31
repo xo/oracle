@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/xo/oracle/internal/types"
-	"github.com/xo/oracle/internal/utils"
 )
 
 type objectField struct {
@@ -30,7 +30,6 @@ func NewobjectField(objData map[string]any, header *header) (*objectField, error
 			field = &nullField{}
 		} else {
 			rValue := reflect.ValueOf(value)
-			//rType := reflect.TypeOf(value)
 			switch rValue.Kind() {
 			case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 				fallthrough
@@ -62,7 +61,7 @@ func NewobjectField(objData map[string]any, header *header) (*objectField, error
 				}
 			default:
 				switch rValue.Type() {
-				case utils.TyTime:
+				case reflect.TypeFor[time.Time]():
 					data := types.Date{}
 					data.SetDataType(types.TIMESTAMPTZ)
 					err = data.SetValue(value)

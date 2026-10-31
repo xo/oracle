@@ -71,36 +71,6 @@ func (param *ClobParameter) Encode(input any, conn IConnection) (err error) {
 	}
 	param.BValue = encoder.GetLocator()
 	return
-	//param.CharsetForm = 1
-	//switch temp := input.(type) {
-	//case types.Clob:
-	//	if temp.UseNCharset {
-	//		param.CharsetForm = 2
-	//	}
-	//case *types.Clob:
-	//	if temp.UseNCharset {
-	//		param.CharsetForm = 2
-	//	}
-	//default:
-	//	err = fmt.Errorf("clob parameter must be of type *Clob")
-	//}
-	////encoder := &types.Clob{}
-	//encoder.Conv, err = strConv.GetStringCoder(param.CharsetID, param.CharsetForm)
-	//if err != nil {
-	//	return err
-	//}
-	//if param.CharsetID == 0 {
-	//	param.CharsetID = encoder.Conv.GetLangID()
-	//}
-	//err = encoder.SetValue(input, param.DataType)
-	//if err != nil {
-	//	return err
-	//}
-	//if err != nil {
-	//	return err
-	//}
-	//param.BValue = encoder.GetLocator()
-	//param.streamer = encoder.GetStreamer()
 }
 
 func (param *ClobParameter) Decode(conn IConnection) (any, error) {

@@ -2,16 +2,12 @@ package types
 
 import (
 	"context"
-	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	//"github.com/xo/oracle/oson"
 )
 
-// type Json interface {
-// }
 type JsonCoder interface {
 	JsonEncoder
 	JsonDecoder
@@ -87,7 +83,6 @@ func (js *Json) SetValue(input any) error {
 			js.bValue, err = js.Coder.EncodeJson(input)
 		}
 
-		//return fmt.Errorf("cannot set value of type %T into Json", input)
 	}
 	if err == nil {
 		dataLen := uint64(len(js.bValue))
@@ -106,43 +101,6 @@ func (js *Json) Value() (any, error) {
 
 func (js *Json) Scan(input any) error {
 	return js.SetValue(input)
-}
-
-func (js *Json) CopyTo(dest driver.Value) error {
-	value, err := js.Value()
-	if err != nil {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *Json:
-		*dst = *js
-	case *string:
-		if value == nil {
-			*dst = ""
-		} else {
-			temp, err := json.Marshal(value)
-			if err != nil {
-				return err
-			}
-			*dst = string(temp)
-		}
-	case *map[string]any:
-		if value == nil {
-			*dst = nil
-		} else {
-			*dst = value.(map[string]any)
-		}
-
-	case *[]any:
-		if value == nil {
-			*dst = nil
-		} else {
-			*dst = value.([]any)
-		}
-	default:
-		return fmt.Errorf("cannot copy Json to variable of type %T", dest)
-	}
-	return nil
 }
 
 // Load reads the whole value and watches no context. See Lob.

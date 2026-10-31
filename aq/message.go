@@ -308,33 +308,12 @@ func (message *Message) readData(conn IConnection, messageType MessageType, udtN
 	switch messageType {
 	case RAW:
 		decoder, err = conn.GetParameterCoder(types.RAW)
-		//if err != nil {
-		//	return err
-		//}
-		//var ms *network.MemorySession
 
-		//if len(message.bValue) > 4 {
-		//	decoder.SetBytes(message.bValue[4:])
-		//	//ms = network.NewMemorySession(message.bValue[4:], nil, session.GetProperties())
-		//} else {
-		//	decoder.SetBytes(message.bValue)
-		//	//ms = network.NewMemorySession(message.bValue, nil, session.GetProperties())
-		//}
-		//err = decoder.Read(ms)
-		//if err != nil {
-		//	return err
-		//}
 	case JSON:
 		decoder, err = conn.GetParameterCoder(types.JSON)
-		//if len(message.bValue) > 4 {
-		//	decoder.SetBytes(message.bValue[4:])
-		//} else {
-		//	decoder.SetBytes(message.bValue)
-		//}
 	default:
 		decoder, err = conn.GetParameterCoder(udtName)
 
-		//decoder.SetBytes(message.bValue)
 	}
 	if err != nil {
 		return err
@@ -358,8 +337,3 @@ func (message *Message) readData(conn IConnection, messageType MessageType, udtN
 	}
 	return nil
 }
-
-//func NewMessage(data interface{}, messageType MessageType) (*Message, error) {
-//	// suppose now payload is []byte
-//
-//}

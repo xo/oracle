@@ -25,29 +25,28 @@ type DataTypeNego struct {
 }
 
 const (
-	bufferGrow             int    = 2369
-	TNS_TYPE_REP_NATIVE    uint16 = 0
-	TNS_TYPE_REP_UNIVERSAL uint16 = 1
-	TNS_TYPE_REP_ORACLE    uint16 = 10
-	TNS_DATA_TYPE_VBI      uint16 = 15
-	TNS_DATA_TYPE_UB2      uint16 = 25
-	TNS_DATA_TYPE_UB4      uint16 = 26
-	TNS_DATA_TYPE_SB1      uint16 = 27
-	TNS_DATA_TYPE_SB2      uint16 = 28
-	TNS_DATA_TYPE_SB4      uint16 = 29
-	TNS_DATA_TYPE_SWORD    uint16 = 30
-	TNS_DATA_TYPE_UWORD    uint16 = 31
-	TNS_DATA_TYPE_PTRB     uint16 = 32
-	TNS_DATA_TYPE_PTRW     uint16 = 33
-	TNS_DATA_TYPE_TIDDEF   uint16 = 10
-	TNS_DATA_TYPE_CURSOR   uint16 = 102
-	TNS_DATA_TYPE_RDD      uint16 = 104
-	TNS_DATA_TYPE_CLOB     uint16 = 112
-	TNS_DATA_TYPE_BLOB     uint16 = 113
-	TNS_DATA_TYPE_BFILE    uint16 = 114
-	TNS_DATA_TYPE_CFILE    uint16 = 115
-	TNS_DATA_TYPE_RSET     uint16 = 116
-	//TNS_DATA_TYPE_VECTOR    int16 = 127
+	bufferGrow              int    = 2369
+	TNS_TYPE_REP_NATIVE     uint16 = 0
+	TNS_TYPE_REP_UNIVERSAL  uint16 = 1
+	TNS_TYPE_REP_ORACLE     uint16 = 10
+	TNS_DATA_TYPE_VBI       uint16 = 15
+	TNS_DATA_TYPE_UB2       uint16 = 25
+	TNS_DATA_TYPE_UB4       uint16 = 26
+	TNS_DATA_TYPE_SB1       uint16 = 27
+	TNS_DATA_TYPE_SB2       uint16 = 28
+	TNS_DATA_TYPE_SB4       uint16 = 29
+	TNS_DATA_TYPE_SWORD     uint16 = 30
+	TNS_DATA_TYPE_UWORD     uint16 = 31
+	TNS_DATA_TYPE_PTRB      uint16 = 32
+	TNS_DATA_TYPE_PTRW      uint16 = 33
+	TNS_DATA_TYPE_TIDDEF    uint16 = 10
+	TNS_DATA_TYPE_CURSOR    uint16 = 102
+	TNS_DATA_TYPE_RDD       uint16 = 104
+	TNS_DATA_TYPE_CLOB      uint16 = 112
+	TNS_DATA_TYPE_BLOB      uint16 = 113
+	TNS_DATA_TYPE_BFILE     uint16 = 114
+	TNS_DATA_TYPE_CFILE     uint16 = 115
+	TNS_DATA_TYPE_RSET      uint16 = 116
 	TNS_DATA_TYPE_DCLOB     uint16 = 195
 	TNS_DATA_TYPE_DBLOB     uint16 = 196
 	TNS_DATA_TYPE_DBFILE    uint16 = 197
@@ -66,25 +65,6 @@ func (nego *DataTypeNego) addTypeRep(dty uint16, ndty uint16, rep uint16) {
 		nego.TypeAndRep = append(nego.TypeAndRep, 0)
 	}
 }
-
-//func (n *DataTypeNego) addTypeRep(dty uint16, ndty uint16, rep uint16) {
-//	if n.TypeAndRep == nil {
-//		n.TypeAndRep = make([]uint16, bufferGrow)
-//	}
-//	if len(n.TypeAndRep) < int(n.TypeAndRep[0]+4) {
-//		n.TypeAndRep = append(n.TypeAndRep, make([]uint16, bufferGrow)...)
-//	}
-//	index := n.TypeAndRep[0]
-//	n.TypeAndRep[index] = dty
-//	n.TypeAndRep[index+1] = ndty
-//	if ndty == 0 {
-//		n.TypeAndRep[0] = index + 2
-//	} else {
-//		n.TypeAndRep[index+2] = rep
-//		n.TypeAndRep[index+3] = 0
-//		n.TypeAndRep[0] = index + 4
-//	}
-//}
 
 func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result := DataTypeNego{
@@ -154,7 +134,6 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 		}
 
 	}
-	//result.TypeAndRep[0] = 1
 	result.addTypeRep(types.NCHAR, types.NCHAR, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(types.NUMBER, types.NUMBER, TNS_TYPE_REP_ORACLE)
 	result.addTypeRep(types.LONG, types.LONG, TNS_TYPE_REP_UNIVERSAL)
@@ -502,7 +481,6 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result.addTypeRep(636, 636, TNS_TYPE_REP_UNIVERSAL)
 	result.DataTypeRepFor1200 = uint16(len(result.TypeAndRep))
 	result.addTypeRep(663, 663, TNS_TYPE_REP_UNIVERSAL)
-	//result.addTypeRep(639, 639, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(640, 640, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(899, 899, TNS_TYPE_REP_UNIVERSAL)
 	result.addTypeRep(900, 900, TNS_TYPE_REP_UNIVERSAL)
@@ -520,7 +498,6 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	} else {
 		result.RuntimeTypeAndRep = result.TypeAndRep
 	}
-	//result.RuntimeTypeAndRep = result.TypeAndRep[:result.DataTypeRepFor1200]
 	return &result
 }
 
@@ -584,7 +561,6 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 		nego.conn.dbTimeZone = time.UTC
 	}
 
-	//nego.conn.session.TTCVersion = nego.Server.ServerCompileTimeCaps[7]
 	nego.conn.session.TTCVersion = nego.conn.dataNego.CompileTimeCaps[7]
 	nego.conn.session.UseBigScn = nego.Server.ServerCompileTimeCaps[7] >= 8
 	if nego.conn.tcpNego.ServerCompileTimeCaps[7] < nego.conn.session.TTCVersion {
@@ -600,9 +576,6 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 		nego.conn.maxLen.nvarchar = 0xFA0
 		nego.conn.maxLen.raw = 0xFA0
 	}
-	// fmt.Println("server timezone version: ", nego.serverTZVersion)
-	// fmt.Println("client timezone version: ", nego.clientTZVersion)
-	// fmt.Println("server timezone: ", nego.dbTimeZone)
 	return
 }
 
@@ -625,7 +598,6 @@ func (nego *DataTypeNego) writeMessage() {
 		session.PutBytes(TZBytes()...)
 		if nego.CompileTimeCaps[37]&2 == 2 {
 			session.PutInt(nego.clientTZVersion, 4, true, false)
-			// session.PutBytes(0, 0, 0, uint8(nego.clientTZVersion))
 		}
 	}
 	session.PutInt(nego.Server.ServerNCharset, 2, false, false)
@@ -660,5 +632,4 @@ func TZBytes() []byte {
 		return interval.Bytes()
 	}
 	return nil
-	//return []byte{128, 0, 0, 0, uint8(hours + 60), uint8(minutes + 60), uint8(seconds + 60), 128, 0, 0, 0}
 }

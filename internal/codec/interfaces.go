@@ -12,9 +12,6 @@ type IConnection interface {
 	converters.StringCoder
 	GetSession() tns.SessionReadWriter
 	NewLobStreamer() types.LobStreamer
-	//GetGoParameterCoder(goType reflect.Type) OracleParameterCoder
-	//GetOracleParameterCoder(oracleType uint16) OracleParameterCoder
-	//GetNameParameterCoder(nameType string) OracleParameterCoder
 	GetParameterCoder(input any) (OracleParameterCoder, error)
 	SendTimeAsUTC() bool
 	GetDBTimeZone() *time.Location
@@ -33,8 +30,6 @@ type (
 		SetAsArrayPar()
 		SetAQMessage()
 		SetParentSession(input tns.SessionReadWriter)
-		//SetChild(bool)
-		//IsChild() bool
 	}
 	OracleParameterEncoder interface {
 		Encode(input any, conn IConnection) error

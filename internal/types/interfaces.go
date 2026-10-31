@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 
 	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/converters"
@@ -33,15 +32,8 @@ type LobStreamer interface {
 type OracleType interface {
 	SetValue(input any) error
 	Value() (any, error)
-	CopyTo(dest driver.Value) error
 	SetDataType(dt uint16)
 	GetDataType() uint16
 	GetMaxLen() int64
 	sql.Scanner
 }
-
-//type LobTyper interface {
-//	SetLobStream(stream LobStreamer)
-//}
-//
-//type StringTyper interface{}

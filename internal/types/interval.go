@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -164,36 +163,4 @@ func (interval *Interval) SetValue(input any) error {
 
 func (interval *Interval) Scan(value any) error {
 	return interval.SetValue(value)
-}
-
-// CopyTo stores the value in dest, which is an *IntervalYM, a
-// *time.Duration, a *string or an *any.
-func (interval *Interval) CopyTo(dest driver.Value) error {
-	value, err := interval.Value()
-	if err != nil {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *any:
-		*dst = value
-	case *IntervalYM:
-		v, ok := value.(IntervalYM)
-		if !ok && value != nil {
-			return fmt.Errorf("cannot copy %T to *IntervalYM", value)
-		}
-		*dst = v
-	case *time.Duration:
-		v, ok := value.(time.Duration)
-		if !ok && value != nil {
-			return fmt.Errorf("cannot copy %T to *time.Duration", value)
-		}
-		*dst = v
-	case *string:
-		if value != nil {
-			*dst = fmt.Sprint(value)
-		}
-	default:
-		return fmt.Errorf("cannot copy Interval to variable of type %T", dest)
-	}
-	return nil
 }

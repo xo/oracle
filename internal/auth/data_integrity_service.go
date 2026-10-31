@@ -34,7 +34,6 @@ func newDataIntegrityService(ano *AdvNego, negoInfo *configurations.AdvNegoServi
 		tracer:                tracer,
 	}
 	err := output.buildServiceList([]string{}, true, true)
-	// output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +121,6 @@ func (serv *dataIntegrityService) writeServiceData() error {
 	for i := 0; i < len(serv.selectedIndices); i++ {
 		index := serv.selectedIndices[i]
 		selectedIndices[i] = uint8(serv.availableServiceIDs[index])
-		// comm.session.PutBytes(uint8(serv.availableServiceIDs[index]))
 	}
 	comm.writeBytes(selectedIndices)
 	return nil
@@ -145,7 +143,6 @@ func (serv *dataIntegrityService) activateAlgorithm() error {
 		iv = serv.ano.iv
 	}
 
-	// return errors.New(fmt.Sprintf("advanced negotiation error: data integrity service algorithm: %d still not supported", serv.algoID))
 	var algo security.OracleNetworkDataIntegrity = nil
 	var err error
 	switch serv.algoID {

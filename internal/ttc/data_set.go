@@ -2,10 +2,11 @@ package ttc
 
 import (
 	"database/sql/driver"
-	"github.com/xo/oracle/internal/tns"
-	"github.com/xo/oracle/internal/trace"
 	"io"
 	"reflect"
+
+	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/trace"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -16,9 +17,6 @@ var (
 	_ = driver.RowsColumnTypeNullable((*DataSet)(nil))
 	_ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
 )
-
-// var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
-// var _ = driver.RowsNextResultSet((*DataSet)(nil))
 
 type DataSet struct {
 	resultSets []ResultSet
@@ -88,14 +86,6 @@ func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
 func (dataSet *DataSet) Err() error {
 	return dataSet.currentResultSet().Err()
 }
-
-//func (dataSet *DataSet) setParent(parent StmtInterface) {
-//	dataSet.currentResultSet().parent = parent
-//}
-//
-//func (dataSet *DataSet) setColumn(cols  *[]ParameterInfo) {
-//	dataSet.currentResultSet().cols = cols
-//}
 
 // Next implement method need for sql.Rows interface
 func (dataSet *DataSet) Next(dest []driver.Value) error {

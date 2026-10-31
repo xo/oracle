@@ -58,13 +58,11 @@ func (basic *BasicParameter) BasicRead(session tns.SessionReader) ([]byte, error
 }
 
 func (basic *BasicParameter) SetDefault() {
-	//basic.DataType = 0
 	if basic.Flag == 0 {
 		basic.Flag = 3
 	}
 	basic.ContFlag = 0
 	basic.CharsetID = 0
-	//basic.CharsetForm = 0
 	if basic.MaxLen == 0 {
 		basic.MaxLen = 1
 	}
@@ -119,7 +117,6 @@ func (basic *BasicParameter) SetParameterInfo(data BasicParameter) {
 	*basic = data
 }
 
-// func (basic *BasicParameter) UpdateParameterInfo() {}
 func (basic *BasicParameter) SetLobStreamer(lobStreamer types.LobStreamer) {
 
 }
@@ -142,7 +139,3 @@ func (basic *BasicParameter) SetParentSession(input tns.SessionReadWriter) {
 func (basic *BasicParameter) SetBytes(data []byte) {
 	basic.BValue = data
 }
-
-//func (basic *BasicParameter) IsChild() bool {
-//	return basic.isChild
-//}

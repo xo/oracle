@@ -15,9 +15,6 @@ type (
 		GetSession() tns.SessionReadWriter
 		NewLobStreamer() types.LobStreamer
 		ProcessTCCResponse(msgCode uint8) error
-		//GetGoParameterCoder(goType reflect.Type) OracleParameterCoder
-		//GetOracleParameterCoder(oracleType uint16) OracleParameterCoder
-		//GetNameParameterCoder(nameType string) OracleParameterCoder
 		GetParameterCoder(input any) (codec.OracleParameterCoder, error)
 		SendTimeAsUTC() bool
 		GetDBTimeZone() *time.Location

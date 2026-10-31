@@ -6,25 +6,6 @@ import (
 	"github.com/xo/oracle/internal/types"
 )
 
-//type jsonCoder struct {
-//	streamer types.LobStreamer
-//}
-//func (c *jsonCoder) EncodeJson(input interface{}) ([]byte, error) {
-//	return oson.Encode(input)
-//}
-//
-//func (c *jsonCoder) DecodeJson(data []byte) (*types.Json, error) {
-//	var value interface{}
-//	var err error
-//	if data != nil {
-//		value, err = oson.Decode(data)
-//		if err != nil {
-//			return nil, err
-//		}
-//	}
-//	return types.NewJson(value, c.streamer, c)
-//}
-
 type JsonParameter struct {
 	locator types.Locator
 	lobParameter

@@ -46,5 +46,9 @@ hold 'abc', which also made the logon NLS query fail on 11g. That is fixed,
 which was sijms/go-ora#703. The tests pass on 11g and 26ai, and `TestIssues`
 on 26ai gives the same 42 passes and 3 failures.
 
-The next step is the cleanup of names, folders, interfaces and `reflect` that
-Ken asked for. Step 7 then moves JSON and OSON to `encoding/json/v2`.
+The `sql.Null` work is done (`ff69666`). The cleanup of step 11 is under way
+and staged: the code that was commented out, `internal/utils`,
+`internal/lazyinit`, the copy machinery and the `Ty` variables are gone.
+`DESIGN.md`, under Where the cleanup stands, lists it. The tests pass, and
+`TestIssues` on 26ai gives the same 42 passes and 3 failures. The renames, the
+interfaces and the move of `TestIssues` are next.

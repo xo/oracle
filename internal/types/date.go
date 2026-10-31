@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -29,13 +28,6 @@ func NewTimeStampTZ(t time.Time) *Date {
 	return ret
 }
 
-//	func NewTimeStampLTZ(t time.Time) *Date {
-//		ret := new(Date)
-//		ret.dataType = TimeStampLTZ_DTY
-//		_ = ret.SetValue(t)
-//		return ret
-//
-// }
 func (date *Date) GetMaxLen() int64 {
 	switch date.dataType {
 	case DATE:
@@ -63,10 +55,6 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 	case TIMESTAMP:
 		bytes = make([]byte, MaxLenTimeStamp)
 		putTimestamp(bytes, &input)
-	//case TimeStampLTZ, TimeStampLTZ_DTY:
-	//	//input = input.UTC()
-	//	bytes = make([]byte, MaxLenTimeStampTZ)
-	//	putTimestamp(bytes, &input)
 	case TIMESTAMPTZ, TimeStampTZ_DTY, TimeStampLTZ, TimeStampLTZ_DTY:
 		var val time.Time
 		if date.AsUTC {
@@ -222,23 +210,4 @@ func (date *Date) decode() (output time.Time, err error) {
 }
 func (date *Date) Scan(value any) (err error) {
 	return date.SetValue(value)
-}
-
-func (date *Date) CopyTo(dest driver.Value) (err error) {
-	if ok, err := ScanExternal(dest, date.Value); ok {
-		return err
-	}
-	value, err := date.Value()
-	if err != nil {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *time.Time:
-		if value != nil {
-			*dst = value.(time.Time)
-		}
-	default:
-		return fmt.Errorf("cannot copy Date to variable of type %T", dest)
-	}
-	return nil
 }

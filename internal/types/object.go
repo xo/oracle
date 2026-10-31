@@ -16,19 +16,3 @@ type Object struct {
 	//attribs
 	//fields OracleTyper
 }
-
-//func (obj *Object) SetValue(input interface{}) error {
-//	return nil
-//}
-
-//func (obj *Object) Value() (interface{}, error) {
-//	return nil, nil
-//}
-
-//func (obj *Object) Scan(input interface{}) error {
-//	return nil
-//}
-//
-//func (obj *Object) CopyTo(dest driver.Value) error {
-//	return nil
-//}

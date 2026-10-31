@@ -78,14 +78,6 @@ func (lob *lobBase) uploadData(data []byte, charsetID, charsetForm int) error {
 	return err
 }
 
-//func (l *lobBase) IsTemporary() bool {
-//	if !l.IsNil() {
-//		locator := l.stream.GetLocator()
-//		return len(locator) > 7 && locator[7]&1 == 1 || locator[4]&0x40 == 0x40 || l.IsValueBased()
-//	}
-//	return false
-//}
-
 func (l *lobBase) Free() error {
 	if !l.IsQuasi() {
 		err := l.stream.FreeTemporaryLocator()
@@ -110,9 +102,6 @@ func (l *lobBase) GetReadMode() configurations.LobReadMode {
 	return configurations.LobReadMode_NONE
 }
 
-//	func (l *lobBase) Read(ctx context.Context) ([]byte, error) {
-//		return l.ReadBytesFromPos(ctx, 0, 0)
-//	}
 func (l *lobBase) ReadFromPos(ctx context.Context, pos int64) ([]byte, error) {
 	return l.ReadBytesFromPos(ctx, pos, 0)
 }
@@ -133,17 +122,3 @@ func (l *lobBase) load() ([]byte, error) {
 	}
 	return l.stream.Read(0, 0)
 }
-
-//func (l *lobBase) copyFrom(input *lobBase) error {
-//	if input.stream != nil && input.stream.GetLocator() != nil {
-//		if l.IsQuasi() {
-//			l.stream = input.stream
-//			return nil
-//		}
-//		if bytes.Compare(l.GetLocator(), input.GetLocator()) == 0 {
-//			return nil
-//		}
-//		return fmt.Errorf("the source lob locator is not empty so copy is not permitted, please free the current lob first")
-//	}
-//	return nil
-//}

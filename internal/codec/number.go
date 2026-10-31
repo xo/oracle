@@ -20,14 +20,11 @@ func (param *NumberParameter) Init() {
 	if param.MaxLen == 0 {
 		param.MaxLen = 0x16
 	}
-	//param.DataType = types.NUMBER
-	//param.MaxLen = 0x16
 }
 
 func (param *NumberParameter) Encode(input any, _ IConnection) error {
 	param.Init()
 	encoder := types.Number{}
-	//encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
 	if err != nil {
 		return err

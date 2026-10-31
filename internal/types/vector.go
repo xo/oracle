@@ -3,7 +3,6 @@ package types
 import (
 	"bytes"
 	"context"
-	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -12,14 +11,6 @@ import (
 type VectorDataType int
 type VectorType int
 
-// const (
-//
-//	VECTOR_NIL VectorDataType = iota
-//	VECTOR_UINT8
-//	VECTOR_FL32
-//	VECTOR_FL64
-//
-// )
 const (
 	VECTOR_SPARSE VectorType = iota
 	VECTOR_DENSE
@@ -66,14 +57,10 @@ func (vector *Vector) SetValue(input any) error {
 		format = 4
 		length = uint32(len(value))
 		data = value
-		//v.Type = VECTOR_UINT8
-		//v.data = value
 	case *[]uint8:
 		format = 4
 		length = uint32(len(*value))
 		data = *value
-		//v.Type = VECTOR_UINT8
-		//v.data = *value
 	case []*uint8:
 		temp := make([]byte, 0, len(value))
 		for _, val := range value {
@@ -82,20 +69,14 @@ func (vector *Vector) SetValue(input any) error {
 		format = 4
 		length = uint32(len(value))
 		data = temp
-		//v.Type = VECTOR_UINT8
-		//v.data = temp
 	case []float32:
 		format = 2
 		length = uint32(len(value))
 		data = value
-		//v.Type = VECTOR_FL32
-		//v.data = value
 	case *[]float32:
 		format = 2
 		length = uint32(len(*value))
 		data = *value
-		//v.Type = VECTOR_FL32
-		//v.data = *value
 	case []*float32:
 		temp := make([]float32, 0, len(value))
 		for _, val := range value {
@@ -104,20 +85,14 @@ func (vector *Vector) SetValue(input any) error {
 		format = 2
 		length = uint32(len(value))
 		data = temp
-		//v.Type = VECTOR_FL32
-		//v.data = temp
 	case []float64:
 		format = 3
 		length = uint32(len(value))
 		data = value
-		//v.Type = VECTOR_FL64
-		//v.data = value
 	case *[]float64:
 		format = 3
 		length = uint32(len(*value))
 		data = *value
-		//v.Type = VECTOR_FL64
-		//v.data = *value
 	case []*float64:
 		temp := make([]float64, 0, len(value))
 		for _, val := range value {
@@ -126,8 +101,6 @@ func (vector *Vector) SetValue(input any) error {
 		format = 3
 		length = uint32(len(value))
 		data = temp
-		//v.Type = VECTOR_FL64
-		//v.data = temp
 	default:
 		return vectorTypeError
 	}
@@ -166,7 +139,6 @@ func (vector *Vector) SetValue(input any) error {
 			if err != nil {
 				return err
 			}
-			//temp := NewDoubleCoderFromFloat(val)
 			_, err = buffer.Write(n.Bytes())
 			if err != nil {
 				return err
@@ -282,14 +254,8 @@ func (vector *Vector) Value() (any, error) {
 			if temp, ok := output.(float32); ok {
 				vecData[i] = temp
 			}
-			//temp := &DoubleCoder{}
-			//vecData[i], err = temp.DecodeFloat(buffer.Next(4))
-			//if err != nil {
-			//	return nil, err
-			//}
 		}
 		return vecData, nil
-		//return types.NewVector(vecData, coder.streamer, coder.copy())
 	case 3:
 		// float64 array
 		vecData := make([]float64, count)
@@ -304,14 +270,8 @@ func (vector *Vector) Value() (any, error) {
 			if temp, ok := output.(float64); ok {
 				vecData[i] = temp
 			}
-			//temp := &DoubleCoder{}
-			//vecData[i], err = temp.DecodeDouble(buffer.Next(8))
-			//if err != nil {
-			//	return nil, err
-			//}
 		}
 		return vecData, nil
-		//return types.NewVector(vecData, coder.streamer, coder.copy())
 	case 4:
 		// int8 array
 		vecData := make([]uint8, count)
@@ -319,31 +279,10 @@ func (vector *Vector) Value() (any, error) {
 			vecData[i], err = buffer.ReadByte()
 		}
 		return vecData, nil
-		//return types.NewVector(vecData, coder.streamer, coder.copy())
 	default:
 		return nil, fmt.Errorf("unsupported format (%d) for vector type", format)
 	}
 }
-
-//	type Vector interface {
-//		VectorType() VectorDataType
-//		Data() interface{}
-//		Length() int
-//		Lob
-//	}
-//type VectorDecoder interface {
-//	DecodeVector(data []byte) (Vector, error)
-//}
-//type vector struct {
-//	//version int
-//	//format  int
-//	//flag int
-//	//Count int
-//	Type    VectorDataType
-//	data    interface{}
-//	decoder VectorDecoder
-//	lobBase
-//}
 
 var vectorTypeError = errors.New("unexpected data for vector type")
 
@@ -352,118 +291,6 @@ func CreateVector(array any) (*Vector, error) {
 	v := new(Vector)
 	return v, v.SetValue(array)
 }
-
-//	func NewVectorFromBytes(data []byte) (Vector, error) {
-//		read := func(tempBuffer *bytes.Buffer, size int) (int, error) {
-//			var err error
-//			switch size {
-//			case 1:
-//				var temp uint8
-//				temp, err = tempBuffer.ReadByte()
-//				if err != nil {
-//					return 0, vectorTypeError
-//				}
-//				return int(temp), nil
-//			case 2:
-//				var temp uint16
-//				err = binary.Read(tempBuffer, binary.BigEndian, &temp)
-//				if err != nil {
-//					return 0, vectorTypeError
-//				}
-//				return int(temp), nil
-//			case 4:
-//				var temp uint32
-//				err = binary.Read(tempBuffer, binary.BigEndian, &temp)
-//				if err != nil {
-//					return 0, vectorTypeError
-//				}
-//				return int(temp), nil
-//			default:
-//				return 0, vectorTypeError
-//			}
-//		}
-//		buffer := bytes.NewBuffer(data)
-//		magicNumber, err := read(buffer, 1)
-//		if err != nil {
-//			return nil, err
-//		}
-//		if magicNumber != 219 {
-//			return nil, vectorTypeError
-//		}
-//		var version, flag, format, count int
-//		version, err = read(buffer, 1)
-//		if err != nil {
-//			return nil, err
-//		}
-//		if version != 0 {
-//			return nil, fmt.Errorf("vector version (%d) not supported", version)
-//		}
-//		flag, err = read(buffer, 2)
-//		if err != nil {
-//			return nil, err
-//		}
-//		format, err = read(buffer, 1)
-//		if err != nil {
-//			return nil, err
-//		}
-//		if flag&1 > 0 {
-//			count, err = read(buffer, 1)
-//		} else if flag&2 > 0 {
-//			count, err = read(buffer, 4)
-//		} else {
-//			count, err = read(buffer, 2)
-//		}
-//		if err != nil {
-//			return nil, err
-//		}
-//		if flag&0x10 > 0 {
-//			_ = buffer.Next(8)
-//		}
-//		switch format {
-//		case 2:
-//			// float32 array
-//			vecData := make([]float32, count)
-//			for i := 0; i < count; i++ {
-//				temp := &DoubleCoder{}
-//				vecData[i], err = temp.DecodeFloat(buffer.Next(4))
-//				if err != nil {
-//					return nil, err
-//				}
-//			}
-//			return NewVector(vecData, nil)
-//		case 3:
-//		case 4:
-//
-//		}
-//	}
-
-//func (v *vector) Length() int {
-//	switch v.Type {
-//	case VECTOR_NIL:
-//		return 0
-//	case VECTOR_UINT8:
-//		if temp, ok := v.data.([]uint8); ok {
-//			return len(temp)
-//		}
-//	case VECTOR_FL32:
-//		if temp, ok := v.data.([]float32); ok {
-//			return len(temp)
-//		}
-//	case VECTOR_FL64:
-//		if temp, ok := v.data.([]float64); ok {
-//			return len(temp)
-//		}
-//	}
-//	return 0
-//}
-
-//func (v *vector) VectorType() VectorDataType {
-//	return v.Type
-//}
-
-//func (v *vector) Data() interface{} {
-//	return v.data
-//}
 
 // Load reads the whole value and watches no context. See Lob.
 func (vector *Vector) Load() error {
@@ -528,78 +355,4 @@ func (vector *Vector) Read(ctx context.Context) error {
 
 func (vector *Vector) Scan(input any) error {
 	return vector.SetValue(input)
-	//var err error
-	//if input == nil {
-	//	if v.stream != nil {
-	//		v.stream.SetLocator(nil)
-	//	}
-	//	v.data = nil
-	//	v.Type = VECTOR_NIL
-	//	return nil
-	//}
-	//switch value := input.(type) {
-	//case *vector:
-	//	err = v.lobBase.copyFrom(&value.lobBase)
-	//	if err != nil {
-	//		return nil
-	//	}
-	//	v.Type = value.Type
-	//	v.data = value.data
-	//	v.decoder = value.decoder
-	//default:
-	//	temp, err := CreateVector(value)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	err = v.Scan(temp)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-	//return nil
-}
-func (vector *Vector) CopyTo(dest driver.Value) error {
-	val, err := vector.Value()
-	//switch value := val.(type) {
-	//case nil:
-	//case []uint8:
-	//case []float32:
-	//case []float64:
-	//}
-	if err != nil {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *Vector:
-		*dst = *vector
-		return nil
-	case *[]uint8:
-		if val == nil {
-			*dst = nil
-			return nil
-		}
-		if v, ok := val.([]uint8); ok {
-			*dst = v
-			return nil
-		}
-	case *[]float32:
-		if val == nil {
-			*dst = nil
-			return nil
-		}
-		if v, ok := val.([]float32); ok {
-			*dst = v
-			return nil
-		}
-	case *[]float64:
-		if val == nil {
-			*dst = nil
-			return nil
-		}
-		if v, ok := val.([]float64); ok {
-			*dst = v
-			return nil
-		}
-	}
-	return fmt.Errorf("cannot copy Vector to variable of type %T", dest)
 }

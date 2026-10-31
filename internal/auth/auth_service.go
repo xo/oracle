@@ -44,7 +44,6 @@ func newAuthService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (
 	//}
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
 	err := output.buildServiceList(negoInfo.AuthService, false, false)
-	// output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
 	}

@@ -287,7 +287,6 @@ func DecodeNumber(inputData []byte) any {
 	}
 
 	if exponent >= 0 && exponent < len(powerOfTen) {
-		// exponent = mantissaDigits - exponent
 		IntMantissa := mantissa
 		IntExponent := exponent
 		var over uint64
@@ -307,11 +306,6 @@ func DecodeNumber(inputData []byte) any {
 	}
 
 fallbackToFloat:
-	//if negative {
-	//	return -float64(mantissa) * math.Pow10(exponent)
-	//}
-	//
-	//return float64(mantissa) * math.Pow10(exponent)
 	absExponent := int(math.Abs(float64(exponent)))
 	if negative {
 		return -math.Round(float64(mantissa)*math.Pow10(exponent)*math.Pow10(absExponent)) / math.Pow10(absExponent)

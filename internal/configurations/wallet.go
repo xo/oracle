@@ -212,7 +212,6 @@ func (w *Wallet) readCredentials(input []byte) error {
 		temp2 struct1
 		temp3 WalletCredentialData
 	)
-	// objectType := 0
 	_, err := asn1.Unmarshal(input, &temp1)
 	if err != nil {
 		return err

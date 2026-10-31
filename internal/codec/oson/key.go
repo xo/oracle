@@ -45,33 +45,6 @@ func NewKey(name string) *key {
 	return ret
 }
 
-//	func Hash(input string) (hash uint8, length int) {
-//		key := []rune(input)
-//		var num uint64 = 0xFFFFFFFF811C9DC5
-//		length = len(key)
-//		for i := 0; i < len(key); i++ {
-//			c := key[i]
-//			if c <= 0x7ff {
-//				temp := []byte(string(c))
-//				for j := 0; j < len(temp); j++ {
-//					num = (num ^ uint64(temp[j])) * uint64(0x1000193)
-//				}
-//				length = length + len(temp) - 1
-//			} else {
-//				temp := strconv.Itoa(int(c))
-//				for x := 0; x < len(temp); x++ {
-//					num = (num ^ uint64(temp[x])) * uint64(0x1000193)
-//				}
-//				if len(temp) == 2 {
-//					i++
-//				}
-//				length = length + len(temp) - 1
-//			}
-//		}
-//		hash = uint8(num)
-//		return
-//	}
-
 func (collection *keyCollection) encode() ([]byte, error) {
 	keyBuffer := bytes.NewBuffer(nil)
 	var err error
@@ -90,7 +63,6 @@ func (collection *keyCollection) encode() ([]byte, error) {
 }
 
 func (collection *keyCollection) decode(data []byte) error {
-	//keyBuffer := bytes.NewBuffer(data)
 	var err error
 	return err
 }

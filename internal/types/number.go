@@ -3,7 +3,6 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -32,96 +31,6 @@ func (number *Number) isZero() bool {
 func (number *Number) isPositive() bool {
 	return len(number.bValue) > 0 && number.bValue[0]&0x80 != 0
 }
-
-//func NewNumberFromString(val string) (*Number, error) {
-//	mantissa := []byte(val)
-//	negative := mantissa[0] == '-'
-//	if negative {
-//		mantissa = mantissa[1:]
-//	}
-//	var (
-//		exp int
-//		err error
-//	)
-//	isFloat := false
-//	if i := bytes.Index(mantissa, []byte{'e'}); i >= 0 {
-//		exp, err = strconv.Atoi(string(mantissa[i+1:]))
-//		if err != nil {
-//			return nil, err
-//		}
-//		mantissa = mantissa[:i]
-//	}
-//	if i := bytes.Index(mantissa, []byte{'.'}); i >= 0 {
-//		mantissa = append(mantissa[:i], mantissa[i+1:]...)
-//		exp += i - 1
-//		isFloat = true
-//	}
-//	if !isFloat {
-//		exp += len(mantissa) - 1
-//	}
-//	ret := new(Number)
-//	err = ret.encode(mantissa, exp, negative)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return ret, nil
-//}
-//func NewNumberFromInt64(val int64) (*Number, error) {
-//	mantissa := []byte(strconv.FormatInt(val, 10))
-//	negative := mantissa[0] == '-'
-//	if negative {
-//		mantissa = mantissa[1:]
-//	}
-//	exp := len(mantissa) - 1
-//	ret := new(Number)
-//	err := ret.encode(mantissa, exp, negative)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return ret, nil
-//}
-//func NewNumberFromUint64(val uint64) (*Number, error) {
-//	mantissa := []byte(strconv.FormatUint(val, 10))
-//	exponent := len(mantissa) - 1
-//	ret := new(Number)
-//	err := ret.encode(mantissa, exponent, false)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return ret, nil
-//}
-//func NewNumberFromFloat(val float64) (*Number, error) {
-//	if val == 0.0 {
-//		return &Number{bValue: []byte{128}}, nil
-//	}
-//	var (
-//		exponent int
-//		err      error
-//	)
-//	mantissa := []byte(strconv.FormatFloat(val, 'e', -1, 64))
-//	if i := bytes.Index(mantissa, []byte{'e'}); i >= 0 {
-//		exponent, err = strconv.Atoi(string(mantissa[i+1:]))
-//		if err != nil {
-//			return nil, err
-//		}
-//		mantissa = mantissa[:i]
-//	}
-//
-//	negative := mantissa[0] == '-'
-//	if negative {
-//		mantissa = mantissa[1:]
-//	}
-//
-//	if i := bytes.Index(mantissa, []byte{'.'}); i >= 0 {
-//		mantissa = append(mantissa[:i], mantissa[i+1:]...)
-//	}
-//	ret := new(Number)
-//	err = ret.encode(mantissa, exponent, negative)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return ret, nil
-//}
 
 func (number *Number) encode(mantissa []byte, exp int, negative bool) ([]byte, error) {
 	trailingZeros := 0
@@ -322,117 +231,7 @@ func NewNumber(n any) (*Number, error) {
 	ret.SetDataType(NUMBER)
 	err = ret.SetValue(n)
 	return ret, err
-	//n, err = utils.GetValue(n)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if n == nil {
-	//	return nil, nil
-	//}
-	//rType := reflect.TypeOf(n)
-	//rValue := reflect.ValueOf(n)
-	//if utils.IsSigned(rType) {
-	//	return NewNumberFromInt64(rValue.Int())
-	//}
-	//if utils.IsUnsigned(rType) {
-	//	return NewNumberFromUint64(rValue.Uint())
-	//}
-	////if f32, ok := col.(float32); ok {
-	////	return strconv.ParseFloat(fmt.Sprint(f32), 64)
-	////}
-	//if utils.IsFloat(rType) {
-	//	return NewNumberFromFloat(rValue.Float())
-	//}
-	//if rType == reflect.TypeOf((*Number)(nil)).Elem() {
-	//	if num, ok := n.(Number); ok {
-	//		return &num, nil
-	//	}
-	//	return nil, errors.New("conversion of unsupported type to number")
-	//}
-	//if rType == utils.TyBytes {
-	//	return &Number{bValue: rValue.Bytes()}, nil
-	//}
-	//switch rType.Kind() {
-	//case reflect.Bool:
-	//	if rValue.Bool() {
-	//		return NewNumberFromInt64(1)
-	//	}
-	//
-	//	return NewNumberFromInt64(0)
-	//case reflect.String:
-	//	return NewNumberFromString(rValue.String())
-	//default:
-	//	return nil, errors.New("conversion of unsupported type to number")
-	//}
 }
-
-//func (number *Number) Encode() ([]byte, error) {
-//	return number.Data, nil
-//}
-//func (number *Number) Decode(data []byte, _ uint16) (interface{}, error) {
-//	if data == nil {
-//		return nil, nil
-//	}
-//	ret := Number{Data: data}
-//	ret.SetTypeInfo(number.TypeInfo)
-//	return ret.String()
-//}
-//func (number *Number) Read(session network.SessionReader, tnsType uint16, _ bool) (interface{}, error) {
-//	bValue, err := number.basicRead(session)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return number.Decode(bValue, tnsType)
-//}
-//func (number *Number) Write(session network.SessionWriter) error {
-//	bValue, err := number.Encode()
-//	if err != nil {
-//		return err
-//	}
-//	session.PutClr(bValue)
-//	return nil
-//}
-
-//func (number *Number) Encode(input interface{}, typeId uint16) ([]byte, error) {
-//	var temp *Number
-//	var err error
-//	switch typeId {
-//	case IBDOUBLE:
-//		switch number := input.(type) {
-//		case float64:
-//			temp = NewBinaryDouble(number)
-//		case float32:
-//			temp = NewBinaryDouble(float64(number))
-//		default:
-//			temp, err = NewNumber(input)
-//		}
-//	case IBFLOAT:
-//		switch number := input.(type) {
-//		case float64:
-//			temp = NewBinaryFloat(float32(number))
-//		case float32:
-//			temp = NewBinaryFloat(number)
-//		default:
-//			temp, err = NewNumber(input)
-//		}
-//	default:
-//		temp, err = NewNumber(input)
-//	}
-//	if err != nil {
-//		return nil, err
-//	}
-//	return temp.bValue, nil
-//}
-//func (number *Number) Decode(input []byte, typeId uint16) (interface{}, error) {
-//	number.bValue = input
-//	switch typeId {
-//	case IBDOUBLE:
-//		return number.decodeDouble()
-//	case IBFLOAT:
-//		return number.decodeFloat()
-//	}
-//	return number.String()
-//}
 
 func (number *Number) decodeDouble() (float64, error) {
 	if len(number.bValue) < int(MaxLenBDouble) {
@@ -482,12 +281,6 @@ func (number *Number) encodeInt(input int64) error {
 	exp := len(mantissa) - 1
 	number.bValue, err = number.encode(mantissa, exp, negative)
 	return err
-	//ret := new(Number)
-	//err := ret.encode(mantissa, exp, negative)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return ret, nil
 }
 func (number *Number) encodeUint(input uint64) error {
 	mantissa := []byte(strconv.FormatUint(input, 10))
@@ -595,7 +388,7 @@ func (number *Number) SetValue(input any) error {
 	}
 	rType := reflect.TypeOf(input)
 	rValue := reflect.ValueOf(input)
-	if rType == TyNumber {
+	if rType == reflect.TypeFor[Number]() {
 		if num, ok := input.(Number); ok {
 			*number = num
 			if number.dataType == 0 {
@@ -684,211 +477,9 @@ func (number *Number) SetValue(input any) error {
 	}
 	return err
 
-	//switch rType {
-	//case TyString:
-	//
-	//case TyNullByte:
-	//	temp := input.(sql.NullByte)
-	//	if temp.Valid {
-	//		err = number.encodeFloat(float64(temp.Byte))
-	//	} else {
-	//		number.bValue = nil
-	//	}
-	//case TyNullInt16:
-	//	temp := input.(sql.NullInt16)
-	//	if temp.Valid {
-	//		err = number.encodeFloat(float64(temp.Int16))
-	//	} else {
-	//		number.bValue = nil
-	//	}
-	//case TyNullInt32:
-	//	temp := input.(sql.NullInt32)
-	//	if temp.Valid {
-	//		err = number.encodeFloat(float64(temp.Int32))
-	//	} else {
-	//		number.bValue = nil
-	//	}
-	//case TyNullInt64:
-	//	temp := input.(sql.NullInt64)
-	//	if temp.Valid {
-	//		err = number.encodeFloat(float64(temp.Int64))
-	//	} else {
-	//		number.bValue = nil
-	//	}
-	//case TyNullFloat64:
-	//	temp := input.(sql.NullFloat64)
-	//	if temp.Valid {
-	//		err = number.encodeFloat(temp.Float64)
-	//	} else {
-	//		number.bValue = nil
-	//	}
-	//
-	//default:
-	//	err = fmt.Errorf("conversion of unsupported type: %v to binary double", rType)
-	//}
-	//return err
-	//
-	//switch typeId {
-	//case IBDOUBLE:
-	//
-	//case IBFLOAT:
-	//	if rType == TyFloat32 {
-	//		if value, ok := input.(float32); ok {
-	//			err = number.encodeFloat32(value)
-	//		} else {
-	//			err = fmt.Errorf("conversion of unsupported type: %v to binary float", rType)
-	//		}
-	//	} else if rType == TyFloat64 {
-	//		err = number.encodeFloat32(float32(rValue.Float()))
-	//	} else if rType == TyString {
-	//		value, err := strconv.ParseFloat(rValue.String(), 32)
-	//		if err != nil {
-	//			return err
-	//		}
-	//		err = number.encodeFloat32(float32(value))
-	//	} else {
-	//		err = fmt.Errorf("conversion of unsupported type: %v to binary float", rType)
-	//	}
-	//	return err
-	//}
-	//if rType == utils.TyBytes {
-	//	return &Number{bValue: rValue.Bytes()}, nil
-	//}
-	//switch rType.Kind() {
-	//case reflect.Bool:
-	//	if rValue.Bool() {
-	//		err = number.encodeInt(1)
-	//	} else {
-	//		err = number.encodeInt(0)
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//case reflect.String:
-	//	err = number.encodeString(rValue.String())
-	//default:
-	//	return errors.New("conversion of unsupported type to number")
-	//}
-	//return nil
 }
 
 func (number *Number) Scan(value any) error {
 	number.SetDataType(NUMBER)
 	return number.SetValue(value)
-	//temp, err := NewNumber(value)
-	//if err != nil {
-	//	return err
-	//}
-	//if temp == nil {
-	//	number.bValue = nil
-	//	return nil
-	//}
-	//number.bValue = temp.bValue
-	//return nil
 }
-
-func (number *Number) CopyTo(dest any) error {
-	if ok, err := ScanExternal(dest, number.Value); ok {
-		return err
-	}
-	destValue := reflect.ValueOf(dest)
-	if destValue.Kind() != reflect.Pointer {
-		return errors.New("dest must be a pointer")
-	}
-
-	if number.bValue == nil {
-		destValue.Elem().Set(reflect.Zero(destValue.Elem().Type()))
-		return nil
-	}
-
-	strVal, err := number.String()
-	if err != nil {
-		return err
-	}
-
-	switch dst := dest.(type) {
-	case *string:
-		*dst = strVal
-	case *int:
-		v, err := strconv.ParseInt(strVal, 10, 64)
-		if err != nil {
-			return err
-		}
-		*dst = int(v)
-	case *int8:
-		v, err := strconv.ParseInt(strVal, 10, 8)
-		if err != nil {
-			return err
-		}
-		*dst = int8(v)
-	case *int16:
-		v, err := strconv.ParseInt(strVal, 10, 16)
-		if err != nil {
-			return err
-		}
-		*dst = int16(v)
-	case *int32:
-		v, err := strconv.ParseInt(strVal, 10, 32)
-		if err != nil {
-			return err
-		}
-		*dst = int32(v)
-	case *int64:
-		v, err := strconv.ParseInt(strVal, 10, 64)
-		if err != nil {
-			return err
-		}
-		*dst = v
-	case *uint:
-		v, err := strconv.ParseUint(strVal, 10, 64)
-		if err != nil {
-			return err
-		}
-		*dst = uint(v)
-	case *uint8:
-		v, err := strconv.ParseUint(strVal, 10, 8)
-		if err != nil {
-			return err
-		}
-		*dst = uint8(v)
-	case *uint16:
-		v, err := strconv.ParseUint(strVal, 10, 16)
-		if err != nil {
-			return err
-		}
-		*dst = uint16(v)
-	case *uint32:
-		v, err := strconv.ParseUint(strVal, 10, 32)
-		if err != nil {
-			return err
-		}
-		*dst = uint32(v)
-	case *uint64:
-		v, err := strconv.ParseUint(strVal, 10, 64)
-		if err != nil {
-			return err
-		}
-		*dst = v
-	case *float32:
-		v, err := strconv.ParseFloat(strVal, 32)
-		if err != nil {
-			return err
-		}
-		*dst = float32(v)
-	case *float64:
-		v, err := strconv.ParseFloat(strVal, 64)
-		if err != nil {
-			return err
-		}
-		*dst = v
-	case *Number:
-		*dst = *number
-	default:
-		return fmt.Errorf("cannot copy Number to variable of type %T", dest)
-	}
-	return nil
-}
-
-//func (number *Number) Value() (driver.Value, error) {
-//	return number.Int64()
-//}

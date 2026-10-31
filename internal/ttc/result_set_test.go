@@ -33,11 +33,11 @@ func TestColumnTypeScanTypeInlineLOB(t *testing.T) {
 		dataType uint16
 		want     reflect.Type
 	}{
-		{"CLOB_inline", types.LongVarChar, types.TyString},
-		{"BLOB_inline", types.LongRaw, types.TyBytes},
-		{"LongVarRaw", types.LongVarRaw, types.TyBytes},
-		{"CLOB_locator", types.OCIClobLocator, types.TyString},
-		{"BLOB_locator", types.OCIBlobLocator, types.TyBytes},
+		{"CLOB_inline", types.LongVarChar, reflect.TypeFor[string]()},
+		{"BLOB_inline", types.LongRaw, reflect.TypeFor[[]byte]()},
+		{"LongVarRaw", types.LongVarRaw, reflect.TypeFor[[]byte]()},
+		{"CLOB_locator", types.OCIClobLocator, reflect.TypeFor[string]()},
+		{"BLOB_locator", types.OCIBlobLocator, reflect.TypeFor[[]byte]()},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

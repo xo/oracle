@@ -3,8 +3,6 @@ package types
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
-	"fmt"
 )
 
 type Blob struct {
@@ -33,19 +31,6 @@ func (blob *Blob) SetValue(input any) error {
 	}
 	return blob.Upload()
 }
-
-//	type Blob interface {
-//		Data() []byte
-//		//CopyFrom(blob Blob) error
-//		ReadFromPos(ctx context.Context, pos int64) ([]byte, error)
-//		ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byte, error)
-//		Lob
-//	}
-//type blob struct {
-//	data []byte
-//	lobBase
-//	UploadCtx context.Context
-//}
 
 // CreateBlob returns a BLOB that holds input, with a streamer from db. The
 // value goes to the server when the BLOB is bound to a statement.
@@ -95,79 +80,6 @@ func (blob *Blob) Read(ctx context.Context) error {
 	blob.bValue, err = blob.ReadFromPos(ctx, 0)
 	return err
 }
-func (blob *Blob) CopyTo(dest driver.Value) error {
-	if ok, err := ScanExternal(dest, blob.Value); ok {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *[]byte:
-		*dst = blob.bValue
-	case *string:
-		*dst = string(blob.bValue)
-	default:
-		return fmt.Errorf("cannot copy blob to variable of type %T ", dest)
-	}
-	return nil
-}
 func (blob *Blob) Scan(src any) error {
 	return blob.SetValue(src)
 }
-
-//func (l *blob) Data() []byte {
-//	//if l.IsNil() || l.data != nil {
-//	//	return l.data, nil
-//	//}
-//	//var err error
-//	//err = l.Read(ctx)
-//	//if err != nil {
-//	//	return nil, err
-//	//}
-//	//if free {
-//	//	err = l.Free()
-//	//	if err != nil {
-//	//		return nil, err
-//	//	}
-//	//}
-//	return l.data
-//}
-//func (lob *blob) Value() (driver.Value, error) {
-//	return lob.Data(context.Background(), false)
-//}
-//func (blob *Blob) Encode() ([]byte, error) {
-//	return blob.Data, nil
-//}
-//func (blob *Blob) Decode(data []byte, tnsType uint16) (interface{}, error) {
-//	blob.Data = data
-//	return blob.Data, nil
-//}
-//func (blob *Blob) Read(session network.SessionReader, tnsType uint16, isUDTPar bool) error {
-//	var err error
-//	blob.Data, err = blob.read(session, isUDTPar)
-//	if err != nil {
-//		return err
-//	}
-//	if blob.locator == nil {
-//		blob.Data = nil
-//		return nil
-//	}
-//	// non-inline blob data should be loaded
-//	return nil
-//}
-//
-//func (blob *Blob) Write(session network.SessionWriter) error {
-//	return blob.write(session, blob.Data, false)
-//}
-//
-//func (blob *Blob) Scan(value interface{}) error {
-//	switch v := value.(type) {
-//	case *Blob:
-//		*blob = *v
-//	case Blob:
-//		*blob = v
-//	case []byte:
-//		blob.Data = v
-//	default:
-//		return fmt.Errorf("Blob column type require []byte value")
-//	}
-//	return nil
-//}

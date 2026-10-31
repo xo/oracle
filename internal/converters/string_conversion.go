@@ -118,7 +118,6 @@ func (conv *StringConverter) Encode(input string) []byte {
 				}
 			} else {
 				output = append(output, uint8(conv.eReplace))
-				// output[x] = uint8(conv.eReplace)
 			}
 		}
 		return output

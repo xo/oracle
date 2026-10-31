@@ -31,7 +31,6 @@ func NewOracleNetworkRC4Cryptor(initBuffer, iv []byte, keySize int) (*OracleNetw
 	}
 	err = ret.Reset()
 	return ret, err
-	// return &OracleNetworkRC4Cryptor{enc: enc, dec: dec}, nil
 }
 
 func (sec *OracleNetworkRC4Cryptor) Reset() error {

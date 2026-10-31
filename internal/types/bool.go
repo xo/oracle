@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"database/sql/driver"
 	"fmt"
 )
 
@@ -54,45 +53,4 @@ func (bl *Bool) Value() (any, error) {
 
 func (bl *Bool) Scan(input any) error {
 	return bl.SetValue(input)
-}
-
-func (bl *Bool) CopyTo(dest driver.Value) error {
-	if ok, err := ScanExternal(dest, bl.Value); ok {
-		return err
-	}
-	val, err := bl.Value()
-	if err != nil {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *Bool:
-		*dst = *bl
-	case *bool:
-		if val != nil {
-			*dst = val.(bool)
-		} else {
-			*dst = false
-		}
-	case *int:
-		if val != nil && val.(bool) {
-			*dst = 1
-		} else {
-			*dst = 0
-		}
-	case *int64:
-		if val != nil && val.(bool) {
-			*dst = 1
-		} else {
-			*dst = 0
-		}
-	case *string:
-		if val != nil && val.(bool) {
-			*dst = "true"
-		} else {
-			*dst = "false"
-		}
-	default:
-		return fmt.Errorf("cannot copy Bool to variable of type %T", dest)
-	}
-	return nil
 }

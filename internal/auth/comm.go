@@ -10,10 +10,6 @@ type AdvancedNegoComm struct {
 	session *tns.Session
 }
 
-// func newComm(session *network.Session) *AdvancedNegoComm {
-// 	return &AdvancedNegoComm{session: session}
-// }
-
 func (comm *AdvancedNegoComm) writePacketHeader(length, _type int) {
 	comm.session.PutInt(length, 2, true, false)
 	comm.session.PutInt(_type, 2, true, false)

@@ -13,7 +13,6 @@ import (
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
-	"github.com/xo/oracle/internal/utils"
 )
 
 type ObjectParameter struct {
@@ -28,7 +27,7 @@ type ObjectParameter struct {
 func (param *ObjectParameter) loadActiveFields() {
 	for x := 0; x < param.typ.NumField(); x++ {
 		f := param.typ.Field(x)
-		fieldID, _, _, _ := utils.ExtractTag(f.Tag.Get("udt"))
+		fieldID, _, _, _ := extractTag(f.Tag.Get("udt"))
 		if len(fieldID) == 0 {
 			continue
 		}
@@ -106,13 +105,6 @@ func (param *ObjectParameter) Init() {
 	}
 }
 
-//	func (param *ObjectParameter) encodeObject(input interface{}, conn parameter_coder.IConnection) (err error) {
-//		return
-//	}
-//
-// func (param *ObjectParameter) encodeArray(input interface{}, conn parameter_coder.IConnection) (err error) {
-//
-// }
 func (param *ObjectParameter) Encode(input any, conn codec.IConnection) (err error) {
 	param.Init()
 	session := tns.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
@@ -154,11 +146,6 @@ func (param *ObjectParameter) Encode(input any, conn codec.IConnection) (err err
 					return err
 				}
 				coderPI := coder.GetParameterInfo()
-				//if coderPI.DataType == types.XMLType {
-				//	session.PutFixedClr(coder.Bytes())
-				//} else {
-				//	session.PutClr(coder.Bytes())
-				//}
 				param.UpdateParameterInfo(coderPI)
 			}
 		}
@@ -188,11 +175,6 @@ func (param *ObjectParameter) Encode(input any, conn codec.IConnection) (err err
 			if err != nil {
 				return err
 			}
-			//if attrib.GetParameterInfo().DataType == types.XMLType {
-			//	session.PutBytes(attrib.Bytes()...)
-			//} else {
-			//	session.PutFixedClr(attrib.Bytes())
-			//}
 		}
 	}
 
@@ -296,9 +278,6 @@ func (param *ObjectParameter) Decode(conn codec.IConnection) (any, error) {
 	}
 	switch objectType {
 	case 0x88:
-		//if param.IsArrayPar {
-		//	param.BValue, err = param.PSession.GetFixedClr()
-		//} else {
 		_ /*attribsLen*/, err := param.PSession.GetInt(2, true, true)
 		if err != nil {
 			return nil, err
@@ -329,7 +308,6 @@ func (param *ObjectParameter) Decode(conn codec.IConnection) (any, error) {
 			}
 		}
 		return items, nil
-		//}
 	case 0x85:
 		return nil, nil
 	case 0x84:
@@ -337,17 +315,6 @@ func (param *ObjectParameter) Decode(conn codec.IConnection) (any, error) {
 		var value any
 		for _, field := range param.fields {
 			attrib := param.attribs[field].Copy()
-			//temp, err := session.Peek()
-			//if err != nil {
-			//	return nil, err
-			//}
-			//if temp == 0xFD || temp == 0xFF {
-			//	_, err = session.GetByte()
-			//	if err != nil {
-			//		return nil, err
-			//	}
-			//	value = nil
-			//} else {
 			attrib.SetParentSession(param.PSession)
 			err = attrib.Read(param.PSession)
 			if err != nil {
@@ -357,9 +324,8 @@ func (param *ObjectParameter) Decode(conn codec.IConnection) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			//}
 			if idx, ok := param.activeFields[field]; ok {
-				err = types.RCopy(retObj.Elem().Field(idx), value)
+				err = copyValue(retObj.Elem().Field(idx).Addr().Interface(), value)
 				if err != nil {
 					return nil, err
 				}

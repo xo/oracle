@@ -12,12 +12,6 @@ const (
 	VisibilityOnCommit  VisibilityMode = 2
 )
 
-//	type AQ struct {
-//		name       string
-//		version    int
-//		flag       int
-//		visibility VisibilityMode
-//	}
 type QAExtension struct {
 	key   []byte
 	value []byte
@@ -87,19 +81,8 @@ func (qu *queue) writeArrayData(messages []*Message) error {
 			session.PutBytes(message.bValue...)
 		case JSON:
 			session.PutBytes(message.bValue...)
-			//quasi := utils.CreateQuasiLocator(uint64(len(message.bValue)))
-			//session.PutUint(len(quasi), 4, true, true)
-			//session.PutBytes(quasi...)
-			//session.PutClr(message.bValue)
 		case UDT:
 			session.PutBytes(message.bValue...)
-			//dataLen := len(message.bValue)
-			//session.PutUint(0, 4, true, true)
-			//session.PutUint(dataLen, 4, true, true)
-			//session.PutBytes(1, 1)
-			//if dataLen > 0 {
-			//	session.PutClr(message.bValue)
-			//}
 		default:
 			return fmt.Errorf("unsupported message type for enqueue: %v", qu.messageType)
 		}

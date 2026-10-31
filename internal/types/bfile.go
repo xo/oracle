@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -27,8 +26,6 @@ type BFile struct {
 func CreateBFile(ctx context.Context, db *sql.DB, dirName, fileName string) (*BFile, error) {
 	var err error
 	ret := &BFile{}
-	//ret.dirName = dirName
-	//ret.fileName = fileName
 	err = ret.createStreamer(ctx, db)
 	if err != nil {
 		return nil, err
@@ -117,12 +114,6 @@ func (file *BFile) SetValue(input any) error {
 	return nil
 }
 
-//	func (file *BFile) filePath() string {
-//		if len(file.dirName) == 0 || len(file.fileName) == 0 {
-//			return ""
-//		}
-//		return file.dirName + "/" + file.fileName
-//	}
 func (file *BFile) SetStreamer(input LobStreamer) {
 	file.stream = input
 	if input != nil {
@@ -143,14 +134,6 @@ func (file *BFile) Value() (any, error) {
 
 func (file *BFile) Scan(input any) error {
 	return file.SetValue(input)
-}
-
-func (file *BFile) CopyTo(dest driver.Value) error {
-	if dst, ok := dest.(*[]byte); ok {
-		*dst = file.bValue
-		return nil
-	}
-	return fmt.Errorf("cannot copy BFile to type %T", dest)
 }
 
 func (file *BFile) IsOpen() bool {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
-	"github.com/xo/oracle/internal/utils"
 )
 
 type ArrayParameter struct {
@@ -30,7 +29,7 @@ func (param *ArrayParameter) Init() {
 func (param *ArrayParameter) FillAttrib(input any, conn IConnection) error {
 	var err error
 	if param.attrib == nil {
-		inputType := utils.GetType(input)
+		inputType := derefType(input)
 		if inputType != nil {
 			itemType := inputType.Elem()
 			if itemType != nil {
@@ -51,7 +50,7 @@ func (param *ArrayParameter) FillAttrib(input any, conn IConnection) error {
 
 func (param *ArrayParameter) Encode(input any, conn IConnection) (err error) {
 	param.Init()
-	inputType := utils.GetType(input)
+	inputType := derefType(input)
 	if inputType.Kind() == reflect.Array || inputType.Kind() == reflect.Slice {
 		var coder OracleParameterCoder
 		err = param.FillAttrib(input, conn)
@@ -73,7 +72,7 @@ func (param *ArrayParameter) Encode(input any, conn IConnection) (err error) {
 				for i := range length {
 					var item driver.Value
 					if rValue.Index(i).CanInterface() {
-						item, err = utils.GetValue(rValue.Index(i).Interface())
+						item, err = derefValue(rValue.Index(i).Interface())
 						if err != nil {
 							return err
 						}
@@ -126,7 +125,6 @@ func (param *ArrayParameter) Decode(conn IConnection) (value any, err error) {
 	}
 	session := conn.GetSession()
 	if param.ArraySize > 0 {
-		//decoders := make([]parameter_coder.OracleParameterCoder, param.ArraySize)
 		items := make([]any, param.ArraySize)
 		for i := 0; i < param.ArraySize; i++ {
 			decoder := param.attrib.Copy()
@@ -157,10 +155,6 @@ func (param *ArrayParameter) Read(session tns.SessionReader) error {
 	if err != nil {
 		return err
 	}
-	//err = param.FillAttrib(nil, )
-	//if err != nil {
-	//	return err
-	//}
 
 	return nil
 }
@@ -172,4 +166,32 @@ func (param *ArrayParameter) Write(session tns.SessionWriter) (err error) {
 		session.PutBytes(param.BValue...)
 	}
 	return
+}
+
+// derefValue returns the value that origVal points to, through its Value
+// method when it is a driver.Valuer.
+func derefValue(origVal driver.Value) (driver.Value, error) {
+	if origVal == nil {
+		return nil, nil
+	}
+	rOriginal := reflect.ValueOf(origVal)
+	if rOriginal.Kind() == reflect.Pointer && rOriginal.IsNil() {
+		return nil, nil
+	}
+	proVal := reflect.Indirect(rOriginal)
+	if valuer, ok := proVal.Interface().(driver.Valuer); ok {
+		return valuer.Value()
+	}
+	return proVal.Interface(), nil
+}
+
+// derefType returns the type of value, with every pointer removed.
+func derefType(value driver.Value) reflect.Type {
+	valueType := reflect.TypeOf(value)
+	if valueType != nil {
+		for valueType.Kind() == reflect.Pointer {
+			valueType = valueType.Elem()
+		}
+	}
+	return valueType
 }

@@ -40,15 +40,6 @@ type Packet struct {
 	// SID        []byte
 }
 
-//const (
-//	NSPFSID   = 1
-//	NSPFRDS   = 2
-//	NSPFRDR   = 4
-//	NSPFSRN   = 8
-//	NSPFPRB   = 0x10
-//	NSPSID_SZ = 0x10
-//)
-
 func (pck *Packet) bytes() []byte {
 	output := make([]byte, 8)
 	if pck.dataOffset > 8 {

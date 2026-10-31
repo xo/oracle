@@ -7,13 +7,13 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/cockroachdb/apd/v3"
 
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/trace"
 	types "github.com/xo/oracle/internal/types"
-	"github.com/xo/oracle/internal/utils"
 )
 
 type Row []driver.Value
@@ -127,7 +127,6 @@ func (resultSet *ResultSet) Trace(t trace.Tracer) {
 // ColumnTypeDatabaseTypeName return Col DataType name
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
 	return ""
-	//return (*resultSet.cols)[index].DataType.String()
 }
 
 // ColumnTypeLength return length of column type
@@ -159,7 +158,7 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	switch col.DataType {
 	case types.NUMBER:
 		if col.Scale == 0 && col.Precision >= 1 && col.Precision <= 18 {
-			return types.TyInt64
+			return reflect.TypeFor[int64]()
 		}
 		return reflect.TypeFor[*apd.Decimal]()
 	case types.ROWID, types.UROWID:
@@ -169,13 +168,13 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	case types.OCIClobLocator:
 		fallthrough
 	case types.LongVarChar:
-		return types.TyString
+		return reflect.TypeFor[string]()
 	case types.RAW:
 		fallthrough
 	case types.OCIBlobLocator, types.OCIFileLocator:
 		fallthrough
 	case types.LongRaw, types.LongVarRaw:
-		return types.TyBytes
+		return reflect.TypeFor[[]byte]()
 	case types.DATE, types.TIMESTAMP:
 		fallthrough
 	case types.TimeStampDTY:
@@ -183,13 +182,13 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	case types.TimeStampLTZ, types.TimeStampLTZ_DTY:
 		fallthrough
 	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
-		return types.TyTime
+		return reflect.TypeFor[time.Time]()
 	case types.IBFLOAT:
-		return types.TyFloat64
+		return reflect.TypeFor[float64]()
 	case types.IBDOUBLE:
-		return types.TyFloat64
+		return reflect.TypeFor[float64]()
 	case types.INTERVALDS_DTY, types.INTERVALYM_DTY:
-		return types.TyString
+		return reflect.TypeFor[string]()
 	default:
 		return nil
 	}
@@ -203,8 +202,7 @@ func (resultSet *ResultSet) Err() error {
 // for non-supported type
 // error means error occur during operation
 func (resultSet *ResultSet) setObjectValue(obj reflect.Value, colIndex int) error {
-	//col := (*resultSet.cols)[colIndex]
-	return types.RCopy(obj, resultSet.currentRow[colIndex])
+	return copyValue(obj.Addr().Interface(), resultSet.currentRow[colIndex])
 }
 
 // Scan act like scan in sql package return row values to dest variable pointers
@@ -233,7 +231,7 @@ func (resultSet *ResultSet) Scan(dest ...any) error {
 					continue
 				}
 				field := destTyp.Field(x)
-				name, _, _, _ := utils.ExtractTag(field.Tag.Get("db"))
+				name, _, _, _ := extractTag(field.Tag.Get("db"))
 				if len(name) == 0 {
 					continue
 				}
@@ -242,7 +240,6 @@ func (resultSet *ResultSet) Scan(dest ...any) error {
 					continue
 				}
 				err := resultSet.setObjectValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), srcIndex+processedFields)
-				// err := setFieldValue(reflect.ValueOf(dest[destIndex]).Elem().Field(x), colInfo.cusType, dataSet.currentRow[srcIndex+processedFields])
 				if err != nil {
 					return err
 				}
@@ -279,16 +276,12 @@ func (resultSet *ResultSet) Next_() bool {
 func (resultSet *ResultSet) Next(dest []driver.Value) error {
 	hasMoreRows := resultSet.parent.hasMoreRows()
 	noOfRowsToFetch := len(resultSet.rows) // dataSet.parent.noOfRowsToFetch()
-	// if noOfRowsToFetch == 0 {
-	// 	return io.EOF
-	// }
 	hasBLOB := resultSet.parent.hasBLOB()
 	hasLONG := resultSet.parent.hasLONG()
 	if !hasMoreRows && noOfRowsToFetch == 0 {
 		return io.EOF
 	}
 	if hasMoreRows && (hasBLOB || hasLONG) && resultSet.index == 0 {
-		// dataSet.rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
 		if err := resultSet.parent.fetch(resultSet); err != nil {
 			return err
 		}

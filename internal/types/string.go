@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql/driver"
 	"fmt"
 
 	"github.com/xo/oracle/internal/converters"
@@ -69,42 +68,4 @@ func (str *String) SetValue(input any) error {
 }
 func (str *String) Scan(input any) error {
 	return str.SetValue(input)
-}
-
-//type String interface {
-//	OracleType
-//}
-
-//type oracleString struct {
-//	data  string
-//	valid bool
-//}
-
-func (str *String) CopyTo(dest driver.Value) (err error) {
-	if ok, err := ScanExternal(dest, str.Value); ok {
-		return err
-	}
-	value, err := str.Value()
-	if err != nil {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *string:
-		if value != nil {
-			*dst = value.(string)
-		} else {
-			*dst = ""
-		}
-	case *[]byte:
-		if value != nil {
-			*dst = []byte(value.(string))
-		} else {
-			*dst = nil
-		}
-	case *String:
-		*dst = *str
-	default:
-		return fmt.Errorf("cannot copy String to variable of type %T", dest)
-	}
-	return nil
 }

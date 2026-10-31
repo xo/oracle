@@ -1,6 +1,7 @@
 package aq
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -8,8 +9,13 @@ import (
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
-	"github.com/xo/oracle/internal/utils"
 )
+
+// Execer runs statements. *sql.DB, *sql.Conn and *sql.Tx are each one.
+type Execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+}
 
 type Queue interface {
 	NewMessage(data any) (*Message, error)
@@ -29,7 +35,7 @@ type queue struct {
 	AutoCommit  bool
 }
 
-func CreateQueue(db utils.Execuer, name string, messageType MessageType, udtName string) (Queue, error) {
+func CreateQueue(db Execer, name string, messageType MessageType, udtName string) (Queue, error) {
 	ret := &queue{
 		Name:        name,
 		messageType: messageType,
@@ -131,7 +137,6 @@ func (qu *queue) Enqueue(message *Message) error {
 	} else {
 		session.PutBytes(0, 0)
 	}
-	// message.marshal()
 	message.write(qu.conn)
 	if len(message.recipients) > 0 {
 		session.PutBytes(1)
@@ -158,7 +163,6 @@ func (qu *queue) Enqueue(message *Message) error {
 		session.PutBytes(0, 0, 0)
 	default:
 		session.PutBytes(1, 0, 0)
-		//session.PutUint(len(message.payloadInBytes), 4, true, true)
 	}
 	// retrieve message id in response
 	if len(message.messageID) == 0 {
@@ -277,7 +281,6 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	}
 	session.PutBytes(1)
 	session.PutInt(len(qu.toid), 4, true, true)
-	//session.PutInt(0x10, 2, true, true)
 	session.PutUint(qu.version, 2, true, true)
 	session.PutBytes(1)
 	// retrieve message id in response
@@ -406,7 +409,6 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 				}
 			}
 			message.messageID, err = session.GetBytes(16)
-			//_, err = session.GetInt(2, true, true)
 		default:
 			err = qu.conn.ProcessTCCResponse(msg)
 			if err != nil {

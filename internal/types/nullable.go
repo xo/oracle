@@ -7,26 +7,6 @@ import (
 	"time"
 )
 
-// ScanExternal stores the value that value returns in dest when dest is an
-// sql.Scanner that is not a type of this package, such as an *sql.Null[T] or
-// an *sql.NullString, and reports whether it did. The Value methods of the
-// types of this package return the plain Go value, which Scan takes, so the
-// driver needs no case for each nullable type.
-func ScanExternal(dest any, value func() (any, error)) (bool, error) {
-	s, ok := dest.(sql.Scanner)
-	if !ok {
-		return false, nil
-	}
-	if _, own := dest.(OracleType); own {
-		return false, nil
-	}
-	v, err := value()
-	if err != nil {
-		return true, err
-	}
-	return true, s.Scan(v)
-}
-
 // OwnNull returns the value of a nullable type whose value the driver binds
 // itself, and reports whether v is one. The Value method of sql.Null[T]
 // converts a time.Duration to an int64 and refuses an IntervalYM, so the

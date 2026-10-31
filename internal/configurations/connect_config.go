@@ -184,18 +184,6 @@ func (config *ConnectionConfig) Validate() error {
 	if config.AuthType == TCPS {
 		config.AuthService = append(config.AuthService, "TCPS")
 	}
-	//if len(config.TokenFile) > 0 {
-	//	config.tokenBytes, err = os.ReadFile(config.TokenFile)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-	//if len(config.TokenPrivateKeyFile) > 0 {
-	//	config.tokenPrivateKeyBytes, err = os.ReadFile(config.TokenPrivateKeyFile)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
 	if len(config.TokenFile) > 0 && len(config.TokenPrivateKeyFile) > 0 {
 
 	} else {

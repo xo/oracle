@@ -28,15 +28,6 @@ func (sec *OracleNetworkDESCryptor) Reset() error {
 }
 
 func (sec *OracleNetworkDESCryptor) Encrypt(input []byte) ([]byte, error) {
-	//padding := 0
-	//if len(input)%8 > 0 {
-	//	padding = 8 - (len(input) % 8)
-	//	input = append(input, bytes.Repeat([]byte{0}, padding)...)
-	//}
-	//enc := cipher.NewCBCEncrypter(sec.blk, sec.iv)
-	//output := make([]byte, len(input))
-	//enc.CryptBlocks(output, input)
-	//return append(output, uint8(padding+1)), nil
 
 	length := len(input)
 	num := 0

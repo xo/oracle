@@ -1,15 +1,5 @@
 package ttc
 
-//type Object struct {
-//	Owner string
-//	Name  string
-//	attribs []ParameterInfo
-//	typ     reflect.Type
-//	toid    []byte // type oid
-//	isArray  bool
-//	fieldMap map[string]int
-//}
-
 // RegisterType register user defined type with owner equal to user id
 // func (conn *Connection) RegisterType(typeName, arrayTypeName string, typeObj interface{}) error {
 // 	return conn.RegisterTypeWithOwner(conn.connOption.UserID, typeName, arrayTypeName, typeObj)
@@ -191,16 +181,6 @@ package ttc
 // 	return nil
 // }
 
-// func (cust *customType) getFieldIndex(name string) int {
-// 	for x := 0; x < cust.typ.NumField(); x++ {
-// 		fieldID, _, _, _ := extractTag(cust.typ.Field(x).Tag.Get("udt"))
-// 		if strings.ToUpper(fieldID) == strings.ToUpper(name) {
-// 			return x
-// 		}
-// 	}
-// 	return -1
-// }
-
 // loadFieldMap read struct tag that supplied with golang type object passed in RegisterType
 // function
 //func (cust *customType) loadFieldMap() {
@@ -216,17 +196,6 @@ package ttc
 //	}
 //}
 
-// func (cust *customType) isRegularArray() bool {
-// 	return cust.isArray && len(cust.attribs) > 0 && cust.attribs[0].DataType != XMLType
-// }
-
-//type Object struct {
-//	Owner       string
-//	Name        string
-//	Value       interface{}
-//	//itemMaxSize int
-//}
-
 // NewObject call this function to wrap oracle object types or arrayso
 //func NewObject(owner, name string, value interface{}) *Object {
 //	return &Object{
@@ -235,28 +204,6 @@ package ttc
 //		Value:       value,
 //		//itemMaxSize: 0,
 //	}
-//}
-
-//func (obj Object) SetDataType(conn *Connection, par *ParameterInfo) error {
-//	par.DataType = oraTypes.XMLType
-//	par.Value = obj.Value
-//	for name, cusType := range conn.cusTyp {
-//		if strings.EqualFold(name, obj.Name) {
-//			par.cusType = new(Object)
-//			*par.cusType = cusType
-//			par.ToID = cusType.toid
-//			if cusType.isArray {
-//				par.MaxNoOfArrayElements = 1
-//			} else {
-//				par.Version = 1
-//			}
-//			break
-//		}
-//	}
-//	if par.cusType == nil {
-//		return fmt.Errorf("type %s is not created or not registered", obj.Name)
-//	}
-//	return nil
 //}
 
 // NewArrayObject call this function for creation of array of regular type

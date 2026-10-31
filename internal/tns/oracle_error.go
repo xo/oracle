@@ -50,7 +50,6 @@ func (err *OracleError) Error() string {
 	} else {
 		output = err.ErrMsg
 	}
-	//return err.ErrMsg
 	return output
 }
 

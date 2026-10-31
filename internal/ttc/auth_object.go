@@ -110,23 +110,6 @@ func (obj *AuthObject) read() error {
 					}
 				}
 			}
-		// case 15:
-		//	warning, err := network.NewWarningObject(conn.session)
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	if warning != nil {
-		//		fmt.Println(warning)
-		//	}
-		// case 23:
-		//	opCode, err := conn.session.GetByte()
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	err = conn.getServerNetworkInformation(opCode)
-		//	if err != nil {
-		//		return nil, err
-		//	}
 		default:
 			err = obj.conn.ProcessTCCResponse(messageCode)
 			if err != nil {
@@ -138,7 +121,6 @@ func (obj *AuthObject) read() error {
 				}
 				loop = false
 			}
-			// return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", messageCode))
 		}
 	}
 	if len(obj.EServerSessKey) != 64 && len(obj.EServerSessKey) != 96 {
@@ -328,7 +310,6 @@ func (obj *AuthObject) Write() error {
 			index++
 		}
 	}
-	//session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x73)
 	if len(connOption.UserID) > 0 {
 		session.PutBytes(1)
@@ -365,7 +346,6 @@ func generateSpeedyKey(buffer, key []byte, turns int) []byte {
 	tempHash := make([]byte, len(firstHash))
 	copy(tempHash, firstHash)
 	for index1 := 2; index1 <= turns; index1++ {
-		// mac = hmac.New(sha512.New, []byte("ter1234"))
 		mac.Reset()
 		mac.Write(tempHash)
 		tempHash = mac.Sum(nil)
@@ -431,9 +411,6 @@ func decryptSessionKey(padding bool, encKey []byte, sessionKey string) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	//if padding {
-	//	result = PKCS5Padding(result, blk.BlockSize())
-	//}
 	enc := cipher.NewCBCDecrypter(blk, make([]byte, 16))
 	output := make([]byte, len(result))
 	enc.CryptBlocks(output, result)
@@ -465,9 +442,6 @@ func encryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 	enc := cipher.NewCBCEncrypter(blk, make([]byte, 16))
 	originalLen := len(sessionKey)
 	sessionKey = security.PKCS5Padding(sessionKey, blk.BlockSize())
-	//if padding {
-	//
-	//}
 	output := make([]byte, len(sessionKey))
 	enc.CryptBlocks(output, sessionKey)
 	if !padding {
@@ -475,12 +449,6 @@ func encryptSessionKey(padding bool, encKey []byte, sessionKey []byte) (string, 
 	}
 	return fmt.Sprintf("%X", output), nil
 
-	// cryptoServiceProvider.Mode = CipherMode.CBC;
-	// cryptoServiceProvider.KeySize = key.Length * 8;
-	// cryptoServiceProvider.BlockSize = O5LogonHelper.d;
-	// cryptoServiceProvider.Key = key;
-	// cryptoServiceProvider.IV = O5LogonHelper.f;
-	// numArray = cryptoServiceProvider.CreateEncryptor().TransformFinalBlock(buffer, 0, buffer.Length);
 }
 
 // encrypt user password
@@ -560,66 +528,3 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 		}
 	}
 }
-
-//func (obj *AuthObject) VerifyResponse(response string) bool {
-//	key, err := decryptSessionKey(true, obj.KeyHash, response)
-//	if err != nil {
-//		fmt.Println(err)
-//		return false
-//	}
-//	//fmt.Printf("%#v\n", key)
-//	return bytes.Compare(key[16:], []byte{83, 69, 82, 86, 69, 82, 95, 84, 79, 95, 67, 76, 73, 69, 78, 84}) == 0
-//	//KZSR_SVR_RESPONSE = new byte[16]{ (byte) 83, (byte) 69, (byte) 82, (byte) 86, (byte) 69, (byte) 82, (byte) 95, (byte) 84, (byte) 79,
-//	//(byte) 95, (byte) 67, (byte) 76, (byte) 73, (byte) 69, (byte) 78, (byte) 84 };
-//
-//}
-
-//func (obj *AuthObject) TestResponse(password, pbkdf2ChkSalt string, vGenCount, sDerCount int) error {
-//	padding := false
-//	obj.pbkdf2ChkSalt = pbkdf2ChkSalt
-//	obj.pbkdf2VgenCount = vGenCount
-//	obj.pbkdf2SderCount = sDerCount
-//	obj.tcpNego = &TCPNego{
-//		MessageCode:           0,
-//		ProtocolServerVersion: 0,
-//		ProtocolServerString:  "",
-//		OracleVersion:         0,
-//		ServerCharset:         0,
-//		ServerFlags:           0,
-//		CharsetElem:           0,
-//		ServernCharset:        0,
-//		ServerCompileTimeCaps: []byte{0, 0, 0, 0, 32},
-//		ServerRuntimeCaps:     nil,
-//	}
-//	salt, err := hex.DecodeString(obj.Salt)
-//	if err != nil {
-//		return err
-//	}
-//	message := append(salt, []byte("AUTH_PBKDF2_SPEEDY_KEY")...)
-//	speedyKey := generateSpeedyKey(message, []byte(password), obj.pbkdf2VgenCount)
-//
-//	buffer := append(speedyKey, salt...)
-//	hash := sha512.New()
-//	hash.Write(buffer)
-//	key := hash.Sum(nil)[:32]
-//	obj.ServerSessKey, err = decryptSessionKey(padding, key, obj.EServerSessKey)
-//	if err != nil {
-//		return err
-//	}
-//	obj.ClientSessKey, err = decryptSessionKey(padding, key, obj.EClientSessKey)
-//	if err != nil {
-//		return err
-//	}
-//	newKey, err := obj.generatePasswordEncKey()
-//	if err != nil {
-//		return err
-//	}
-//	fmt.Println(decryptSessionKey(padding, newKey, obj.EPassword))
-//
-//	obj.EPassword, err = encryptPassword([]byte(password), newKey, false)
-//	if err != nil {
-//		return err
-//	}
-//	obj.ESpeedyKey, err = encryptPassword(speedyKey, newKey, false)
-//	return err
-//}

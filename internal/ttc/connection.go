@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"github.com/xo/oracle/aq"
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/configurations"
-	"github.com/xo/oracle/internal/lazyinit"
 	"github.com/xo/oracle/internal/trace"
 	"github.com/xo/oracle/internal/types"
 
@@ -54,7 +52,6 @@ const (
 // from GODROR
 const wrapResultset = "--WRAP-RESULTSET--"
 
-// const createQueue = "--CREATE-QUEUE--"
 const createLob = "--CREATE-LOB-STREAM--"
 const connRef = "--GET-CONNECTION-REF--"
 
@@ -62,10 +59,6 @@ const connRef = "--GET-CONNECTION-REF--"
 type Querier interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
-
-//type Executer interface {
-//	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
-//}
 
 // ///
 
@@ -154,39 +147,7 @@ func (conn *Connection) buildParameterCoderMap(drv *Registry) {
 	conn.goTypeCoder = drv.goTypeCoder
 	conn.nameTypeCoder = drv.nameTypeCoder
 	conn.oracleTypeCoder = drv.oracleTypeCoder
-	//conn.oracleTypeCoder = make(map[uint16]parameter_coder.OracleParameterCoder)
-	//for name, value := range drv.oracleTypeCoder {
-	//	rValue := reflect.ValueOf(value)
-	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
-	//	if temp, ok := newValue.(parameter_coder.OracleParameterCoder); ok {
-	//		conn.oracleTypeCoder[name] = temp
-	//	}
-	//}
-	//conn.goTypeCoder = make(map[reflect.Type]parameter_coder.OracleParameterCoder)
-	//for key, value := range drv.goTypeCoder {
-	//	rValue := reflect.ValueOf(value)
-	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
-	//	if temp, ok := newValue.(parameter_coder.OracleParameterCoder); ok {
-	//		conn.goTypeCoder[key] = temp
-	//	}
-	//}
-	//conn.nameTypeCoder = make(map[string]parameter_coder.OracleParameterCoder)
-	//for key, value := range drv.nameTypeCoder {
-	//	rValue := reflect.ValueOf(value)
-	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
-	//	if temp, ok := newValue.(parameter_coder.OracleParameterCoder); ok {
-	//		conn.nameTypeCoder[key] = temp
-	//	}
-	//}
 
-	//conn.typeDecoder = make(map[uint16]type_coder.OracleTypeDecoder)
-	//for name, value := range drv.typeDecoder {
-	//	rValue := reflect.ValueOf(value)
-	//	newValue := reflect.New(rValue.Elem().Type()).Interface()
-	//	if temp, ok := newValue.(type_coder.OracleTypeDecoder); ok {
-	//		conn.typeDecoder[name] = temp
-	//	}
-	//}
 }
 
 // GetNLS return NLS properties of the connection.
@@ -224,24 +185,6 @@ func (conn *Connection) GetNLS() (*NLSData, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// fmt.Println(stmt.Pars)
-
-	// if len(stmt.Pars) >= 10 {
-	//	conn.NLSData.Calender = conn.sStrConv.Decode(stmt.Pars[0].BValue)
-	//	conn.NLSData.Comp = conn.sStrConv.Decode(stmt.Pars[1].BValue)
-	//	conn.NLSData.LengthSemantics = conn.sStrConv.Decode(stmt.Pars[2].BValue)
-	//	conn.NLSData.NCharConvExcep = conn.sStrConv.Decode(stmt.Pars[3].BValue)
-	//	conn.NLSData.DateLang = conn.sStrConv.Decode(stmt.Pars[4].BValue)
-	//	conn.NLSData.Sort = conn.sStrConv.Decode(stmt.Pars[5].BValue)
-	//	conn.NLSData.Currency = conn.sStrConv.Decode(stmt.Pars[6].BValue)
-	//	conn.NLSData.DateFormat = conn.sStrConv.Decode(stmt.Pars[7].BValue)
-	//	conn.NLSData.IsoCurrency = conn.sStrConv.Decode(stmt.Pars[8].BValue)
-	//	conn.NLSData.NumericChars = conn.sStrConv.Decode(stmt.Pars[9].BValue)
-	//	conn.NLSData.DualCurrency = conn.sStrConv.Decode(stmt.Pars[10].BValue)
-	//	conn.NLSData.Timestamp = conn.sStrConv.Decode(stmt.Pars[11].BValue)
-	//	conn.NLSData.TimestampTZ = conn.sStrConv.Decode(stmt.Pars[12].BValue)
-	// }
 
 	/*
 		for _, par := range stmt.Pars {
@@ -311,9 +254,6 @@ func (conn *Connection) GetMaxRawLength() int64 {
 }
 func (conn *Connection) getDefaultCharsetID() int {
 
-	//if conn.cStrConv != nil {
-	//	return conn.cStrConv.GetLangID()
-	//}
 	return conn.tcpNego.ServerCharset
 }
 func (conn *Connection) GetDefaultStringCoder() (converters.IStringConverter, error) {
@@ -350,7 +290,6 @@ func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (converters.I
 	if conn.nStrConv != nil && charsetID == conn.nStrConv.GetLangID() {
 		return conn.nStrConv, nil
 	}
-	//return conn.sStrConv, nil
 	temp := converters.NewStringConverter(charsetID)
 	if temp == nil {
 		return nil, errStringCoder
@@ -368,30 +307,12 @@ func (conn *Connection) Logoff() error {
 	conn.tracer.Print("Logoff")
 	session := conn.session
 	session.ResetBuffer()
-	// session.PutBytes(0x11, 0x87, 0, 0, 0, 0x2, 0x1, 0x11, 0x1, 0, 0, 0, 0x1, 0, 0, 0, 0, 0, 0x1, 0, 0, 0, 0, 0,
-	//	3, 9, 0)
-	//session.PutBytes(3, 9, 0)
 	session.PutTTCFunc(3, 9)
 	err := session.Write()
 	if err != nil {
 		return err
 	}
 	return conn.read()
-	// loop := true
-	// for loop {
-	//	msg, err := session.GetByte()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	err = conn.processTCCResponse(msg)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if msg == 4 || msg == 9 {
-	//		loop = false
-	//	}
-	// }
-	// return nil
 }
 
 func (conn *Connection) read() error {
@@ -414,22 +335,6 @@ func (conn *Connection) read() error {
 }
 
 // Open the connection = bring it online
-
-// func (conn *Connection) restore() error {
-//	tracer := conn.tracer
-//	failOver := conn.connOption.Failover
-//	var err error
-//	for trial := 0; trial < failOver; trial++ {
-//		tracer.Print("reconnect trial #", trial+1)
-//		err = conn.Open()
-//		if err != nil {
-//			tracer.Print("Error: ", err)
-//			continue
-//		}
-//		break
-//	}
-//	return err
-// }
 
 // OpenWithContext open the connection with timeout context
 func (conn *Connection) OpenWithContext(ctx context.Context) error {
@@ -635,7 +540,6 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	conn.serialID = int(serialNum)
 	conn.connOption.InstanceName = conn.SessionProperties["AUTH_SC_INSTANCE_NAME"]
-	// conn.connOption.Host = conn.SessionProperties["AUTH_SC_SERVER_HOST"]
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
@@ -676,8 +580,6 @@ func (conn *Connection) getDBServerTimeZone(ctx context.Context) {
 func (conn *Connection) getDBTimeZone(ctx context.Context) error {
 	var result string
 	err := conn.QueryRowContext(ctx, "SELECT DBTIMEZONE FROM DUAL", nil).Scan(&result)
-	// var current time.Time
-	// err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
 	if err != nil {
 		return err
 	}
@@ -749,7 +651,6 @@ func NewConnection(config *configurations.ConnectionConfig) (*Connection, error)
 	if len(token) > 0 && len(tokenPrivateKey) == 0 {
 		return nil, errors.New("token private key file is required")
 	}
-	// conStr, err := newConnectionStringFromUrl(databaseUrl)
 	temp := new(configurations.ConnectionConfig)
 	*temp = *config
 	return &Connection{
@@ -821,7 +722,6 @@ func (conn *Connection) Close() (err error) {
 	}
 	tracer := conn.tracer
 	tracer.Print("Close")
-	// var err error = nil
 	if conn.session != nil {
 		err = conn.Logoff()
 		if err != nil {
@@ -939,7 +839,6 @@ func (conn *Connection) doAuth() error {
 			if msg == 4 || msg == 9 {
 				stop = true
 			}
-			// return errors.New(fmt.Sprintf("message code error: received code %d", msg))
 		}
 	}
 
@@ -1188,10 +1087,6 @@ func SetNTSAuth(newNTSManager auth.NTSAuthInterface) {
 	auth.NTSAuth = newNTSManager
 }
 
-var insertQueryBracketsRegexp = lazyinit.NewLazyInit(func() (any, error) {
-	return regexp.Compile(`\((.*?)\)`)
-})
-
 // BulkInsert mass insert column values into a table
 // all columns should pass as an array of values
 //func (conn *Connection) BulkInsert(sqlText string, rowNum int, columns ...[]driver.Value) (driver.Result, error) {
@@ -1349,27 +1244,10 @@ func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtN
 	switch messageType {
 	case aq.JSON:
 		return nil, errors.New("unsupported")
-		//return NewJsonBytes(data)
 	case aq.UDT:
-		//par.DataType = types.XMLType
-		//for name, cust := range conn.cusTyp {
-		//	if name == strings.ToUpper(udtName) {
-		//		par.cusType = new(Object)
-		//		*par.cusType = cust
-		//		par.ToID = cust.toid
-		//	}
-		//}
-		//err := decodeObject(conn, &par, nil)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//output := reflect.New(par.cusType.typ)
-		//err = setFieldValue(output, par.cusType, par.oPrimValue)
-		//return output.Interface(), err
 	default:
 		return nil, errors.New("unsupported message type")
 	}
-	//err := par.decodeParameterValue(conn, nil)
 	return par.Value, err
 }
 func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -1412,7 +1290,6 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 		}
 		tempVal := reflect.ValueOf(args[0].Value)
 		tempVal.Elem().Set(reflect.ValueOf(conn))
-		//args[0].Value = conn
 		return nil, nil
 	}
 	stmt := NewStmt(query, conn)
@@ -1440,9 +1317,6 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	//if conn.State != Opened {
-	//	return nil, driver.ErrBadConn
-	//}
 	if conn.State != Opened || !conn.session.Connected {
 		if !conn.session.Connected {
 			t := time.Now().Local()
@@ -1467,12 +1341,6 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 	var err error
 	switch msgCode {
 	case 4:
-		// if conn.session.IsBreak() {
-		//	if conn.session.RestoreIndex() {
-		//		_, _ = conn.session.GetByte()
-		//	}
-		//	conn.session.ResetBreak()
-		// }
 		conn.session.Summary, err = tns.NewSummary(session)
 		if err != nil {
 			return err
@@ -1492,18 +1360,6 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 				return err
 			}
 		}
-		// for x := 0; x < 2; x++ {
-		//	_, err = session.GetInt(4, true, true)
-		//	if err != nil {
-		//		return err
-		//	}
-		// }
-		// for x := 2; x < size; x++ {
-		//	_, err = session.GetInt(4, true, true)
-		//	if err != nil {
-		//		return err
-		//	}
-		// }
 		_, err = session.GetInt(2, true, true)
 		if err != nil {
 			return err
@@ -1514,10 +1370,8 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			if err != nil {
 				return err
 			}
-			// fmt.Println(key, val, num)
 			if num == 163 {
 				session.TimeZone = val
-				// fmt.Println("session time zone", session.TimeZone)
 			}
 		}
 		if session.TTCVersion >= 4 {
@@ -1675,6 +1529,12 @@ func (conn *Connection) GetParameterCoder(input any) (codec.OracleParameterCoder
 		if coder, ok := conn.goTypeCoder[input]; ok {
 			return coder.Copy(), nil
 		}
+		if input != nil && input.Kind() != reflect.Interface {
+			if coder := builtinCoder(reflect.Zero(input).Interface()); coder != nil {
+				coder.Init()
+				return coder, nil
+			}
+		}
 
 		return nil, fmt.Errorf("no parameter coder registered for go type %s", input.String())
 	case string:
@@ -1703,7 +1563,6 @@ func (conn *Connection) GetParameterCoder(input any) (codec.OracleParameterCoder
 
 func (conn *Connection) SendTimeAsUTC() bool {
 	return conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion == conn.dataNego.serverTZVersion
-	//return !(conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion != conn.dataNego.serverTZVersion)
 }
 
 func (conn *Connection) GetDBTimeZone() *time.Location {

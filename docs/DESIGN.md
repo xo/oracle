@@ -543,6 +543,29 @@ structs in step 7, because `encoding/json/v2` does it.
 `internal/tns` are code that is commented out. Delete them. Git history keeps
 them.
 
+### Where the cleanup stands
+
+Done, on 2026-10-31:
+
+- A tool deleted 6,011 lines of code that was commented out. It parsed each
+  group of comments as Go, so a comment that is prose stayed.
+- `internal/utils` and `internal/lazyinit` are gone. Each regular expression
+  is a `regexp.MustCompile` of the package, `Max` is `max`, and `ExtractTag`,
+  `GetType`, `GetValue` and `Execuer` moved to the one package that used each.
+  `aq.CreateQueue` takes an `aq.Execer`, which a caller can name.
+- `types.RCopy`, `copyx.go` and the 11 `CopyTo` methods are gone.
+  `copyValue` in `internal/ttc` stores an OUT argument, a field of a user
+  defined type and an element of an array through `sql.ConvertAssign`. A NULL
+  in a destination that cannot hold one is its zero value, as in `go-ora`.
+- The 52 `Ty` variables are gone. `builtinCoder` chooses the coder of a Go
+  type with a type switch, and the map keyed by `reflect.Type` holds only the
+  types that `RegisterType` registers.
+
+`reflect` fell from 158 to 19 uses in `internal/types` and from 295 to 151 in
+`internal/ttc`, where the mapping of user defined types and struct tags holds
+most of what is left. The renames, the interfaces and the move of
+`TestIssues` are next.
+
 ## The order of the work
 
 Each step leaves a driver that builds and passes its tests.

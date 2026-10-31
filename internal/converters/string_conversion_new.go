@@ -78248,17 +78248,4 @@ func NewStringConverter(langID int) IStringConverter {
 	default:
 		return nil
 	}
-	//fileName := fmt.Sprintf("glb/lx20%x.json", LangID)
-	//jsonFile, err := os.Open(fileName)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	return nil
-	//}
-	//content, _ := ioutil.ReadAll(jsonFile)
-	//var conv StringConverter
-	//err = json.Unmarshal(content, &conv)
-	//if err != nil {
-	//	return nil
-	//}
-	//return &conv
 }

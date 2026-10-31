@@ -11,24 +11,7 @@ import (
 	ora_types "github.com/xo/oracle/internal/types"
 )
 
-//type Clob struct {
-//	locator []byte
-//	String  string
-//	Valid   bool
-//}
-
 //type NClob Clob
-
-//type lobInterface interface {
-//	getLocator() []byte
-//}
-
-//type Blob struct {
-//	locator []byte
-//	Data    []byte
-//	// deprecated
-//	Valid bool
-//}
 
 var errEmptyLocator = errors.New("call lob operation on an empty locator")
 
@@ -47,12 +30,6 @@ type LobStream struct {
 	isNull        bool
 	sendSize      bool
 }
-
-//func newLob(connection *Connection) *LobStream {
-//	return &LobStream{
-//		conn: connection,
-//	}
-//}
 
 func (lob *LobStream) initialize() {
 	lob.bNullO2U = false
@@ -134,8 +111,6 @@ func (lob *LobStream) Read(offset, count int64) (data []byte, err error) {
 	lob.data.Reset()
 	session := lob.conn.session
 	session.ResetBuffer()
-	//done := session.StartContext(ctx)
-	//defer session.EndContext(done)
 	lob.writeOp(2)
 	err = session.Write()
 	if err != nil {
@@ -155,8 +130,6 @@ func (lob *LobStream) Write(data []byte) error {
 	}
 	lob.conn.tracer.Printf("Write Lob Data: %d bytes", len(data))
 	lob.initialize()
-	//lob.size = int64(len(data))
-	//lob.sendSize = true
 	lob.sourceOffset = 1
 	lob.conn.session.ResetBuffer()
 	lob.writeOp(0x40)
@@ -246,7 +219,6 @@ func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (ora_ty
 	lob.conn.tracer.Print("Create Temporary Lob:")
 	lob.sourceLocator = make([]byte, 0x28)
 	lob.sourceLocator[1] = 0x54
-	//lob.sourceLen = len(lob.sourceLocator)
 	lob.bNullO2U = true
 	lob.scn = make([]byte, 1)
 	// lob.scn[0] = 1 if you need to cache otherwise 0
@@ -278,28 +250,6 @@ func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (ora_ty
 	return lob.sourceLocator, nil
 }
 
-//func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
-//	//lob.initialize()
-//	//lob.conn.tracer.Print("Create Temporary CLob")
-//	//lob.sourceLocator = make([]byte, 0x28)
-//	//lob.sourceLocator[1] = 0x54
-//	//lob.bNullO2U = true
-//	//lob.scn = make([]byte, 1)
-//	//lob.destLen = 0xA
-//	//lob.size = 0xA
-//	//lob.sendSize = true
-//	//lob.charsetID = charset
-//	//lob.sourceOffset = int64(charsetForm)
-//	session := lob.conn.session
-//	session.ResetBuffer()
-//	lob.writeOp(0x110)
-//	err := session.Write()
-//	if err != nil {
-//		return err
-//	}
-//	return lob.read()
-//}
-
 func (lob *LobStream) Open(mode, opID int) error {
 	if lob.sourceLocator == nil {
 		return errEmptyLocator
@@ -318,8 +268,6 @@ func (lob *LobStream) Open(mode, opID int) error {
 	lob.initialize()
 	lob.size = int64(mode)
 	lob.sendSize = true
-	//done := lob.conn.session.StartContext(context)
-	//defer lob.conn.session.EndContext(done)
 	lob.conn.session.ResetBuffer()
 	lob.writeOp(opID)
 	err := lob.conn.session.Write()
@@ -344,7 +292,6 @@ func (lob *LobStream) Close(opID int) error {
 	}
 	err = lob.read()
 	return processReset(err, lob.conn)
-	//}
 }
 
 func (lob *LobStream) writeOp(operationID int) {
@@ -521,7 +468,6 @@ func (lob *LobStream) readData() error {
 }
 
 func (lob *LobStream) GetLobId() []byte {
-	// BitConverter.ToString(lobLocator, 10, 10);
 	if lob.sourceLocator == nil {
 		return nil
 	}
@@ -563,116 +509,3 @@ func (lob *LobStream) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, 
 	err = lob.read()
 	return processReset(err, lob.conn)
 }
-
-//func (val *Clob) Scan(value interface{}) error {
-//	val.Valid = true
-//	if value == nil {
-//		val.Valid = false
-//		val.String = ""
-//		return nil
-//	}
-//	switch temp := value.(type) {
-//	case Clob:
-//		*val = temp
-//	case *Clob:
-//		*val = *temp
-//	case NClob:
-//		*val = Clob(temp)
-//	case *NClob:
-//		*val = Clob(*temp)
-//	case string:
-//		val.String = temp
-//	case types.Nil:
-//		val.String = ""
-//		val.Valid = false
-//	default:
-//		return errors.New("go-ora: Clob column type require Clob or string values")
-//	}
-//	return nil
-//}
-
-//func (val *Blob) Scan(value interface{}) error {
-//	// val.Valid = true
-//	if value == nil {
-//		// val.Valid = false
-//		val.Data = nil
-//		return nil
-//	}
-//	switch temp := value.(type) {
-//	case Blob:
-//		*val = temp
-//	case *Blob:
-//		*val = *temp
-//	case []byte:
-//		val.Data = temp
-//	case types.Nil:
-//		val.Data = nil
-//	default:
-//		return errors.New("go-ora: Blob column type require Blob or []byte values")
-//	}
-//	return nil
-//}
-
-//func (val *NClob) Scan(value interface{}) error {
-//	val.Valid = true
-//	if value == nil {
-//		val.Valid = false
-//		val.String = ""
-//		return nil
-//	}
-//	switch temp := value.(type) {
-//	case Clob:
-//		*val = NClob(temp)
-//	case *Clob:
-//		*val = NClob(*temp)
-//	case NClob:
-//		*val = temp
-//	case *NClob:
-//		*val = *temp
-//	case string:
-//		val.String = temp
-//	case types.Nil:
-//		val.String = ""
-//		val.Valid = false
-//	default:
-//		return errors.New("go-ora: Clob column type require Clob or string values")
-//	}
-//	return nil
-//}
-//
-//func (val Blob) getLocator() []byte {
-//	return val.locator
-//}
-//
-//func (val Clob) getLocator() []byte {
-//	return val.locator
-//}
-//
-//func (val NClob) getLocator() []byte {
-//	return val.locator
-//}
-
-//func (val Clob) Value() (driver.Value, error) {
-//	if val.Valid {
-//		return val.String, nil
-//	} else {
-//		return nil, nil
-//	}
-//}
-
-//
-//func (val *NClob) Value() (driver.Value, error) {
-//	if val.Valid {
-//		return val.String, nil
-//	} else {
-//		return nil, nil
-//	}
-//}
-//
-//func (val *Blob) Value() (driver.Value, error) {
-//	if val.Valid {
-//		return val.Data, nil
-//	} else {
-//		return nil, nil
-//	}
-//}

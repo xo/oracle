@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/xo/oracle/internal/lazyinit"
 )
 
 type RefusePacket struct {
@@ -48,17 +46,11 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 }
 
-var errExtractRegexp = lazyinit.NewLazyInit(func() (any, error) {
-	return regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
-})
+var errExtractRegexp = regexp.MustCompile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
 
-var errorExtractRegexp = lazyinit.NewLazyInit(func() (any, error) {
-	return regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
-})
+var errorExtractRegexp = regexp.MustCompile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
 
-var codeExtractRegexp = lazyinit.NewLazyInit(func() (any, error) {
-	return regexp.Compile(`CODE\s*=\s*([0-9]+)`)
-})
+var codeExtractRegexp = regexp.MustCompile(`CODE\s*=\s*([0-9]+)`)
 
 func (pck *RefusePacket) extractErrCode() {
 	var err error
@@ -67,14 +59,8 @@ func (pck *RefusePacket) extractErrCode() {
 		return
 	}
 
-	var errExtractRegexpAny any
-	errExtractRegexpAny, err = errExtractRegexp.GetValue()
-	if err != nil {
-		return
-	}
-
 	msg := strings.ToUpper(pck.message)
-	matches := errExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(msg)
+	matches := errExtractRegexp.FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
 	}
@@ -86,25 +72,13 @@ func (pck *RefusePacket) extractErrCode() {
 		return
 	}
 
-	var errorExtractRegexpAny any
-	errorExtractRegexpAny, err = errorExtractRegexp.GetValue()
-	if err != nil {
-		return
-	}
-
-	matches = errorExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(msg)
+	matches = errorExtractRegexp.FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
 	}
 	codeStr := matches[1]
 
-	var codeExtractRegexpAny any
-	codeExtractRegexpAny, err = codeExtractRegexp.GetValue()
-	if err != nil {
-		return
-	}
-
-	matches = codeExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(codeStr)
+	matches = codeExtractRegexp.FindStringSubmatch(codeStr)
 	if len(matches) != 2 {
 		return
 	}

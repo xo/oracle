@@ -24,10 +24,5 @@ type (
 		SetBytes(b []byte)
 		Value(typeId uint16) (any, error)
 		Bytes() []byte
-
-		//Encode(typeId uint16) error
-		//Decode(typeId uint16) error
-		//Value() interface{}
-		//Bytes() []byte
 	}
 )

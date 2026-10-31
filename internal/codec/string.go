@@ -3,7 +3,6 @@ package codec
 import (
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
-	"github.com/xo/oracle/internal/utils"
 )
 
 type StringParameter struct {
@@ -57,7 +56,7 @@ func (param *StringParameter) Encode(input any, conn IConnection) error {
 	}
 	param.BValue = encoder.Bytes()
 	length := int64(len(param.BValue))
-	length = utils.Max(length, param.MaxLen, param.MaxCharLen)
+	length = max(length, param.MaxLen, param.MaxCharLen)
 	param.MaxLen = length
 	param.MaxCharLen = length
 	length = conn.GetMaxStringLength()

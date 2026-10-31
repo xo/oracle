@@ -1,46 +1,8 @@
 package types
 
 import (
-	"database/sql"
 	"encoding/binary"
-	"reflect"
 	"time"
-)
-
-var (
-	TyFloat64     = reflect.TypeFor[float64]()
-	TyFloat32     = reflect.TypeFor[float32]()
-	TyInt         = reflect.TypeFor[int]()
-	TyInt8        = reflect.TypeFor[int8]()
-	TyInt16       = reflect.TypeFor[int16]()
-	TyInt32       = reflect.TypeFor[int32]()
-	TyInt64       = reflect.TypeFor[int64]()
-	TyUint        = reflect.TypeFor[uint]()
-	TyUint8       = reflect.TypeFor[uint8]()
-	TyUint16      = reflect.TypeFor[uint16]()
-	TyUint32      = reflect.TypeFor[uint32]()
-	TyUint64      = reflect.TypeFor[uint64]()
-	TyBool        = reflect.TypeFor[bool]()
-	TyBytes       = reflect.TypeFor[[]byte]()
-	TyString      = reflect.TypeFor[string]()
-	TyTime        = reflect.TypeFor[time.Time]()
-	TyTimeStampTZ = reflect.TypeFor[TimeStampTZ]()
-	TyDuration    = reflect.TypeFor[time.Duration]()
-	TyIntervalYM  = reflect.TypeFor[IntervalYM]()
-	TyScanner     = reflect.TypeFor[sql.Scanner]()
-
-	TyNumber   = reflect.TypeFor[Number]()
-	TyBoolean  = reflect.TypeFor[Bool]()
-	TyVarchar  = reflect.TypeFor[String]()
-	TyDate     = reflect.TypeFor[Date]()
-	TyInterval = reflect.TypeFor[Interval]()
-	TyRaw      = reflect.TypeFor[Raw]()
-	TyVector   = reflect.TypeFor[Vector]()
-	TyJson     = reflect.TypeFor[Json]()
-	TyClob     = reflect.TypeFor[Clob]()
-	TyBlob     = reflect.TypeFor[Blob]()
-	TyBFile    = reflect.TypeFor[BFile]()
-	TyObject   = reflect.TypeFor[Object]()
 )
 
 const (

@@ -75,7 +75,6 @@ func getString(col any) string {
 			return ""
 		}
 		return temp.(string)
-		//return (*val).Data().String
 	}
 	col, _ = getValue(col)
 	if col == nil {
@@ -150,8 +149,6 @@ func getDate(col any) (time.Time, error) {
 	switch val := col.(type) {
 	case time.Time:
 		return val, nil
-	//case TimeStamp:
-	//	return time.Time(val), nil
 	case oraTypes.TimeStampTZ:
 		return time.Time(val), nil
 	case string:
@@ -175,9 +172,7 @@ func getBytes(col any) ([]byte, error) {
 			return nil, nil
 		}
 		return temp.([]byte), nil
-		//return val.Data(), nil
 	case *oraTypes.Blob:
-		//return (*val).Data(), nil
 		var temp any
 		temp, err = val.Value()
 		if err != nil {
@@ -200,8 +195,6 @@ func getBytes(col any) ([]byte, error) {
 		return val, nil
 	case string:
 		return []byte(val), nil
-	//case Blob:
-	//	return val.Data, nil
 	case oraTypes.Blob:
 		var temp any
 		temp, err = val.Value()
@@ -212,54 +205,10 @@ func getBytes(col any) ([]byte, error) {
 			return nil, nil
 		}
 		return temp.([]byte), nil
-		//return val.Data(), nil
 	default:
 		return nil, errors.New("conversion of unsupported type to []byte")
 	}
 }
-
-//func getVector(col interface{}) (*Vector, error) {
-//var err error
-//col, err = getValue(col)
-//if err != nil {
-//	return nil, err
-//}
-//if col == nil {
-//	return nil, nil
-//}
-//switch val := col.(type) {
-//case Vector:
-//	val.bValue, err = val.encode()
-//	if err != nil {
-//		return nil, err
-//	}
-//	val.lob.sourceLocator = utils.CreateQuasiLocator(uint64(len(val.bValue)))
-//	return &val, nil
-//default:
-//	return nil, errors.New("conversion of unsupported type to Vector")
-//}
-//}
-//func getJson(col interface{}) (*Json, error) {
-//	var err error
-//	col, err = getValue(col)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if col == nil {
-//		return nil, nil
-//	}
-//	switch val := col.(type) {
-//	case Json:
-//		err = val.encode()
-//		if err != nil {
-//			return nil, err
-//		}
-//		val.lob.sourceLocator = utils.CreateQuasiLocator(uint64(len(val.bValue)))
-//		return &val, nil
-//	default:
-//		return nil, errors.New("conversion of unsupported type to Json")
-//	}
-//}
 
 // get lob from supported types
 //func getLob(col interface{}, conn *Connection) (*LobStream, error) {

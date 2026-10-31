@@ -62,17 +62,6 @@ func NumberToUInt64(data []byte) (uint64, error) {
 	return toUInt64Internal(data, Uint64MaxByte, Uint64MinByte)
 }
 
-// func StringToNumber(s string) ([]byte, error) {
-// 	return ByteToNumber([]byte(s))
-// }
-
-// func ByteToNumber(b []byte) ([]byte, error) {
-// 	if b[0] == '-' {
-// 		return _toLnxFmt(b[1:], true), nil
-// 	}
-// 	return _toLnxFmt(b, false), nil
-// }
-
 func toBytes(b []byte) ([]byte, error) {
 	if _isZero(b) {
 		return []byte("0"), nil
@@ -360,34 +349,6 @@ func _fromLnxFmt(b []byte) []byte {
 	}
 	return newData
 }
-
-// func _toLnxFmt(b []byte, negative bool) []byte {
-// 	var data []byte
-// 	l := len(b)
-// 	if !negative {
-// 		fmt.Println(b)
-// 		data = make([]byte, l)
-// 		data[0] = b[0] + 128 + 64 + 1
-// 		for i := 1; i < l; i++ {
-// 			data[i] = b[i] + 1
-// 		}
-// 	} else {
-// 		if l-1 < 20 {
-// 			data = make([]byte, l+1)
-// 		} else {
-// 			data = make([]byte, l)
-// 		}
-// 		data[0] = b[0] + 128 + 64 + 1 ^ 0xFF
-// 		var i int
-// 		for i = 1; i < l; i++ {
-// 			data[i] = 101 - b[i]
-// 		}
-// 		if i <= 20 {
-// 			data[i] = 102
-// 		}
-// 	}
-// 	return data
-// }
 
 func _byteToChars(paramByte byte, result []byte, pos int) int {
 	if paramByte < 0 {

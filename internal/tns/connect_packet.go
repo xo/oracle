@@ -10,9 +10,6 @@ type ConnectPacket struct {
 
 func (pck *ConnectPacket) bytes() []byte {
 	output := pck.Packet.bytes()
-	// binary.BigEndian.PutUint16(output, pck.length)
-	// output[4] = uint8(pck.packetType)
-	// output[5] = pck.flag
 	binary.BigEndian.PutUint16(output[8:], pck.sessionCtx.Version)
 	binary.BigEndian.PutUint16(output[10:], pck.sessionCtx.LoVersion)
 	binary.BigEndian.PutUint16(output[12:], pck.sessionCtx.Options)
@@ -54,8 +51,6 @@ func newConnectPacket(sessionCtx *SessionContext) *ConnectPacket {
 	sessionCtx.hisOne = 1
 	sessionCtx.ACFL0 = 1
 	sessionCtx.ACFL1 = 1
-	// sessionCtx.ACFL0 = 4
-	// sessionCtx.ACFL1 = 4
 	pck := &ConnectPacket{
 		sessionCtx: sessionCtx,
 		dataOffset: 74,

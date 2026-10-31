@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql/driver"
 	"fmt"
 )
 
@@ -38,21 +37,4 @@ func (raw *Raw) SetValue(input any) error {
 
 func (raw *Raw) Scan(input any) error {
 	return raw.SetValue(input)
-}
-
-func (raw *Raw) CopyTo(dest driver.Value) error {
-	if ok, err := ScanExternal(dest, raw.Value); ok {
-		return err
-	}
-	switch dst := dest.(type) {
-	case *[]byte:
-		*dst = raw.bValue
-	case *string:
-		*dst = string(raw.bValue)
-	case *Raw:
-		*dst = *raw
-	default:
-		return fmt.Errorf("cannot copy Raw to variable of type %T", dest)
-	}
-	return nil
 }

@@ -99,7 +99,6 @@ func (nego *AdvNego) readHeader() (length, version, servCount int, err error) {
 	}
 	if errFlags != 0 {
 		err = tns.NewOracleError(errFlags)
-		//err = fmt.Errorf("advanced negotiation error: during receive ano header: network exception: ora-%d", errFlags)
 	}
 	return
 }
@@ -166,7 +165,6 @@ func (nego *AdvNego) Read() error {
 	if authServ, ok := nego.serviceList[1].(*authService); ok {
 		if authServ.active {
 			if authServ.serviceName == "KERBEROS5" {
-				// return errors.New("advanced negotiation: KERBEROS5 authentication still not supported")
 				nego.authKerberos = true
 			} else if authServ.serviceName == "NTS" {
 				nego.authNTS = true
@@ -258,8 +256,6 @@ func (nego *AdvNego) Read() error {
 		if err != nil {
 			return err
 		}
-		// fmt.Println(nego.comm.session.GetBytes(10))
-		// return errors.New("interrupt")
 		return nil
 	}
 	return nego.comm.session.Write()
@@ -356,7 +352,6 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	}
 	// if address is ipv6 then num1 = 24 otherwise = 2
 	num1 := 2
-	//localAddress = net.IP{172, 17, 0, 2}
 	if len(localAddress) > 4 {
 		num1 = 24
 	}
@@ -365,7 +360,6 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ 
 	nego.writeHeader(len(ticketData)+43+len(localAddress), 1)
 	// send header(4)
 	authServ.writeHeader(4)
-	// send ub2 = num1
 	nego.comm.writeUB2(num1)
 	// send ub4 = length of address
 	nego.comm.writeUB4(len(localAddress))
@@ -441,8 +435,6 @@ func (nego *AdvNego) WriteDataBuffer(data []byte) ([]byte, error) {
 	var err error
 	tracer := nego.tracer
 	if nego.cryptAlgo != nil {
-		// outputData = make([]byte, len(outputData))
-		// copy(outputData, outputData)
 		tracer.LogPacket("Write packet (Decrypted): ", data)
 		data, err = nego.cryptAlgo.Encrypt(data)
 		if err != nil {
@@ -487,9 +479,6 @@ func (nego *AdvNego) SetKeyFolding(key []byte, isExternalAuth, isSys bool) error
 		if nego.IsNTSAuth() && (!isSys) {
 			return nil
 		}
-		//if ano.IsKerberosAuth() && ano.IsNewVersion(1) && ano.kkey != null {
-		//	Key = ano.kkey
-		//}
 	}
 	if len(key) == 0 || len(nego.sessionKey) == 0 || len(nego.iv) == 0 {
 		return nil

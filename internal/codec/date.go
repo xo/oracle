@@ -35,9 +35,6 @@ func (param *DateParameter) Encode(input any, conn IConnection) error {
 		param.MaxLen = encoder.GetMaxLen()
 	}
 	param.BValue = encoder.Bytes()
-	//if len(param.BValue) > 0 {
-	//	param.MaxLen = int64(len(param.BValue))
-	//}
 	return nil
 }
 

@@ -27,7 +27,6 @@ func (pck *DataPacket) bytes() []byte {
 }
 
 func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.Tracer, mu *sync.Mutex, dataFlag uint16) (*DataPacket, error) {
-	// var outputData []byte = initialData
 	var err error
 	mu.Lock()
 	defer mu.Unlock()
@@ -78,7 +77,3 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer
 	}
 	return pck, nil
 }
-
-//func (pck *DataPacket) Data() []byte {
-//	return pck.buffer
-//}

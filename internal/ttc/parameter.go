@@ -16,15 +16,10 @@ type (
 	ParameterDirection int
 )
 
-// func (n *NVarChar) ConvertValue(v interface{}) (driver.Value, error) {
-//	return driver.Value(string(*n)), nil
-// }
-
 const (
 	Input  ParameterDirection = 1
 	Output ParameterDirection = 2
 	InOut  ParameterDirection = 3
-	// RetVal ParameterDirection = 9
 )
 
 type Out struct {
@@ -43,11 +38,6 @@ type Out struct {
 //go:generate stringer -type=TNSType
 
 // type ParameterType int
-
-//const (
-//	Number ParameterType = 1
-//	String ParameterType = 2
-//)
 
 type ParameterInfo struct {
 	Name         string
@@ -90,8 +80,6 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.Precision, err = session.GetByte()
-	// precision, err := session.GetInt(1, false, false)
-	// var scale int
 	switch par.DataType {
 	case oraTypes.NUMBER:
 		fallthrough
@@ -123,18 +111,12 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 	default:
 		par.Scale, err = session.GetByte()
-		// scale, err = session.GetInt(1, false, false)
 	}
-	// if par.Scale == uint8(-127) {
-	//
-	// }
 	if par.DataType == oraTypes.NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
 		par.Precision = 38
 		par.Scale = 0xFF
 	}
 
-	// par.Scale = uint16(scale)
-	// par.Precision = uint16(precision)
 	par.MaxLen, err = session.GetInt64(4, true, true)
 	if err != nil {
 		return err
@@ -338,7 +320,6 @@ func (par *ParameterInfo) write(session *tns.Session) error {
 	}
 	if par.ToID == nil {
 		session.PutBytes(0)
-		// session.PutInt(0, 1, false, false)
 	} else {
 		session.PutInt(len(par.ToID), 4, true, true)
 		session.PutClr(par.ToID)
@@ -346,7 +327,6 @@ func (par *ParameterInfo) write(session *tns.Session) error {
 	session.PutUint(par.Version, 2, true, true)
 	session.PutUint(par.CharsetID, 2, true, true)
 	session.PutBytes(uint8(par.CharsetForm))
-	// session.PutUint(par.CharsetForm, 1, false, false)
 	session.PutUint(par.MaxCharLen, 4, true, true)
 	if session.TTCVersion >= 8 {
 		session.PutInt(par.oaccollid, 4, true, true)
@@ -367,40 +347,6 @@ func (par *ParameterInfo) clone() ParameterInfo {
 		Precision:   par.Precision}
 	return tempPar
 }
-
-//func (par *ParameterInfo) collectLocators() [][]byte {
-//	var ret [][]byte = nil
-//	if temp, ok := par.Value.(oraTypes.Lob); ok {
-//		locator := temp.GetLocator()
-//		if locator != nil {
-//			ret = append(ret, locator)
-//		}
-//	}
-//	if temp, ok := par.oPrimValue.(oraTypes.Lob); ok {
-//		locator := temp.GetLocator()
-//		if locator != nil {
-//			ret = append(ret, locator)
-//		}
-//	}
-//	return ret
-//	//switch value := par.iPrimValue.(type) {
-//	//case *Lob:
-//	//	if value != nil && value.sourceLocator != nil {
-//	//		return [][]byte{value.sourceLocator}
-//	//	}
-//	//case *BFile:
-//	//	if value != nil && value.lob.sourceLocator != nil {
-//	//		return [][]byte{value.lob.sourceLocator}
-//	//	}
-//	//case []ParameterInfo:
-//	//	output := make([][]byte, 0, 10)
-//	//	for _, temp := range value {
-//	//		output = append(output, temp.collectLocators()...)
-//	//	}
-//	//	return output
-//	//}
-//	//return [][]byte{}
-//}
 
 func (par *ParameterInfo) isLongType() bool {
 	return par.DataType == oraTypes.LONG ||
@@ -457,90 +403,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	par.oPrimValue, err = decoder.Decode(conn)
 	return err
 
-	//switch par.DataType {
-
-	//case OCIClobLocator, OCIBlobLocator:
-	//	var locator []byte
-	//	if !udt {
-	//		locator, err = session.GetClr()
-	//	} else {
-	//		locator = par.BValue
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	lob := Lob{
-	//		sourceLocator: locator,
-	//		sourceLen:     len(locator),
-	//		connection:    conn,
-	//		charsetID:     par.CharsetID,
-	//	}
-	//	if lob.isTemporary() {
-	//		*temporaryLobs = append(*temporaryLobs, locator)
-	//	}
-	//	par.oPrimValue = lob
-	//case VECTOR:
-	//	var locator []byte
-	//	if !udt {
-	//		locator, err = session.GetClr()
-	//	} else {
-	//		locator = par.BValue
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	lob := Lob{
-	//		sourceLocator: locator,
-	//		sourceLen:     len(locator),
-	//		connection:    conn,
-	//		charsetID:     par.CharsetID,
-	//	}
-	//	v := oraTypes.Vector{}
-	//	if lob.isTemporary() {
-	//		*temporaryLobs = append(*temporaryLobs, locator)
-	//	}
-	//	par.oPrimValue = v
-	//case OCIFileLocator:
-	//	var locator []byte
-	//	if !udt {
-	//		locator, err = session.GetClr()
-	//	} else {
-	//		locator = par.BValue
-	//	}
-	//	if err != nil {
-	//		return err
-	//	}
-	//	var dirName, fileName string
-	//	if len(locator) > 16 {
-	//		index := 16
-	//		length := int(binary.BigEndian.Uint16(locator[index : index+2]))
-	//		index += 2
-	//		dirName = conn.sStrConv.Decode(locator[index : index+length])
-	//		index += length
-	//		length = int(binary.BigEndian.Uint16(locator[index : index+2]))
-	//		index += 2
-	//		fileName = conn.sStrConv.Decode(locator[index : index+length])
-	//		index += length
-	//	}
-	//	lob := &Lob{
-	//		sourceLocator: locator,
-	//		sourceLen:     len(locator),
-	//		connection:    conn,
-	//		charsetID:     par.CharsetID,
-	//	}
-	//	f := oraTypes.CreateBFileFromStream(lob, dirName, fileName)
-	//	//f := oraTypes.BFile{
-	//	//	dirName:  dirName,
-	//	//	fileName: fileName,
-	//	//	Valid:    len(locator) > 0,
-	//	//	isOpened: false,
-	//	//	,
-	//	//}
-	//	if lob.isTemporary() {
-	//		*temporaryLobs = append(*temporaryLobs, locator)
-	//	}
-	//	par.oPrimValue = f
-
 	//case XMLType:
 	//	err = decodeObject(conn, par, temporaryLobs)
 	//	if err != nil {
@@ -562,14 +424,6 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 		return err
 	}
 	return nil
-	//if temp, ok := par.Value.(sql.Scanner); ok {
-	//	err = temp.Scan(par.oPrimValue)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	return nil
-	//}
-	//return fmt.Errorf("the input parameter does not support scanner interface")
 }
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
