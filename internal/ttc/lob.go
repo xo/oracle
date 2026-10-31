@@ -7,7 +7,6 @@ import (
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/config"
-	"github.com/xo/oracle/internal/trace"
 	ora_types "github.com/xo/oracle/internal/types"
 )
 
@@ -39,15 +38,6 @@ func (lob *LobStream) initialize() {
 	lob.destOffset = 0
 }
 
-// variableWidthChar if lob has variable width char or not
-//func (lob *LobStream) IsVarWidthChar() bool {
-//	return len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&0x80 == 0x80
-//}
-// IsLittleEndian if Lob is littleEndian or not
-//func (lob *LobStream) IsLittleEndian() bool {
-//	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&0x40 == 0x40
-//}
-
 func (lob *LobStream) Locator() ora_types.Locator {
 	return lob.sourceLocator
 }
@@ -58,10 +48,6 @@ func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	}
 
 }
-func (lob *LobStream) Tracer() trace.Tracer {
-	return lob.conn.tracer
-}
-
 func (lob *LobStream) DatabaseVersionNumber() int {
 	return int(lob.conn.dBVersion.Number)
 }
@@ -78,7 +64,7 @@ func (lob *LobStream) Size() (size int64, err error) {
 	lob.initialize()
 	lob.sendSize = true
 	session := lob.conn.session
-	lob.conn.tracer.Print("Read Lob Size")
+	lob.conn.logger.Debug("read LOB size")
 	session.ResetBuffer()
 	lob.writeOp(1)
 	err = session.Write()
@@ -91,7 +77,7 @@ func (lob *LobStream) Size() (size int64, err error) {
 		return
 	}
 	size = lob.size
-	lob.conn.tracer.Print("Lob Size: ", size)
+	lob.conn.logger.Debug("LOB size", "size", size)
 	return
 }
 
@@ -100,9 +86,9 @@ func (lob *LobStream) Read(offset, count int64) (data []byte, err error) {
 		return nil, errEmptyLocator
 	}
 	if offset == 0 && count == 0 {
-		lob.conn.tracer.Print("Read Lob Data:")
+		lob.conn.logger.Debug("read LOB data")
 	} else {
-		lob.conn.tracer.Printf("Read Lob Data Position: %d, Count: %d\n", offset, count)
+		lob.conn.logger.Debug("read LOB data", "offset", offset, "count", count)
 	}
 	lob.initialize()
 	lob.size = count
@@ -128,7 +114,7 @@ func (lob *LobStream) Write(data []byte) error {
 	if lob.sourceLocator == nil {
 		return errEmptyLocator
 	}
-	lob.conn.tracer.Printf("Write Lob Data: %d bytes", len(data))
+	lob.conn.logger.Debug("write LOB data", "length", len(data))
 	lob.initialize()
 	lob.sourceOffset = 1
 	lob.conn.session.ResetBuffer()
@@ -171,24 +157,6 @@ func (lob *LobStream) LobReadMode() config.LobReadMode {
 	return lob.conn.connOption.LobReadMode
 }
 
-// isTemporary: return true if the lob is temporary
-//
-//	func (lob *LobStream) isTemporary() bool {
-//		if len(lob.sourceLocator) > 7 {
-//			if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 || lob.isValueBasedLocator() {
-//				return true
-//			}
-//		}
-//		return false
-//	}
-//
-//	func (lob *LobStream) isQuasiLocator() bool {
-//		return lob.sourceLocator.IsInline()
-//	}
-//
-//	func (lob *LobStream) isValueBasedLocator() bool {
-//		return lob.sourceLocator[4]&0x20 > 0
-//	}
 func (lob *LobStream) StartContext(ctx context.Context) func() {
 	return lob.conn.session.StartContext(ctx)
 }
@@ -216,7 +184,7 @@ func (lob *LobStream) FreeTemporaryLocator() error {
 }
 func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (ora_types.Locator, error) {
 	lob.initialize()
-	lob.conn.tracer.Print("Create Temporary Lob:")
+	lob.conn.logger.Debug("create temporary LOB")
 	lob.sourceLocator = make([]byte, 0x28)
 	lob.sourceLocator[1] = 0x54
 	lob.bNullO2U = true
@@ -254,7 +222,7 @@ func (lob *LobStream) Open(mode, opID int) error {
 	if lob.sourceLocator == nil {
 		return errEmptyLocator
 	}
-	lob.conn.tracer.Printf("Open Lob: Mode= %d   Operation ID= %d", mode, opID)
+	lob.conn.logger.Debug("open LOB", "mode", mode, "operation", opID)
 	if lob.sourceLocator.IsTemporary() {
 		if lob.sourceLocator[7]&8 == 8 {
 			return errors.New("TTC Error")
@@ -282,7 +250,7 @@ func (lob *LobStream) Close(opID int) error {
 	if lob.sourceLocator == nil {
 		return errEmptyLocator
 	}
-	lob.conn.tracer.Print("Close Lob: ")
+	lob.conn.logger.Debug("close LOB")
 	lob.initialize()
 	lob.conn.session.ResetBuffer()
 	lob.writeOp(opID)
@@ -472,40 +440,4 @@ func (lob *LobStream) LobID() []byte {
 		return nil
 	}
 	return lob.sourceLocator[10 : 10+10]
-}
-
-func (lob *LobStream) append(dest []byte) error {
-	if lob.sourceLocator == nil {
-		return errEmptyLocator
-	}
-	lob.initialize()
-	lob.destLocator = dest
-	lob.destLen = len(dest)
-	lob.conn.session.ResetBuffer()
-	lob.writeOp(0x80)
-	err := lob.conn.session.Write()
-	if err != nil {
-		return err
-	}
-	err = lob.read()
-	return processReset(err, lob.conn)
-}
-
-func (lob *LobStream) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, length int64) error {
-	lob.initialize()
-	lob.sourceLocator = srcLocator
-	lob.destLocator = dstLocator
-	lob.destLen = len(dstLocator)
-	lob.sourceOffset = srcOffset
-	lob.destOffset = dstOffset
-	lob.size = length
-	lob.sendSize = true
-	lob.conn.session.ResetBuffer()
-	lob.writeOp(4)
-	err := lob.conn.session.Write()
-	if err != nil {
-		return err
-	}
-	err = lob.read()
-	return processReset(err, lob.conn)
 }

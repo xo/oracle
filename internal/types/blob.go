@@ -44,31 +44,6 @@ func CreateBlob(ctx context.Context, db *sql.DB, input any) (*Blob, error) {
 	return ret, ret.SetValue(input)
 }
 
-func NewBlob(stream LobStreamer, input any) (*Blob, error) {
-	ret := &Blob{}
-	ret.stream = stream
-	return ret, ret.SetValue(input)
-}
-
-//	func (blob *Blob) createLocatorAndUploadData(ctx context.Context) error {
-//		if l.stream == nil {
-//			return errNilStreamer
-//		}
-//		var err error
-//		if len(blob.bValue) == 0 {
-//			return nil
-//		}
-//		done := blob.stream.StartContext(ctx)
-//		defer blob.stream.EndContext(done)
-//		_, err = blob.stream.CreateTemporaryLocator(0, 0)
-//		if err != nil {
-//			return err
-//		}
-//		err = blob.stream.Write(blob.bValue)
-//		return err
-//	}
-//
-// Load reads the whole value and watches no context. See Lob.
 func (blob *Blob) Load() error {
 	var err error
 	blob.bValue, err = blob.load()

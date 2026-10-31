@@ -42,17 +42,6 @@ type AuthObject struct {
 	conn         *Connection
 }
 
-// create authentication object through reading data from network
-//func newAuthObject(conn *Connection) (*AuthObject, error) {
-//	session := conn.session
-//	ret := new(AuthObject)
-//	ret.conn = conn
-//	ret.tcpNego = conn.tcpNego
-//	ret.usePadding = false
-//	//ret.customHash = ret.tcpNego.ServerCompileTimeCaps[4]&32 != 0
-//
-//}
-
 func (obj *AuthObject) read() error {
 	loop := true
 	session := obj.conn.session

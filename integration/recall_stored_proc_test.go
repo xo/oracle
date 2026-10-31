@@ -4,8 +4,9 @@ package integration
 import (
 	"database/sql"
 	"fmt"
-	"github.com/xo/oracle"
 	"testing"
+
+	"github.com/xo/oracle"
 )
 
 func TestRecallStoredProc(t *testing.T) {

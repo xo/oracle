@@ -42,11 +42,11 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	} else {
 		if par.encoder, err = connection.ParameterCoder(tempType); err == nil {
 		} else {
-			connection.tracer.Printf("Error get parameter encoder for type %v: %v", tempType, err)
+			connection.logger.Debug("parameter encoder", "type", tempType, "error", err)
 			if reflect.TypeOf(tempValue) != nil && tempType != reflect.TypeOf(tempValue) {
 				par.encoder, err = connection.ParameterCoder(reflect.TypeOf(tempValue))
 				if err != nil {
-					connection.tracer.Printf("Error get parameter encoder for type %v: %v", reflect.TypeOf(tempValue), err)
+					connection.logger.Debug("parameter encoder", "type", reflect.TypeOf(tempValue), "error", err)
 				}
 			}
 			if par.encoder == nil && tempValue == nil {
@@ -117,48 +117,6 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		}
 		par.MaxLen = par.MaxCharLen * perChar
 	}
-
-	//else {
-	//
-	//	switch tempType.Kind() {
-	//	case reflect.Array, reflect.Slice:
-	//		var inVal driver.Value = nil
-	//		rValue := reflect.ValueOf(tempValue)
-	//		size := rValue.Len()
-	//		if size > 0 && rValue.Index(0).CanInterface() {
-	//			inVal, err = getValue(rValue.Index(0).Interface())
-	//			if err != nil {
-	//				return err
-	//			}
-	//		}
-	//		tempType = getType(inVal)
-	//		tempValue, err = getValue(inVal)
-	//		if err != nil {
-	//			return err
-	//		}
-	//		if coder, ok = connection.goTypeCoder[tempType]; ok {
-	//			par.encoder = coder.Copy()
-	//			err = par.encoder.Encode(tempValue, connection)
-	//			if err != nil {
-	//				return err
-	//			}
-	//			par.SetParameterInfo(par.encoder.ParameterInfo())
-	//			if par.MaxLen < int64(size) {
-	//				par.MaxLen = int64(size)
-	//			}
-	//			if par.DataType != oraTypes.XMLType {
-	//				par.Flag = 0x43
-	//			}
-	//			par.ArraySize = 1
-	//		} else {
-	//			// return err
-	//		}
-	//
-	//		return nil
-	//	default:
-	//		return fmt.Errorf("no encoder register for data type: %T", par.Value)
-	//	}
-	//}
 
 	if par.DataType == oraTypes.OCIFileLocator {
 		par.MaxLen = int64(size)

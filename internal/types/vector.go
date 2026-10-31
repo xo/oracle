@@ -305,54 +305,6 @@ func (vector *Vector) Read(ctx context.Context) error {
 	return err
 }
 
-//func (v *vector) Read(ctx context.Context) error {
-//	if v.Type != VECTOR_NIL || v.data != nil {
-//		return nil
-//	}
-//	if v.IsInline() {
-//		return nil
-//	}
-//	if v.decoder == nil {
-//		return fmt.Errorf("no decoder defined for vector type")
-//	}
-//	temp, err := v.lobBase.ReadFromPos(ctx, 0)
-//	if err != nil {
-//		return err
-//	}
-//	if v.decoder == nil {
-//		return fmt.Errorf("no decoder defined for vector type")
-//	}
-//	tempVector, err := v.decoder.DecodeVector(temp)
-//	if err != nil {
-//		return err
-//	}
-//	return v.Scan(tempVector)
-//}
-//func (v *vector) CopyFrom(source Vector) error {
-//	if temp, ok := source.(*vector); ok {
-//		err := v.lobBase.CopyFrom(&temp.lobBase)
-//		if err != nil {
-//			return err
-//		}
-//		//v.flag = temp.flag
-//		v.Type = temp.Type
-//		v.data = temp.data
-//	}
-//	return nil
-//}
-// load will retrieve data from Lob and then call decode
-//func (vector *Vector) load(stream LobStreamer) error {
-//	if len(vector.locator) > 0 {
-//		bValue, err := stream.Read(context.Background(), 0, 0)
-//		if err != nil {
-//			return err
-//		}
-//		_, err = vector.Decode(bValue, VECTOR)
-//		return err
-//	}
-//	return nil
-//}
-
 func (vector *Vector) Scan(input any) error {
 	return vector.SetValue(input)
 }

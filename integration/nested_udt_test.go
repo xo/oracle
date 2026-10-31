@@ -3,10 +3,11 @@ package integration
 import (
 	"database/sql"
 	"fmt"
-	"github.com/xo/oracle"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/xo/oracle"
 )
 
 func TestNestedUDT(t *testing.T) {

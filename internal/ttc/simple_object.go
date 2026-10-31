@@ -8,8 +8,7 @@ import (
 )
 
 type simpleObject struct {
-	connection *Connection
-	// session     *network.Session
+	connection  *Connection
 	operationID uint8
 	data        []byte
 	err         error
@@ -25,16 +24,9 @@ func (obj *simpleObject) write() *simpleObject {
 	return obj
 }
 
-func (obj *simpleObject) read() error {
-	if obj.err != nil {
-		return obj.err
-	}
-	return obj.connection.read()
-}
-
 func (obj *simpleObject) exec() error {
 	conn := obj.connection
-	tracer := conn.tracer
+	logger := conn.logger
 	obj.write()
 	if obj.err != nil {
 		return obj.err
@@ -46,7 +38,7 @@ func (obj *simpleObject) exec() error {
 	if err != nil {
 		if isBadConn(err) {
 			obj.connection.setBad()
-			tracer.Print("Error: ", err)
+			logger.Info("bad connection", "error", err)
 			return driver.ErrBadConn
 		}
 		return err

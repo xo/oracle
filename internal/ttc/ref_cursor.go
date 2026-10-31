@@ -132,8 +132,8 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		cursor.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := cursor.connection.tracer
-	tracer.Printf("Query RefCursor: %d", cursor.cursorID)
+	logger := cursor.connection.logger
+	logger.Debug("query a REF CURSOR", "cursor", cursor.cursorID)
 	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
 	cursor._hasMoreRows = true
 	if len(cursor.parent.scnForSnapshot) > 0 {
@@ -144,7 +144,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	if err != nil {
 		if isBadConn(err) {
 			cursor.connection.setBad()
-			tracer.Print("Error: ", err)
+			logger.Info("bad connection", "error", err)
 			return nil, driver.ErrBadConn
 		}
 		return nil, err

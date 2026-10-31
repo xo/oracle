@@ -3,9 +3,10 @@ package integration
 import (
 	"database/sql"
 	"fmt"
-	"github.com/xo/oracle"
 	"strings"
 	"testing"
+
+	"github.com/xo/oracle"
 )
 
 func TestClientCharset(t *testing.T) {

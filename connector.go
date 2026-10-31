@@ -151,6 +151,7 @@ func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 	}
 	conn := config.New()
 	conn.UserID, conn.Password = cfg.User, cfg.Password
+	conn.Logger = cfg.Logger
 	if cfg.Host != "" {
 		port := cfg.Port
 		if port == 0 {

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,8 +44,9 @@ type ConnectionConfig struct {
 	DatabaseInfo
 	SessionInfo
 	AdvNegoServiceInfo
-	TraceFilePath       string
-	TraceDir            string
+	// Logger receives the packets and events of the connection. Nil logs
+	// nothing (D14).
+	Logger              *slog.Logger
 	PrefetchRows        int
 	Lob                 LobFetch
 	LobReadMode         LobReadMode

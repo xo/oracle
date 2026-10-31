@@ -95,13 +95,13 @@ func Encode(mainObj any) ([]byte, error) {
 	var objectData []byte
 	switch mainObj := mainObj.(type) {
 	case map[string]any:
-		obj, err := NewobjectField(mainObj, header)
+		obj, err := newObjectField(mainObj, header)
 		if err != nil {
 			return nil, err
 		}
 		objectData, err = obj.Encode()
 	case []any:
-		obj, err := NewarrayField(mainObj, header)
+		obj, err := newArrayField(mainObj, header)
 		if err != nil {
 			return nil, err
 		}
@@ -507,78 +507,4 @@ func Decode(data []byte) (any, error) {
 		return nil, err
 	}
 	return obj.Value()
-	//if value, ok := obj.Value().(map[string]interface{}); ok {
-	//	return value, nil
-	//}
-	//if !isScalar(flags) {
-	//	if flags&8 != 0 {
-	//		fieldId := 4
-	//		uniqueFields := binary.BigEndian.Uint32(data[index : index+4])
-	//		index += 4
-	//		fmt.Println(fieldId, uniqueFields)
-	//	} else if flags&1024 != 0 {
-	//		fieldId := 2
-	//		uniqueFields := binary.BigEndian.Uint32(data[index : index+2])
-	//		index += 2
-	//		fmt.Println(fieldId, uniqueFields)
-	//	} else {
-	//		fieldId := 1
-	//		uniqueFields := data[index]
-	//		index++
-	//		fmt.Println(fieldId, uniqueFields)
-	//	}
-	//	if flags&2048 != 0 {
-	//		fieldHeapSize := binary.BigEndian.Uint32(data[index : index+4])
-	//		index += 4
-	//		fmt.Println(fieldHeapSize)
-	//	} else {
-	//		fieldHeapSize := binary.BigEndian.Uint16(data[index : index+2])
-	//		index += 2
-	//		fmt.Println(fieldHeapSize)
-	//	}
-	//	if version >= 3 {
-	//		flags2 := binary.BigEndian.Uint16(data[index : index+2])
-	//		index += 2
-	//		uniqueFields2 := binary.BigEndian.Uint32(data[index : index+4])
-	//		index += 4
-	//		fieldHeapSize2 := binary.BigEndian.Uint32(data[index : index+4])
-	//		index += 4
-	//		fmt.Println(flags2, fieldHeapSize2, uniqueFields2)
-	//	}
-	//	if flags&4096 != 0 {
-	//		treeSegmentSize := binary.BigEndian.Uint32(data[index : index+4])
-	//		index += 4
-	//		fmt.Println(treeSegmentSize)
-	//	} else {
-	//		treeSegmentSize := binary.BigEndian.Uint16(data[index : index+2])
-	//		index += 2
-	//		fmt.Println(treeSegmentSize)
-	//	}
-	//	tinyNodeCount := binary.BigEndian.Uint16(data[index : index+2])
-	//	index += 2
-	//	fmt.Println(tinyNodeCount)
-	//} else {
-	//	if flags&4096 != 0 {
-	//		treeSegmentSize := binary.BigEndian.Uint32(data[index : index+4])
-	//		index += 4
-	//		fmt.Println(treeSegmentSize)
-	//	} else {
-	//		treeSegmentSize := binary.BigEndian.Uint16(data[index : index+2])
-	//		index += 2
-	//		fmt.Println(treeSegmentSize)
-	//	}
-	//}
-	//if
-	//if (this.uniqueFields > 0)
-	//{
-	//	this.ReadDictionary(b);
-	//}
-	//if (this.uniqueFields2 > 0)
-	//{
-	//	this.ReadDictionary2(b);
-	//}
-	//if (!this.IsSet(4) || !this.IsSet(2))
-	//{
-	//	throw new NotSupportedException();
-	//}
 }

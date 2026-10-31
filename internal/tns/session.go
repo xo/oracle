@@ -9,10 +9,12 @@ import (
 	"crypto/x509"
 	"database/sql/driver"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strings"
 	"sync"
@@ -20,8 +22,6 @@ import (
 	"time"
 
 	"github.com/xo/oracle/internal/config"
-
-	"github.com/xo/oracle/internal/trace"
 
 	"github.com/xo/oracle/internal/charset"
 )
@@ -66,7 +66,11 @@ type Session struct {
 		roots              *x509.CertPool
 		tlsCertificates    []tls.Certificate
 	}
-	tracer trace.Tracer
+	// logger is never nil. hide withholds the bytes of each packet from it
+	// while a connection logs on, since those packets carry the encrypted
+	// session key and password (D14).
+	logger *slog.Logger
+	hide   atomic.Bool
 	basicSession
 }
 
@@ -77,13 +81,12 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		TransportDataUnitSize: 0xFFFF,
 	}
 	ret := &Session{
-		// ctx:        context.Background(),
 		conn:       nil,
 		lastPacket: bytes.Buffer{},
 		// connOption:      *connOption,
 		Context: NewSessionContext(options),
 		Summary: nil,
-		tracer:  trace.NilTracer(),
+		logger:  slog.New(slog.DiscardHandler),
 	}
 	ret.inBuffer = bytes.NewBuffer(input)
 	ret.terminal = ret
@@ -92,13 +95,13 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 	return ret
 }
 
-func NewSession(config *config.ConnectionConfig, tracer trace.Tracer) *Session {
+func NewSession(config *config.ConnectionConfig, logger *slog.Logger) *Session {
 	ret := &Session{
 		conn:       nil,
 		Context:    NewSessionContext(config),
 		Summary:    nil,
 		lastPacket: bytes.Buffer{},
-		tracer:     tracer,
+		logger:     logger,
 	}
 	ret.inBuffer = &bytes.Buffer{}
 	ret.outBuffer = &bytes.Buffer{}
@@ -227,18 +230,18 @@ func (session *Session) breakForContext() {
 	defer session.breakMu.Unlock()
 	session.mu.Lock()
 	connected := session.Connected
-	tracer := session.tracer
+	logger := session.logger
 	session.mu.Unlock()
 	if !connected {
 		if err := session.WriteFinalPacket(); err != nil {
-			tracer.Print("Write Final Packet With Error: ", err)
+			logger.Info("writing the final packet", "error", err)
 		}
 		session.Disconnect()
 		return
 	}
 	session.breakDeadline.Store(time.Now().Add(breakGrace).UnixNano())
 	if err := session.BreakConnection(); err != nil {
-		tracer.Print("Connection Break Error: ", err)
+		logger.Info("breaking the call", "error", err)
 	}
 }
 
@@ -384,15 +387,8 @@ func (session *Session) IsBreak() bool {
 
 // BreakConnection elicit connection break to cancel the current operation
 func (session *Session) BreakConnection() error {
-	session.tracer.Print("Break Connection")
+	session.logger.Info("break")
 	var err error
-	// first discard remaining bytes
-	// if session.remainingBytes > 0 {
-	// 	_, err = session.readPacket()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
 
 	done := false
 	if session.Context.NegotiatedOptions&0x400 > 0 {
@@ -421,7 +417,7 @@ func (session *Session) Connect(ctx context.Context) error {
 	connOption := session.Context.connConfig
 	session.ResetBuffer()
 	session.Disconnect()
-	session.tracer.Print("Connect")
+	session.logger.Debug("connect")
 	var err error
 	connected := false
 	var host *config.ServerAddr
@@ -461,14 +457,14 @@ func (session *Session) Connect(ctx context.Context) error {
 		session.mu.Unlock()
 
 		if err != nil {
-			session.tracer.Printf("using: %s ..... [FAILED]", addr)
+			session.logger.Debug("dial", "address", addr, "error", err)
 			host = connOption.ActiveServer(true)
 			if host == nil {
 				break
 			}
 			continue
 		}
-		session.tracer.Printf("using: %s ..... [SUCCEED]", addr)
+		session.logger.Debug("dial", "address", addr)
 		connected = true
 		loop = false
 	}
@@ -480,13 +476,13 @@ func (session *Session) Connect(ctx context.Context) error {
 		return err
 	}
 	if connOption.SSL {
-		session.tracer.Print("Using SSL/TLS")
+		session.logger.Debug("tls")
 		session.negotiate()
 		session.reader = bufio.NewReaderSize(session.sslConn, readBufferSize)
 	} else {
 		session.reader = bufio.NewReaderSize(session.conn, readBufferSize)
 	}
-	session.tracer.Print("Open :", connOption.ConnectionData())
+	session.logger.Debug("open", "connect data", connOption.ConnectionData())
 	connectPacket := newConnectPacket(session.Context)
 	err = session.writePacket(connectPacket)
 	if err != nil {
@@ -509,11 +505,11 @@ func (session *Session) Connect(ctx context.Context) error {
 		*session.Context = *acceptPacket.sessionCtx
 		session.Context.handshakeComplete = true
 		session.mu.Unlock()
-		session.tracer.Print("Handshake Complete")
+		session.logger.Debug("handshake complete")
 		return nil
 	}
 	if redirectPacket, ok := pck.(*RedirectPacket); ok {
-		session.tracer.Print("Redirect")
+		session.logger.Debug("redirect")
 		err = session.Context.connConfig.UpdateDatabaseInfoForRedirect(redirectPacket.redirectAddr, redirectPacket.reconnectData)
 		if err != nil {
 			return err
@@ -530,7 +526,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			addr = host.Addr
 			port = host.Port
 		}
-		session.tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
+		session.logger.Debug("refused", "address", addr, "port", port, "error", refusePacket.Err)
 		host = connOption.ActiveServer(true)
 		if host == nil {
 			session.Disconnect()
@@ -542,7 +538,7 @@ func (session *Session) Connect(ctx context.Context) error {
 }
 
 func (session *Session) WriteFinalPacket() error {
-	data, err := newDataPacket(nil, session.Context, session.tracer, &session.mu, 0)
+	data, err := newDataPacket(nil, session.Context, &session.mu, 0)
 	if err != nil {
 		return err
 	}
@@ -576,7 +572,7 @@ func (session *Session) WriteRPC(start, end bool) error {
 	size := session.outBuffer.Len()
 	if size == 0 {
 		// send empty data packet
-		pck, err := newDataPacket(nil, session.Context, session.tracer, &session.mu, dataFlag)
+		pck, err := newDataPacket(nil, session.Context, &session.mu, dataFlag)
 		if err != nil {
 			return err
 		}
@@ -589,7 +585,7 @@ func (session *Session) WriteRPC(start, end bool) error {
 		segment := make([]byte, segmentLen)
 		for size > segmentLen {
 			copy(segment, outputBytes[offset:offset+segmentLen])
-			pck, err := newDataPacket(segment, session.Context, session.tracer, &session.mu, dataFlag)
+			pck, err := newDataPacket(segment, session.Context, &session.mu, dataFlag)
 			if err != nil {
 				return err
 			}
@@ -603,7 +599,7 @@ func (session *Session) WriteRPC(start, end bool) error {
 		}
 	}
 	if size != 0 {
-		pck, err := newDataPacket(outputBytes[offset:], session.Context, session.tracer, &session.mu, dataFlag)
+		pck, err := newDataPacket(outputBytes[offset:], session.Context, &session.mu, dataFlag)
 		if err != nil {
 			return err
 		}
@@ -643,22 +639,6 @@ func (session *Session) processMarker() error {
 	if err != nil {
 		return err
 	}
-	// receive all packet until you get marker
-	// var pck packet = nil
-	// for pck == nil || pck.getPacketType() != MARKER {
-	//
-	// 	if session.isFinalPacketRead {
-	// 		break
-	// 	}
-	// }
-
-	// receive all marker packet
-	//for pck != nil && pck.getPacketType() == MARKER /*&& !session.isFinalPacketRead*/ {
-	//	pck, err = session.readPacket()
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
 
 	return nil
 
@@ -715,7 +695,7 @@ func (session *Session) writePacket(pck packet) error {
 	defer session.mu.Unlock()
 	session.sendPcks = append(session.sendPcks, pck)
 	tmp := pck.bytes()
-	session.tracer.LogPacket("Write packet:", tmp)
+	session.LogPacket("write packet", tmp)
 	err := session.initWrite()
 	if err != nil {
 		return err
@@ -815,7 +795,7 @@ func (session *Session) readPacketData() error {
 	if err != nil {
 		return err
 	}
-	session.tracer.LogPacket("Read packet:", session.lastPacket.Bytes())
+	session.LogPacket("read packet", session.lastPacket.Bytes())
 	return nil
 }
 
@@ -886,7 +866,7 @@ func (session *Session) readPacket() (packet, error) {
 		if uint16(pck.length) <= pck.dataOffset {
 			err = session.readPacketData()
 			packetData = session.lastPacket.Bytes()
-			dataPck, err := newDataPacketFromData(packetData, session.Context, session.tracer, &session.mu)
+			dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
 			if err != nil {
 				return nil, err
 			}
@@ -903,7 +883,7 @@ func (session *Session) readPacket() (packet, error) {
 		}
 		return pck, nil
 	case DATA:
-		dataPck, err := newDataPacketFromData(packetData, session.Context, session.tracer, &session.mu)
+		dataPck, err := newDataPacketFromData(packetData, session.Context, &session.mu)
 		if dataPck != nil {
 			if session.Context.connConfig.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
 				session.negotiate()
@@ -926,4 +906,33 @@ func (session *Session) readPacket() (packet, error) {
 	default:
 		return nil, fmt.Errorf("unsupported packet type: %d", pckType)
 	}
+}
+
+// Logger returns the logger of the session, which is never nil.
+func (session *Session) Logger() *slog.Logger {
+	return session.logger
+}
+
+// HidePackets withholds the bytes of each packet from the logger while hide
+// is true. A connection sets it until it has logged on.
+func (session *Session) HidePackets(hide bool) {
+	session.hide.Store(hide)
+}
+
+// LogPacket writes p to the logger at the debug level, or only its length
+// while packets are hidden.
+func (session *Session) LogPacket(msg string, p []byte) {
+	if session.hide.Load() {
+		session.logger.Debug(msg, "length", len(p), "bytes", "withheld")
+		return
+	}
+	session.logger.Debug(msg, "length", len(p), "bytes", packetDump(p))
+}
+
+// packetDump formats a packet as hex.Dump does, and only when a handler
+// writes it.
+type packetDump []byte
+
+func (p packetDump) LogValue() slog.Value {
+	return slog.StringValue(hex.Dump(p))
 }

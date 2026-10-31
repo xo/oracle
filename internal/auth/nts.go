@@ -28,10 +28,6 @@ func (nts *NTSAuthDefault) ProcessChallenge(chaMsgData []byte, user, password st
 	return ntlmssp.ProcessChallenge(chaMsgData, user, password)
 }
 
-func (nts *NTSAuthHash) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
-	return ntlmssp.ProcessChallengeWithHash(chaMsgData, user, password)
-}
-
 func createNTSNegoPacket(domain, machine string) ([]byte, error) {
 	packetData := []byte{
 		0, 1, 0, 7, 0, 0, 0, 0, 0, 4, 0, 5, 2, 0, 0, 0,

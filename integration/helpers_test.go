@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/xo/oracle"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/xo/oracle"
 )
 
 // urlOptions holds the keys that a test adds to the query of ORACLE_DSN.

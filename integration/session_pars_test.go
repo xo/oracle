@@ -2,8 +2,9 @@ package integration
 
 import (
 	"bytes"
-	"github.com/xo/oracle"
 	"testing"
+
+	"github.com/xo/oracle"
 )
 
 func TestSessionPars(t *testing.T) {

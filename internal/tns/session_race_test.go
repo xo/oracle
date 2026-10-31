@@ -2,12 +2,12 @@ package tns
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/xo/oracle/internal/config"
-	"github.com/xo/oracle/internal/trace"
 )
 
 // TestConnectDisconnectRace verifies that Session.Connect and
@@ -25,7 +25,7 @@ func TestConnectDisconnectRace(t *testing.T) {
 	}
 
 	for range 5 {
-		session := NewSession(connOption, trace.NilTracer())
+		session := NewSession(connOption, slog.New(slog.DiscardHandler))
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 
 		var wg sync.WaitGroup

@@ -24,25 +24,6 @@ func newAuthService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo) (*authSer
 	// var avaAuth []string
 	output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}
 	output.availableServiceIDs = []int{0, 1, 1, 2}
-	//if runtime.GOOS == "windows" {
-	//
-	//} else {
-	//	output.availableServiceNames = []string{"NTS", "TCPS"}
-	//	output.availableServiceIDs = []int{1, 2}
-	//}
-	//str :=  ""
-	//for
-	//if connOption != nil {
-	//	snConfig := connOption.SNOConfig
-	//	if snConfig != nil {
-	//		var exists bool
-	//		str, exists = snConfig["sqlnet.authentication_services"]
-	//		if !exists {
-	//			str = ""
-	//		}
-	//	}
-	//}
-	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
 	err := output.buildServiceList(negoInfo.AuthService, false, false)
 	if err != nil {
 		return nil, err

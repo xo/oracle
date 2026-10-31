@@ -1,9 +1,10 @@
 package integration
 
 import (
-	"github.com/xo/oracle"
 	"testing"
 	"time"
+
+	"github.com/xo/oracle"
 )
 
 func TestIssue307(t *testing.T) {

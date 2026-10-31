@@ -61,10 +61,6 @@ func (collection *keyCollection) encode() ([]byte, error) {
 	return keyBuffer.Bytes(), nil
 }
 
-func (collection *keyCollection) decode(data []byte) error {
-	var err error
-	return err
-}
 func (collection *keyCollection) Sort() {
 	sort.Slice(*collection, func(i, j int) bool {
 		return (*collection)[i].hash < (*collection)[j].hash // Sort by hash ascending

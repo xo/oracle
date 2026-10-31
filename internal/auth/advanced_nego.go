@@ -3,26 +3,14 @@ package auth
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/xo/oracle/internal/auth/security"
 	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
-	"github.com/xo/oracle/internal/trace"
 )
 
 const version = uint32(0x17000000)
-
-// KerberosAuthenticator is an alias for config.KerberosAuthenticator, maintained for backwards compatibility.
-type KerberosAuthenticator = config.KerberosAuthenticator
-
-var kerberosAuth KerberosAuthenticator = nil
-
-// SetKerberosAuth Set Kerberos5 Authentication interface used for kerberos authentication
-func SetKerberosAuth(input KerberosAuthenticator) {
-	kerberosAuth = input
-}
 
 type AdvNego struct {
 	version      uint32
@@ -31,7 +19,6 @@ type AdvNego struct {
 	comm         *AdvancedNegoComm
 	clientInfo   *config.ClientInfo
 	negoInfo     *config.AdvNegoServiceInfo
-	tracer       trace.Tracer
 	serviceList  []negoService
 	sessionKey   []byte
 	iv           []byte
@@ -41,13 +28,12 @@ type AdvNego struct {
 	keyFolding   bool
 }
 
-func NewAdvNego(session *tns.Session, tracer trace.Tracer, config *config.ConnectionConfig) (*AdvNego, error) {
+func NewAdvNego(session *tns.Session, config *config.ConnectionConfig) (*AdvNego, error) {
 	output := &AdvNego{
 		version:     version,
 		comm:        &AdvancedNegoComm{session: session},
 		clientInfo:  &config.ClientInfo,
 		negoInfo:    &config.AdvNegoServiceInfo,
-		tracer:      tracer,
 		serviceList: make([]negoService, 5),
 	}
 	var err error
@@ -59,7 +45,7 @@ func NewAdvNego(session *tns.Session, tracer trace.Tracer, config *config.Connec
 	if err != nil {
 		return nil, err
 	}
-	output.serviceList[3], err = newDataIntegrityService(output, output.negoInfo, output.tracer)
+	output.serviceList[3], err = newDataIntegrityService(output, output.negoInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -194,21 +180,14 @@ func (nego *AdvNego) Read() error {
 	nego.writeHeader(size+13, numService)
 	if dataServ, ok := nego.serviceList[3].(*dataIntegrityService); ok {
 		if len(dataServ.publicKey) > 0 {
-			nego.tracer.Print("Send Client Public Key:")
 			dataServ.writeHeader(1)
 			nego.comm.writeBytes(dataServ.publicKey)
 		}
 	}
 	if nego.authKerberos {
-		// Validate configuration
-		if kerberosAuth == nil && nego.negoInfo.Kerberos == nil {
-			return fmt.Errorf("advanced negotiation error: Kerberos authenticator not set; call SetKerberosAuth to set it globally or WithKerberosAuth to set it per session")
-		}
-
-		// Prefer session-specific Kerberos auth object
 		auth := nego.negoInfo.Kerberos
 		if auth == nil {
-			auth = kerberosAuth
+			return errors.New("kerberos authentication needs Config.Kerberos")
 		}
 
 		if authServ, ok := nego.serviceList[1].(*authService); ok {
@@ -316,7 +295,7 @@ func (nego *AdvNego) IsNewVersion(serviceType int) bool {
 	return isNew(nego.version)
 }
 
-func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthenticator, authServ *authService) error {
+func (nego *AdvNego) kerberosHandshake(kerberos config.KerberosAuthenticator, authServ *authService) error {
 	_, _, count, err := nego.readHeader()
 	if err != nil {
 		return err
@@ -433,9 +412,8 @@ func (nego *AdvNego) WriteDataBuffer(data []byte) ([]byte, error) {
 		data = append(data, hashData...)
 	}
 	var err error
-	tracer := nego.tracer
 	if nego.cryptAlgo != nil {
-		tracer.LogPacket("Write packet (Decrypted): ", data)
+		nego.comm.session.LogPacket("write packet, decrypted", data)
 		data, err = nego.cryptAlgo.Encrypt(data)
 		if err != nil {
 			return nil, err
@@ -456,13 +434,12 @@ func (nego *AdvNego) ReadDataBuffer(data []byte) ([]byte, error) {
 	if nego.cryptAlgo != nil || nego.hashAlgo != nil {
 		data = data[:len(data)-1]
 	}
-	tracer := nego.tracer
 	if nego.cryptAlgo != nil {
 		data, err = nego.cryptAlgo.Decrypt(data)
 		if err != nil {
 			return nil, err
 		}
-		tracer.LogPacket("Read packet (Decrypted): ", data)
+		nego.comm.session.LogPacket("read packet, decrypted", data)
 	}
 	if nego.hashAlgo != nil {
 		data, err = nego.hashAlgo.Validate(data)

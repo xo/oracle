@@ -17,7 +17,7 @@ func (array *arrayField) Value() (any, error) {
 	return array.value, nil
 }
 
-func NewarrayField(value []any, header *header) (*arrayField, error) {
+func newArrayField(value []any, header *header) (*arrayField, error) {
 	ret := new(arrayField)
 	ret.header = header
 	var err error
@@ -33,16 +33,16 @@ func NewarrayField(value []any, header *header) (*arrayField, error) {
 			}
 			field = &numberField{value: *temp}
 		case string:
-			field = NewstringField(v)
+			field = newStringField(v)
 		case bool:
 			field = &booleanField{value: v}
 		case []any:
-			field, err = NewarrayField(v, header)
+			field, err = newArrayField(v, header)
 			if err != nil {
 				return nil, err
 			}
 		case map[string]any:
-			field, err = NewobjectField(v, header)
+			field, err = newObjectField(v, header)
 			if err != nil {
 				return nil, err
 			}

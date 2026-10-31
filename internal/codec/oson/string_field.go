@@ -17,7 +17,7 @@ func (field *stringField) Value() (any, error) {
 	return field.value, nil
 }
 
-func NewstringField(value string) *stringField {
+func newStringField(value string) *stringField {
 	return &stringField{
 		value: value,
 	}

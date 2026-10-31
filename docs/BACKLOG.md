@@ -11,40 +11,29 @@ decided on the way (D3).
 
 ### Reshape the TTC code
 
-Step 4b moved the TTC code to `internal/ttc` as it was. Its names are the ones
-of `go-ora`: `Connection`, `Stmt`, `DataSet`, `ParameterInfo`, `Transaction`.
-`OracleConnector` and the struct of the old driver are gone, and the code
-still holds many lines that are commented out. Steps 5 and 6 reshape it.
-`Config` has no keys for the OS user and password of NTS, the domain, the
+Step 4b moved the TTC code to `internal/ttc` as it was, and steps 5 and 6
+reshaped it in place. Its names are still the ones of `go-ora`: `Connection`,
+`Stmt`, `DataSet`, `ParameterInfo`, `Transaction`. `DESIGN.md`, under The root
+package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
+type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
 list of authentication services, out of band breaks or the location of the
 server, which `go-ora` read. Add each when a caller needs it.
 
 ### Remove the state that the whole process shares
 
-Step 4 removed the package variable `oracleDriver` (D9), and step 9 moved the
-fast login cookies to the `Connector`. Two pieces of state for the whole
-process remain:
+Step 4 removed the package variable `oracleDriver` (D9). Step 9 moved the fast
+login cookies to the `Connector`, and deleted the Kerberos authenticator of
+the process, since `Config.Kerberos` sets one for each connector. One piece of
+state for the whole process remains: `auth.NTSAuth`, which `SetNTSAuth` sets,
+and which a configuration with an OS password sets for every connection after
+it. Move it to the `Connector`.
 
-- `auth.NTSAuth`, which `SetNTSAuth` sets, and which a configuration with an
-  OS password sets for every connection after it.
-- `auth.kerberosAuth`, a Kerberos authenticator for every connection.
-  `Config.Kerberos` sets one for each connector already.
+### Build the statement options
 
-Move each to the `Connector` or to the connection.
-
-### Send the trace to Config.Logger
-
-`Config.Logger` is in the DSN code and reaches nothing. The connection still
-writes its trace through `internal/trace`, to the `TraceFilePath` or the
-`TraceDir` of the configuration, which no key of the DSN sets. So a caller
-cannot see the packets. Write each packet and event to the logger, as
-`DESIGN.md` says under Logging, and delete `internal/trace` (D14).
-
-### Stop printing on reconnect
-
-`internal/ttc/connection.go` prints a line to standard output with `fmt.Printf` when it
-reconnects after a bad connection. The driver logs nothing (D14). Send it to
-`Config.Logger`, or return the error.
+`DESIGN.md`, under Options, holds the options of a statement as dbimp D109
+sets them out: `WithOptions`, `WithTimeout`, `WithReadonly`, `WithPrefetch`
+and `WithLobFetch`. None is built. The DSN keys `prefetch` and `lob_fetch` set
+the same for every statement of a connector.
 
 ### Find the statement that answers ORA-01403 at logon
 
@@ -73,7 +62,7 @@ Step 1 deleted the files of `TestIssues` that did not build against the `v3`
 code. They used the API of `v2`, such as `go_ora.Clob`, `go_ora.Object` and
 `go_ora.NVarChar`, or a package that the module does not carry: `gorm`, `xorm`
 and the `dbms` package of `v2`. Each one is in commit `d9fa927` and earlier.
-Step 9 of `DESIGN.md` writes a test for each again, on the new API:
+Write a test for each again, on the new API:
 
 - `bool_type_test.go`, `emoji_test.go`, `long_input_test.go`,
   `regular_type_array_test.go`, `udt_string_test.go`, `varray_test.go` and
@@ -90,8 +79,8 @@ Step 9 of `DESIGN.md` writes a test for each again, on the new API:
 Step 1 also deleted the unit tests of functions that `v3` removed:
 `parameter_encode_test.go`, `bulkcopy_test.go`, the tests of `setString`,
 `setFieldValue` and `setNull`, and `TestCreateNewType` with the dead function
-that it tested. The vectors of `converters/other_types_test.go`, now under `internal/`, moved to
-`types/vectors_test.go`.
+that it tested. The vectors of `converters/other_types_test.go` moved to
+`internal/types/vectors_test.go`.
 
 ### Make the integration tests pass on every release
 
@@ -127,12 +116,7 @@ started it. The oracle job in the workflow lists 19c and fails on a runner
 until `dbmeta` can start it there. Decide with Ken whether to publish the image
 or to leave 19c out of CI.
 
-### Fix the root level leftovers
-
-Only `./internal/codec/oson/...` and a few other unit tests run with no server. Most
-tests need a live database.
-
-### Tell dburl when the parser lands
+### Tell dburl when the first tag exists
 
 dburl staged its `oracle` scheme as provisional on 2026-10-31 (its D69), with
 `github.com/xo/oracle` as the package. Its `GenOracle` writes
@@ -140,8 +124,8 @@ dburl staged its `oracle` scheme as provisional on 2026-10-31 (its D69), with
 and the port 1521, and it passes the path and the query through as they are,
 so `%2F` in a service name and every `ssl*` key reach the parser unchanged.
 dburl maps no `tls` key to `sslmode` for any scheme, and will not. The parser
-of D11 is not written yet. When it lands, and again when the first tag
-exists, tell the dburl session, which then rechecks its tests and documents.
+of D11 landed in step 4. When the first tag exists, tell the dburl session,
+which then rechecks its tests and documents.
 
 ### Fix the upstream issues
 

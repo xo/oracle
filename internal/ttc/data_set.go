@@ -4,9 +4,6 @@ import (
 	"database/sql/driver"
 	"io"
 	"reflect"
-
-	"github.com/xo/oracle/internal/tns"
-	"github.com/xo/oracle/internal/trace"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -49,11 +46,6 @@ func (dataSet *DataSet) clear() {
 	dataSet.index = 0
 }
 
-// load Loading dataset information from network session
-func (dataSet *DataSet) load(session *tns.Session) error {
-	return dataSet.currentResultSet().load(session)
-}
-
 // Close closes each result set. A nil DataSet has nothing to close, where it
 // panicked, which was sijms/go-ora#762.
 func (dataSet *DataSet) Close() error {
@@ -81,13 +73,6 @@ func (dataSet *DataSet) Scan(dest ...any) error {
 	return dataSet.currentResultSet().Scan(dest...)
 }
 
-// set object value using currentRow[colIndex] return true if succeed or false
-// for non-supported type
-// error means error occur during operation
-func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
-	return dataSet.currentResultSet().setObjectValue(obj, colIndex)
-}
-
 func (dataSet *DataSet) Err() error {
 	return dataSet.currentResultSet().Err()
 }
@@ -100,10 +85,6 @@ func (dataSet *DataSet) Next(dest []driver.Value) error {
 // Columns return a string array that represent columns names
 func (dataSet *DataSet) Columns() []string {
 	return dataSet.currentResultSet().Columns()
-}
-
-func (dataSet *DataSet) Trace(t trace.Tracer) {
-	dataSet.currentResultSet().Trace(t)
 }
 
 // ColumnTypeDatabaseTypeName return Col DataType name

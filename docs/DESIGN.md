@@ -41,7 +41,7 @@ design that removes it.
 
 | Today | Fault | Design |
 | --- | --- | --- |
-| One package variable, `oracleDriver`, holds the session parameters, the registered types, the coders, the TLS configuration and the string converters of every database | Two databases in one process share them. A string converter set by the first connection decodes the text of the second, which is sijms/go-ora#692 | Connector |
+| One package variable, `oracleDriver`, holds the session parameters, the registered types, the coders, the TLS configuration and the string converters of every database, and one store holds the fast login cookies of the process | Two databases in one process share them. A cookie of the first names the charset of the second when both have one service name, which is sijms/go-ora#692 | Connector |
 | `AddSessionParam(db, ...)`, `RegisterType(db, ...)` and `AddParameterCoder(db, ...)` reach the driver through a `*sql.DB` | The call changes the driver of every `*sql.DB`, not only the one that the caller names | Connector |
 | `StartContext` starts a goroutine for each call, and the goroutine breaks the connection when the context ends | A goroutine for each round trip, a race on `breakConn`, and a rollback that runs under a context that already ended, which is sijms/go-ora#767 | Context |
 | `Transaction` stores its context | Against dbimp hard rule 4 | Transactions |
@@ -63,34 +63,32 @@ Everything that a caller does not use goes under `internal/`, so that it can
 change without a new major version. `go-ora` made every package public.
 
 Step 3 moved each package of `go-ora` that a caller does not use under
-`internal/`, and changed nothing else. The third column says where each one
-was. The 30 recorded exchanges passed before and after the move, so the driver
-sent the same packets.
+`internal/`, and changed nothing else. The 30 recorded exchanges passed before
+and after the move, so the driver sent the same packets. Later steps renamed,
+split and deleted packages, and the table holds the layout now. The third
+column says where each one was.
 
 | Path | Holds | In `go-ora` |
 | --- | --- | --- |
-| `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package. Step 6 moved `types` to `internal/types`, and the root package names the types a caller uses, as aliases |
+| `/` | The driver, the connector, the DSN, the errors, and the value types that a caller passes or scans, as aliases of `internal/types` and `internal/ttc` | the root package |
 | `aq/` | Advanced Queuing | `aq` |
-| `internal/ttc/` | The connection, statements, rows, transactions, LOBs, cursors, user defined types, the negotiation of data types, O5LOGON, and the registry of types | the root package, which step 4b moved |
-| `internal/configurations/` | The configuration of the protocol code, and wallets | `configurations` |
-| `internal/tns/` | Packets, the session, TLS, the redirect, out of band breaks | `network` |
+| `integration/` | The integration tests of `go-ora`, which need a server | `TestIssues` |
+| `internal/ttc/` | The connection, statements, rows, transactions, LOBs, cursors, user defined types, the negotiation of data types, O5LOGON, the fast login cookies, and the registry of types | the root package, which step 4b moved |
+| `internal/config/` | The configuration of the protocol code, and wallets | `configurations` |
+| `internal/tns/` | Packets, the session, TLS, the redirect, out of band breaks, and the logging of packets | `network` |
 | `internal/auth/` | The advanced negotiation of Oracle Net: encryption, checksums, Kerberos and NTS | `advanced_nego` |
 | `internal/auth/security/` | DES and RC4, and the padding that O5LOGON uses | `network/security` |
 | `internal/auth/ntlmssp/` | NTLM, with the MD4 hash that it needs | `advanced_nego/ntlmssp`, `network/security/md4` |
 | `internal/codec/` | The encoders and decoders of each Oracle type | `parameter_coder` |
 | `internal/codec/oson/` | OSON, the binary JSON of Oracle | `types/oson` |
-| `internal/converters/` | The charsets, NUMBER, dates and floats | `converters` |
-| `internal/trace/`, `internal/lazyinit/`, `internal/utils/` | Helpers | `trace`, `lazy_init`, `utils` |
+| `internal/types/` | The Oracle values, such as NUMBER, dates, intervals, LOBs and JSON | `types` |
+| `internal/charset/` | The 236 charsets, as an embedded blob | `converters` |
+| `internal/tnstest/` | The recorder and the player of TNS exchanges | none |
+| `internal/repotest/` | The tests of the repository setup | none |
 
-Later steps finish the layout:
-
-- Step 4b moved the TTC code of the root package to `internal/ttc/`. O5LOGON
-  is in `internal/ttc/auth_object.go`, and the wallets in
-  `internal/configurations`. Both can move to `internal/auth/` later.
-- Step 8 splits `internal/converters` into `internal/charset`, the compacted
-  charsets, and `internal/codec`, the number and date encoders.
-- `internal/trace` goes with D14, and the code of `internal/lazyinit` and
-  `internal/utils` moves to the package that uses it.
+`internal/utils`, `internal/lazyinit` and `internal/trace` are gone. O5LOGON
+is in `internal/ttc/auth_object.go`, and the wallets in `internal/config`.
+Both can move to `internal/auth/` later.
 
 ## The root package
 
@@ -112,11 +110,12 @@ one job, so that a person or an agent finds a behavior by its file name.
 | `lob.go` | `Clob`, `Blob` and `BFile` |
 | `object.go` | User defined types and collections |
 
-After step 4b the root package holds `driver.go`, `connector.go`, `dsn.go`,
-`errors.go` and `values.go`. `values.go` names the types of `internal/ttc`
-that a caller uses, such as `Out` and `RefCursor`, as aliases. `conn`, `stmt`,
-`rows` and `tx` are still `ttc.Connection`, `ttc.Stmt`, `ttc.DataSet` and
-`ttc.Transaction`, and steps 5 and 6 reshape them there.
+The table is the target. The root package holds `driver.go`, `connector.go`,
+`dsn.go`, `errors.go` and `values.go` today. `values.go` names the types of
+`internal/ttc` and `internal/types` that a caller uses, such as `Out`,
+`RefCursor` and `Clob`, as aliases. `conn`, `stmt`, `rows` and `tx` are still
+`ttc.Connection`, `ttc.Stmt`, `ttc.DataSet` and `ttc.Transaction`, which steps
+5 and 6 reshaped in place, and `options.go` waits for the options below.
 
 ## Connector
 
@@ -172,8 +171,10 @@ takes a `*sql.DB` reaches the state of that database through `db.Driver()`.
 first `Connect`, as in `cassandra`.
 
 The charset and the national charset belong to each connection. The server
-sends them at logon, and `conn` keeps them. Nothing caches them across
-connections. That fixes sijms/go-ora#692.
+sends them at logon, and `conn` keeps them. A fast login cookie names them
+too, so that the next logon is shorter, and each `Connector` keeps its own
+cookies. A cookie of one database never reaches another. That fixes
+sijms/go-ora#692.
 
 ## Context
 
@@ -302,7 +303,7 @@ the arguments. The common options are `WithTimeout`, the time that the server
 gives one statement, and `WithReadonly`. The options of this driver are
 `WithPrefetch` and `WithLobFetch`. dbimp holds the machinery in its root
 package. This module cannot import it (hard rule 2), so it holds a copy of the
-part it needs.
+part it needs. None of this is built yet, and the backlog holds it.
 
 ## Values
 
@@ -330,10 +331,9 @@ the caller with no copy through `any`.
 | An object or a collection | the type that `RegisterType` registered | |
 
 Step 6 built the rows of `NUMBER`, `BINARY_FLOAT`, the intervals and
-`RowsColumnScanner`, and `values_test.go` checks each against a server. These
-rows are not built yet: `JSON` and OSON on `encoding/json/v2` are step 7, and
-the dates keep the behavior of `go-ora` until `TestTime` is fixed. The
-backlog holds both.
+`RowsColumnScanner`, step 7 built `JSON`, and `values_test.go` checks each
+against a server. The dates keep the behavior of `go-ora` until `TestTime` is
+fixed, which the backlog holds.
 
 The type of a column decides the Go type, and the value never does, so every
 row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,
@@ -393,12 +393,21 @@ server, so that `database/sql` runs it again only when that is safe.
 
 ## Logging
 
-The driver writes no file and holds no logger of its own. The `trace` package
-and the `TRACE FILE` key go. A caller that needs to see the packets sets
-`Config.Logger`, a `*slog.Logger`. The connection writes each packet it sends
-and receives to it at `slog.LevelDebug`, and each break and each reconnect at
-`slog.LevelInfo`. A nil logger, the default, logs nothing. A password and a
-key never reach the logger (D14).
+The driver writes no file and holds no logger of its own. A caller that needs
+to see the packets sets `Config.Logger`, a `*slog.Logger`. The connection
+writes each packet it sends and receives to it at `slog.LevelDebug`, as a hex
+dump that the handler formats only when it writes the record, and each event
+of the connection and each statement and bind at the same level. A break and
+a bad connection go at `slog.LevelInfo`. A nil logger, the default, logs
+nothing. A password and a key never reach the logger (D14).
+
+The packets of a logon carry the encrypted session key and password, from
+which a password can be found offline. So `tns.Session` withholds the bytes of
+each packet from the start of a connection until the logon ends, and logs
+only its length. The network encryption logs each packet decrypted under the
+same rule. The keys of the Diffie Hellman exchange, which `go-ora` traced, are
+not logged. Step 9 did this, and deleted `internal/trace` and the trace file
+of the configuration. `TestLogger` holds it.
 
 ## Charsets
 
@@ -434,7 +443,7 @@ The code uses these, where each fits:
 - `context.AfterFunc`, for a break.
 - `errors.Join`, where two errors both reach the caller, as for a statement
   that failed and a cursor that did not close.
-- `encoding/json/v2`, `uuid.UUID`, and `sql.Null[T]`.
+- `encoding/json/v2`, `slog`, and `sql.Null[T]`.
 - `driver.RowsColumnScanner`.
 - In tests, `t.Context()`, `b.Loop()`, and `testing/synctest` for deadlines.
 - `reflect.TypeFor[T]()`, in place of `reflect.TypeOf((*T)(nil)).Elem()`.
@@ -484,9 +493,11 @@ order. A change that sends another packet, such as a new round trip at logon,
 needs the exchanges recorded again. That is the point: it shows each change to
 what the driver sends.
 
-An integration test reads `ORACLE_DSN` and skips when it is empty. CI sets it
-from `dbrun dsn --json` for every release (D7). `integration`, which was `TestIssues`, becomes these
-tests, one for each upstream issue that this design fixes, named for the issue.
+A test that needs a server reads `ORACLE_DSN` and skips when it is empty. CI
+sets it from `dbrun dsn --json` for every release (D7). `upstream_test.go` in
+the root package holds a test for each upstream fault that step 9 fixed,
+named for its fault, and its doc comment names the issue. `integration`, which
+was `TestIssues`, holds the integration tests of `go-ora`.
 
 ## Idiomatic names and structure
 
@@ -497,19 +508,19 @@ each item names its fix.
 
 ### Folders and packages
 
-| Today | Fix |
+| Was | Fix |
 | --- | --- |
 | `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration`, done. One file for each area, and not for each upstream issue, is still to do |
-| `internal/utils` | Delete. `Max` is the built in `max`. `CreateQuasiLocator`, `GetValue`, `GetType` and the `Ty` variables repeat code of `internal/types` and `internal/ttc`. `ExtractTag` moves to the code of user defined types |
-| `internal/lazyinit` | Delete. `sync.OnceValue` does the same |
+| `internal/utils` | Deleted. `Max` is the built in `max`. `CreateQuasiLocator`, `GetValue`, `GetType` and the `Ty` variables repeat code of `internal/types` and `internal/ttc`. `ExtractTag` moves to the code of user defined types |
+| `internal/lazyinit` | Deleted. `sync.OnceValue` does the same |
 | `internal/converters` | `internal/charset`, done in step 8. Its NUMBER code had no user, and is gone |
-| `internal/configurations` | `internal/config` |
+| `internal/configurations` | `internal/config`, done |
 | `internal/types` | Stays, as the package of the Oracle values |
-| `internal/trace` | Goes with D14, when `Config.Logger` replaces it |
+| `internal/trace` | Gone in step 9. `Config.Logger` replaces it (D14) |
 
 ### Names
 
-| Today | Fix |
+| Was | Fix |
 | --- | --- |
 | `IConnection`, `IStringConverter` | No `I` prefix. An interface is named for what it does, and is defined where it is used, with the methods that the user calls. `IConnection` becomes the few methods that a coder calls |
 | `NTSAuthInterface`, `KerberosAuthInterface`, `PacketInterface`, `StmtInterface`, `DialerContext` | No `Interface` suffix. `DialerContext` and `KerberosAuthInterface` repeat `oracle.Dialer` and `oracle.Kerberos` |
@@ -555,8 +566,9 @@ structs in step 7, because `encoding/json/v2` does it.
 ### Dead code
 
 7,553 lines of `internal/ttc`, `internal/types`, `internal/codec` and
-`internal/tns` are code that is commented out. Delete them. Git history keeps
-them.
+`internal/tns` were code that was commented out. Two passes deleted them, and
+git history keeps them. A sweep in step 9 deleted 860 more lines, the empty
+files, and the functions that nothing calls, which `deadcode -test` found.
 
 ### Where the cleanup stands
 
@@ -614,8 +626,8 @@ Then, with Ken's agreement on the names:
   names `negoService`, `Negotiator`, `terminalReader` and `ValueWriter`, and
   `ValueStreamReader` and `ValueStreamer` had no user and are gone.
 
-Left: one file of integration tests for each area. Step 8 split
-`internal/converters`.
+Left: one file of integration tests for each area, and a named type for the
+Oracle type IDs, which are constants of `uint16` in `internal/types`.
 
 ### JSON
 
@@ -638,7 +650,7 @@ and nothing else:
 The interfaces `JSONCoder`, `JSONEncoder` and `JSONDecoder`, the `Coder`
 field, the type `Oson`, the global map of field encoders and the `reflect`
 of OSON are gone. `types.JSON` cannot import `oson`, which imports `types` for
-NUMBER and dates, so `codec` and `ttc` make the conversions. Step 8 can move
+NUMBER and dates, so `codec` and `ttc` make the conversions. A later step can move
 NUMBER and dates below both. Binding JSON never worked in `go-ora`: it sent a
 NULL, because the coder was set after the value. `TestJSON` binds and reads it
 on 21c and 26ai.
@@ -665,7 +677,8 @@ Each step leaves a driver that builds and passes its tests.
 9. Fix the upstream faults in `UPSTREAM.md`, each with a test.
 10. Tell the consumers about the package name and the keys of the DSN. They are
     `dburl`, `usql` and `dbmeta`. `dburl` staged a scheme on 2026-10-31 that
-    passes the query through, and it rechecks when the parser of step 4 lands.
+    passes the query through. The parser landed in step 4, and `dburl`
+    rechecks when the first tag exists.
 11. Make the names and the structure idiomatic, as the section above says.
     It runs before step 7, so that JSON and the charsets move into the new
     layout, in this order: delete the dead code, delete `internal/utils` and

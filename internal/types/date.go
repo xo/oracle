@@ -15,19 +15,6 @@ type Date struct {
 	DBServerTimeZone *time.Location
 }
 
-func NewTimestamp(t time.Time) *Date {
-	ret := new(Date)
-	ret.dataType = TIMESTAMP
-	_ = ret.SetValue(t)
-	return ret
-}
-func NewTimestampTZ(t time.Time) *Date {
-	ret := new(Date)
-	ret.dataType = TimestampTZDTY
-	_ = ret.SetValue(t)
-	return ret
-}
-
 func (date *Date) MaxLen() int64 {
 	switch date.dataType {
 	case DATE:

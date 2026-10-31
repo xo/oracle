@@ -5,10 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/xo/oracle"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/xo/oracle"
 )
 
 func TestArray(t *testing.T) {

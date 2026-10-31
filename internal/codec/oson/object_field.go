@@ -14,11 +14,10 @@ type objectField struct {
 }
 
 func (obj *objectField) Value() (any, error) {
-	//TODO implement me
 	return obj.value, nil
 }
 
-func NewobjectField(objData map[string]any, header *header) (*objectField, error) {
+func newObjectField(objData map[string]any, header *header) (*objectField, error) {
 	ret := new(objectField)
 	ret.header = header
 	var err error
@@ -34,16 +33,16 @@ func NewobjectField(objData map[string]any, header *header) (*objectField, error
 			}
 			field = &numberField{value: *temp}
 		case string:
-			field = NewstringField(v)
+			field = newStringField(v)
 		case bool:
 			field = &booleanField{value: v}
 		case []any:
-			field, err = NewarrayField(v, header)
+			field, err = newArrayField(v, header)
 			if err != nil {
 				return nil, err
 			}
 		case map[string]any:
-			field, err = NewobjectField(v, header)
+			field, err = newObjectField(v, header)
 			if err != nil {
 				return nil, err
 			}

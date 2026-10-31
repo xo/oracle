@@ -28,10 +28,6 @@ func (number *Number) isZero() bool {
 	return len(number.bValue) > 0 && number.bValue[0] == 0x80
 }
 
-func (number *Number) isPositive() bool {
-	return len(number.bValue) > 0 && number.bValue[0]&0x80 != 0
-}
-
 func (number *Number) encode(mantissa []byte, exp int, negative bool) ([]byte, error) {
 	trailingZeros := 0
 	for i := len(mantissa) - 1; i >= 0 && mantissa[i] == '0'; i-- {
@@ -214,17 +210,6 @@ func (number *Number) String() (string, error) {
 	return strNum, nil
 }
 
-func NewBinaryDouble(number float64) *Number {
-	ret := new(Number)
-	_ = ret.encodeFloat64(number)
-	return ret
-}
-
-func NewBinaryFloat(number float32) *Number {
-	ret := new(Number)
-	_ = ret.encodeFloat32(number)
-	return ret
-}
 func NewNumber(n any) (*Number, error) {
 	var err error
 	ret := new(Number)
@@ -400,20 +385,6 @@ func (number *Number) SetValue(input any) error {
 		return nil
 	}
 	var tempValue any
-	//if utils.IsSigned(rType) {
-	//
-	//	//return number.encodeInt()
-	//}
-	//if utils.IsUnsigned(rType) {
-	//	tempValue = rValue.Uint()
-	//	//return number.encodeUint()
-	//}
-	//if utils.IsFloat(rType) {
-	//	tempValue = rValue.Float()
-	//	//return number.encodeFloat()
-	//}
-	// by the kind, so that a named type such as type ID int64 binds too,
-	// which was sijms/go-ora#699
 	switch rValue.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		tempValue = rValue.Int()

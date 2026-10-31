@@ -12,7 +12,6 @@ import (
 	"github.com/cockroachdb/apd/v3"
 
 	"github.com/xo/oracle/internal/tns"
-	"github.com/xo/oracle/internal/trace"
 	types "github.com/xo/oracle/internal/types"
 )
 
@@ -110,18 +109,6 @@ func (resultSet *ResultSet) Columns() []string {
 		ret[x] = (*resultSet.cols)[x].Name
 	}
 	return ret
-}
-
-func (resultSet *ResultSet) Trace(t trace.Tracer) {
-	for r, row := range resultSet.rows {
-		if r > 25 {
-			break
-		}
-		t.Printf("Row %d", r)
-		for c, col := range *resultSet.cols {
-			t.Printf("  %-20s: %v", col.Name, row[c])
-		}
-	}
 }
 
 // ColumnTypeDatabaseTypeName return Col DataType name

@@ -13,8 +13,9 @@ the open questions. Do not decide an open question on your own. Ask Ken.
 gofmt -l . && go vet ./... && go build ./... && go test ./...
 ```
 
-`gofmt -l .` must print nothing. Tests in `integration` need a live Oracle
-database and skip without one.
+`gofmt -l .` must print nothing. A test that needs a live Oracle database, in
+`integration` or in the root package, reads `ORACLE_DSN` and skips when it is
+empty.
 
 ## Testing against Oracle
 

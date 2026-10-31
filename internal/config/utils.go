@@ -5,27 +5,6 @@ import (
 	"strings"
 )
 
-func uniqueAppendString(list []string, newItem string, ignoreCase bool) ([]string, bool) {
-	found := false
-	for _, temp := range list {
-		if ignoreCase {
-			if strings.EqualFold(strings.ToUpper(temp), strings.ToUpper(newItem)) {
-				found = true
-				break
-			}
-		} else {
-			if strings.EqualFold(temp, newItem) {
-				found = true
-				break
-			}
-		}
-	}
-	if !found {
-		list = append(list, newItem)
-	}
-	return list, !found
-}
-
 func getCharsetID(charset string) (int, error) {
 	charsetMap := map[string]int{
 		"US7ASCII":          0x1,

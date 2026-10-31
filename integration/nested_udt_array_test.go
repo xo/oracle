@@ -14,9 +14,10 @@ package integration
 import (
 	"database/sql"
 	"fmt"
-	"github.com/xo/oracle"
 	"testing"
 	"time"
+
+	"github.com/xo/oracle"
 )
 
 func TestNestedUDTArray(t *testing.T) {

@@ -47,21 +47,6 @@ func (serv *defaultService) writeHeader(serviceSubPackets int) {
 	comm.session.PutInt(0, 4, true, false)
 }
 
-func (serv *defaultService) readAdvNegoLevel(level string) {
-	level = strings.ToUpper(level)
-	if level == "" || level == "ACCEPTED" {
-		serv.level = 0
-	} else if level == "REJECTED" {
-		serv.level = 1
-	} else if level == "REQUESTED" {
-		serv.level = 2
-	} else if level == "REQUIRED" {
-		serv.level = 3
-	} else {
-		serv.level = -1
-	}
-}
-
 func (serv *defaultService) buildServiceList(userList []string, useLevel, useDefault bool) error {
 	serv.selectedIndices = make([]int, 0, 10)
 	if useLevel {

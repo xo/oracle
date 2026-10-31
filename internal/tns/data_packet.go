@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"sync"
-
-	"github.com/xo/oracle/internal/trace"
 )
 
 type DataPacket struct {
@@ -26,7 +24,7 @@ func (pck *DataPacket) bytes() []byte {
 	return ret.Bytes()
 }
 
-func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.Tracer, mu *sync.Mutex, dataFlag uint16) (*DataPacket, error) {
+func newDataPacket(initialData []byte, sessionCtx *SessionContext, mu *sync.Mutex, dataFlag uint16) (*DataPacket, error) {
 	var err error
 	mu.Lock()
 	defer mu.Unlock()
@@ -48,7 +46,7 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.
 	}, nil
 }
 
-func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer trace.Tracer, mu *sync.Mutex) (*DataPacket, error) {
+func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, mu *sync.Mutex) (*DataPacket, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	if len(packetData) < 0xA || PacketType(packetData[4]) != DATA {

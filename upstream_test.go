@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,4 +194,36 @@ func TestBatchError(t *testing.T) {
 		}
 	}
 	usable(t, db)
+}
+
+// TestClobOutsideBMP is sijms/go-ora#769: on 19c a CLOB of over about 8K
+// UTF-16 units with characters outside the BMP read back with U+FFFD in
+// place of some of them.
+func TestClobOutsideBMP(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	const table = "xo_oracle_clob_bmp"
+	if _, err := db.ExecContext(ctx, "BEGIN EXECUTE IMMEDIATE 'DROP TABLE "+table+" PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "CREATE TABLE "+table+" (v CLOB)"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE " + table + " PURGE") })
+	// the server builds the value, so that only the read is tested
+	_, err := db.ExecContext(ctx, `DECLARE c CLOB; BEGIN
+		DBMS_LOB.CREATETEMPORARY(c, TRUE);
+		FOR i IN 1..10000 LOOP DBMS_LOB.WRITEAPPEND(c, 3, UNISTR('\D55C\D83D\DE00')); END LOOP;
+		DBMS_LOB.WRITEAPPEND(c, 1, UNISTR('\B05D'));
+		INSERT INTO `+table+` VALUES (c); END;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := db.QueryRowContext(ctx, "SELECT v FROM "+table).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if want := strings.Repeat("한😀", 10000) + "끝"; got != want {
+		t.Errorf("got %d bytes with %d U+FFFD, want %d bytes", len(got), strings.Count(got, "�"), len(want))
+	}
 }

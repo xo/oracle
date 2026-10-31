@@ -41,27 +41,7 @@ func getType(value driver.Value) reflect.Type {
 	return valueType
 }
 
-//	func setWithScanner(dest reflect.Value, input interface{}) error {
-//		if temp, ok := dest.Interface().(sql.Scanner); ok {
-//			if temp != nil && !reflect.ValueOf(temp).IsNil() {
-//				return temp.Scan(input)
-//			}
-//		}
-//		if dest.CanAddr() {
-//			if temp, ok := dest.Addr().Interface().(sql.Scanner); ok {
-//				err := temp.Scan(input)
-//				return err
-//			}
-//		}
-//		return fmt.Errorf("can't set %T to type: %v", input, dest.Type().Name())
-//	}
-//
-// get string value from supported types
 func getString(col any) string {
-	//if val, ok := col.(oraTypes.Clob); ok {
-	//	return val.Data().String
-	//}
-	// common types
 	switch val := col.(type) {
 	case oraTypes.Clob:
 		temp, _ := val.Value()
@@ -85,19 +65,6 @@ func getString(col any) string {
 	}
 
 	return fmt.Sprintf("%v", col)
-}
-
-// get bool value from supported types
-func getBool(col any) (bool, error) {
-	col, err := getValue(col)
-	if err != nil {
-		return false, err
-	}
-	if col == nil {
-		return false, nil
-	}
-	rValue := reflect.ValueOf(col)
-	return rValue.Bool(), nil
 }
 
 // get int64 value from supported types
@@ -209,74 +176,6 @@ func getBytes(col any) ([]byte, error) {
 		return nil, errors.New("conversion of unsupported type to []byte")
 	}
 }
-
-// get lob from supported types
-//func getLob(col interface{}, conn *Connection) (*LobStream, error) {
-//	var err error
-//	col, err = getValue(col)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if col == nil {
-//		return nil, nil
-//	}
-//	charsetID := conn.getDefaultCharsetID()
-//	charsetForm := 1
-//	stringVar := ""
-//	var byteVar []byte
-//	switch val := col.(type) {
-//	case string:
-//		stringVar = val
-//	case Clob:
-//		if !val.Valid {
-//			return nil, nil
-//		}
-//		stringVar = val.String
-//	//case NVarChar:
-//	//	stringVar = string(val)
-//	//	charsetForm = 2
-//	//	charsetID = conn.tcpNego.ServernCharset
-//	case NClob:
-//		charsetForm = 2
-//		charsetID = conn.tcpNego.ServernCharset
-//		if !val.Valid {
-//			return nil, nil
-//		}
-//		stringVar = val.String
-//	case []byte:
-//		byteVar = val
-//	case Blob:
-//		byteVar = val.Data
-//		//case Vector:
-//		//	byteVar, err = val.encode()
-//		//	if err != nil {
-//		//		return nil, err
-//		//	}
-//		//lob := newLob(conn)
-//		//lob.createQuasiLocator(uint64(len(byteVar)))
-//		//lob.data.Reset()
-//
-//	}
-//	if len(stringVar) > 0 {
-//		lob := &LobStream{conn: conn}
-//		lob.sourceLocator, err = lob.CreateTemporaryLocator(charsetID, charsetForm)
-//		if err != nil {
-//			return nil, err
-//		}
-//		err = lob.putString(stringVar)
-//		return lob, err
-//	}
-//	if len(byteVar) > 0 {
-//		lob := &LobStream{conn: conn}
-//		lob.sourceLocator, err = lob.CreateTemporaryLocator(0, 0)
-//		if err != nil {
-//			return nil, err
-//		}
-//		err = lob.putData(byteVar)
-//		return lob, err
-//	}
-//	return nil, nil
-//}
 
 // namedBasic reports whether v is a value of a named type of a basic kind,
 // such as type ID string, that the driver does not know. database/sql

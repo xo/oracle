@@ -36,7 +36,7 @@ func (nego *TCPNego) write() error {
 func (nego *TCPNego) readMessage() error {
 	var err error
 	session := nego.conn.session
-	tracer := nego.conn.tracer
+	logger := nego.conn.logger
 	nego.MessageCode, err = session.ReadByte()
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func (nego *TCPNego) readMessage() error {
 	if err != nil {
 		return err
 	}
-	tracer.Print("Server Charset: ", nego.ServerCharset)
+	logger.Debug("server charset", "charset", nego.ServerCharset)
 	// create string converter object
 	if nego.conn.sStrConv == nil {
 		nego.conn.sStrConv = charset.New(nego.ServerCharset)
@@ -108,7 +108,7 @@ func (nego *TCPNego) readMessage() error {
 			return fmt.Errorf("the server use ncharset with id: %d which is not supported by the driver", nego.ServerNCharset)
 		}
 	}
-	tracer.Print("Server National Charset: ", nego.ServerNCharset)
+	logger.Debug("server national charset", "charset", nego.ServerNCharset)
 	len2, err := session.ReadByte()
 	if err != nil {
 		return err

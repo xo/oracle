@@ -33,7 +33,7 @@ blocks a connection, P2 is a fault with a workaround.
 | --- | --- | --- | --- | --- |
 | sijms/go-ora#767 | P0 | A cancelled transaction can commit. `Rollback` runs under the cancelled context, and `breakConn` is read without the lock | Roll back under `context.WithoutCancel`, and read `breakConn` under the lock | Fixed in step 5. `TestCancelledTransactionDoesNotCommit` fails before and passes after, on 11g, 21c and 26ai |
 | sijms/go-ora#776 | P1 | `SELECT NULL a FROM dual` returns no row and no error. sijms/go-ora#755 is the same family in `v2` | Do not end the row loop on a row whose columns are all zero length | Fixed in step 9. A NULL of no type has a zero `MaxLen`, and `BasicRead` read it as a column that sends nothing. It reads the length now, and `Next` fetches when the execute brought no row. `TestUntypedNullRow` holds it, on 26ai |
-| sijms/go-ora#769 | P1 | A CLOB over about 8K UTF-16 units with characters outside the BMP reads back as U+FFFD with `LOB FETCH=INLINE` | Fetch inline CLOB text as AL16UTF16. sijms/go-ora#768 does this | Open |
+| sijms/go-ora#769 | P1 | A CLOB over about 8K UTF-16 units with characters outside the BMP reads back as U+FFFD with `LOB FETCH=INLINE` | Fetch inline CLOB text as AL16UTF16. sijms/go-ora#768 does this | Fixed in step 9, as the issue says and without the pull request. An inline CLOB is defined in the national charset when that is AL16UTF16. It reproduced on 11g as well, with the same 4 U+FFFD, and 26ai read it right. `TestClobOutsideBMP` holds it, on 11g and 26ai |
 | sijms/go-ora#765 | P1 | After a RAC SCAN redirect, TLS checks the certificate against the redirect address | Keep the host of the connect string as `ServerName`. sijms/go-ora#766 does this | Fixed in step 4. The configuration names the host of the DSN, and `negotiate` keeps it. No test with a redirect yet |
 | sijms/go-ora#757 | P1 | `negotiate` writes `ServerName` into the caller's `*tls.Config` on every dial | Clone the configuration before writing to it. Fix with sijms/go-ora#765 | Fixed in step 4. `negotiate` clones the configuration. No test with TLS yet |
 | sijms/go-ora#771 | P1 | XMLType is NULL on Autonomous Database, whose flag word is 0x8014, and a value over about 254 bytes hangs | Test the flag bits, not equality. sijms/go-ora#770 does this in `v2` | Not located in `v3` yet |
@@ -87,7 +87,7 @@ None is applied. Each waits for Ken (D5).
 
 | Pull request | What it does | Verdict |
 | --- | --- | --- |
-| sijms/go-ora#768 | Fetches inline CLOB text as AL16UTF16, for sijms/go-ora#769 | Apply the `v3` half, with a test |
+| sijms/go-ora#768 | Fetches inline CLOB text as AL16UTF16, for sijms/go-ora#769 | Not applied. Step 9 fixed sijms/go-ora#769 the way the issue says, in its own code |
 | sijms/go-ora#766 | Checks the certificate against the original host, for sijms/go-ora#765 | Apply the `v3` half, with sijms/go-ora#757 |
 | sijms/go-ora#747 | Accepts named types through `reflect.Kind`, for sijms/go-ora#699 | Not needed. Step 9 fixed sijms/go-ora#699 through `driver.ErrSkip` |
 | sijms/go-ora#734 | Stops `putString` writing UTF-16BE into an AL32UTF8 CLOB, for sijms/go-ora#733 | Apply the `v3` half |

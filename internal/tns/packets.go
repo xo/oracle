@@ -9,7 +9,6 @@ type PacketType uint8
 type packet interface {
 	bytes() []byte
 	getPacketType() PacketType
-	getFlag() uint8
 }
 
 const (
@@ -58,4 +57,3 @@ func (pck *Packet) bytes() []byte {
 func (pck *Packet) getPacketType() PacketType {
 	return pck.packetType
 }
-func (pck *Packet) getFlag() uint8 { return pck.flag }

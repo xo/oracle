@@ -5,8 +5,9 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/xo/oracle"
 	"testing"
+
+	"github.com/xo/oracle"
 )
 
 type OracleBool bool

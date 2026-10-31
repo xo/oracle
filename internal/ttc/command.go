@@ -1,7 +1,6 @@
 package ttc
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
 	oraTypes "github.com/xo/oracle/internal/types"
 
@@ -251,6 +251,16 @@ func (stmt *defaultStmt) writeDefine() error {
 					col.DataType = oraTypes.LongVarChar
 					// change data type in the original array
 					stmt.columns[index].DataType = oraTypes.LongVarChar
+					// a CLOB of a database in AL32UTF8 is stored as UTF-16.
+					// Defined in the database charset, 11g to 19c convert it
+					// piece by piece and send U+FFFD for a pair that a piece
+					// splits, which was sijms/go-ora#769. Defined in the
+					// national charset when that is AL16UTF16, it comes as
+					// it is stored.
+					if col.CharsetForm == 1 && stmt.connection.nStrConv != nil && stmt.connection.nStrConv.LangID == charset.AL16UTF16 {
+						col.CharsetForm, col.CharsetID = 2, charset.AL16UTF16
+						stmt.columns[index].CharsetForm, stmt.columns[index].CharsetID = 2, charset.AL16UTF16
+					}
 				}
 			} else {
 				col.ContFlag |= 0x2000000
@@ -354,10 +364,6 @@ func (stmt *Stmt) writePars() error {
 				}
 				continue
 			}
-			//if par.DataType == oraTypes.REFCURSOR {
-			//	ms.PutBytes(1, 0)
-			//	//session.WriteBytes(&buffer, 1, 0)
-			//} else
 			if (par.Direction == Input || par.Direction == InOut) && par.isLobType() {
 				if par.DataType == oraTypes.VECTOR {
 				} else {
@@ -445,25 +451,6 @@ func (stmt *Stmt) write() error {
 				}
 			}
 
-			// for valueIndex, values := range arrayValue {
-			// 	stmt.Pars[parIndex].BValue = values[valueIndex]
-			// }
-			//  valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-			//  each value represented an array of []byte
-			// }
-			// for valueIndex := 0; valueIndex < stmt.arrayBindCount; valueIndex++ {
-			// 	for parIndex, arrayValue := range arrayValues {
-			// 		tempVal := reflect.ValueOf(arrayValue)
-			// 		err = stmt.Pars[parIndex].encodeValue(tempVal.Index(valueIndex).Interface(), 0, stmt.connection)
-			// 		if err != nil {
-			// 			return err
-			// 		}
-			// 	}
-			// 	err = stmt.writePars()
-			// 	if err != nil {
-			// 		return err
-			// 	}
-			// }
 		} else {
 			err = stmt.writePars()
 			if err != nil {
@@ -569,10 +556,10 @@ func (stmt *defaultStmt) fetch(resultSet *ResultSet) error {
 		if maxRowSize > 0 {
 			stmt._noOfRowsToFetch = (0x20000 / int(maxRowSize)) + 1
 		}
-		stmt.connection.tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
+		stmt.connection.logger.Debug("fetch size", "rows", stmt._noOfRowsToFetch)
 	}
 
-	tracer := stmt.connection.tracer
+	logger := stmt.connection.logger
 	err := stmt._fetch(resultSet)
 	if errors.Is(err, tns.ErrConnReset) {
 		err = stmt.connection.read()
@@ -584,7 +571,7 @@ func (stmt *defaultStmt) fetch(resultSet *ResultSet) error {
 	if err != nil {
 		if isBadConn(err) {
 			stmt.connection.setBad()
-			tracer.Print("Error: ", err)
+			logger.Info("bad connection", "error", err)
 			return driver.ErrBadConn
 		}
 		return err
@@ -625,7 +612,7 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, resultSet *ResultSet) error
 		if maxRowSize > 0 {
 			stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
 		}
-		stmt.connection.tracer.Printf("Fetch Size Calculated: %d", stmt._noOfRowsToFetch)
+		stmt.connection.logger.Debug("fetch size", "rows", stmt._noOfRowsToFetch)
 	}
 	stmt.connection.session.ResetBuffer()
 	err := stmt.basicWrite(exeOp, false, true)
@@ -935,37 +922,6 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			}
 		}
 	}
-	if stmt.connection.tracer.IsOn() {
-		resultSet.Trace(stmt.connection.tracer)
-	}
-	return nil
-}
-
-// requestCustomTypeInfo an experimental function to ask for UDT information
-func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
-	session := stmt.connection.session
-	session.SaveState(nil)
-	session.PutBytes(0x3, 0x5c, 0)
-	session.PutInt(3, 4, true, true)
-
-	session.PutBytes(bytes.Repeat([]byte{0}, 19)...)
-	session.PutInt(2, 4, true, true)
-	session.PutInt(len(stmt.connection.connOption.UserID), 4, true, true)
-	session.PutClr(stmt.connection.sStrConv.Encode(stmt.connection.connOption.UserID))
-	session.PutInt(len(typeName), 4, true, true)
-	session.PutClr(stmt.connection.sStrConv.Encode(typeName))
-	session.PutBytes(0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
-	session.PutBytes(bytes.Repeat([]byte{0}, 50)...)
-	err := session.Write()
-	if err != nil {
-		return err
-	}
-	data, err := session.ReadBytes(0x10)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("%#v\n", data)
-	session.LoadState()
 	return nil
 }
 
@@ -1043,10 +999,9 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.tracer
-	tracer.Printf("Exec With Context:")
+	logger := stmt.connection.logger
 
-	tracer.Printf("Exec:\n%s", stmt.text)
+	logger.Debug("exec", "query", stmt.text)
 	stmt.arrayBindCount = 0
 
 	done := stmt.connection.session.StartContext(ctx)
@@ -1186,13 +1141,6 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			if err != nil {
 				return
 			}
-			//fieldVal, err := oraTypes.NewClob(, nil, temp, false)
-			//if err != nil {
-			//	return nil, err
-			//}
-			//if !hasNullValue {
-			//	fieldVal.String, fieldVal.Valid = getString(fieldValue), true
-			//}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nclob":
 			fieldVal := &oraTypes.Clob{}
@@ -1338,7 +1286,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			}
 			if processedPars > 0 {
 				stmt.bulkExec = false
-				stmt.connection.tracer.Printf("    %d:\n%v", x, args[x])
+				stmt.connection.logger.Debug("bind", "index", x, "value", args[x])
 				parIndex += processedPars
 				structPars = append(structPars, args[x].Value)
 				continue
@@ -1436,7 +1384,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		}
 		stmt.setParam(parIndex, *par)
 		parIndex++
-		stmt.connection.tracer.Printf("    %d:\n%v", x, args[x])
+		stmt.connection.logger.Debug("bind", "index", x, "value", args[x])
 	}
 	if useNamedPars {
 		err = stmt.useNamedParameters()
@@ -1475,16 +1423,6 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						}
 					}
 				}
-				// reading of blob
-				//err = copy_(par.Value, par.oPrimValue)
-				//if err != nil {
-				//	return nil, err
-				//}
-				//continue
-				//err = setFieldValue(fieldValue, par.cusType, par.oPrimValue)
-				//if err != nil {
-				//	return nil, err
-				//}
 
 			}
 			err = copyValue(par.Value, par.oPrimValue)
@@ -1573,8 +1511,8 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.tracer
-	tracer.Printf("Exec:\n%s", stmt.text)
+	logger := stmt.connection.logger
+	logger.Debug("exec", "query", stmt.text)
 	var result *QueryResult
 	var err error
 	stmt.arrayBindCount = 0
@@ -1597,7 +1535,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	if err != nil {
 		if isBadConn(err) {
 			stmt.connection.setBad()
-			tracer.Print("Error: ", err)
+			logger.Info("bad connection", "error", err)
 			return nil, driver.ErrBadConn
 		}
 		return nil, err
@@ -1627,15 +1565,6 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		Direction: direction,
 		Value:     val,
 	}
-	// initialize bfile
-	//if file, ok := val.(*BFile); ok {
-	//	if !file.isInit() {
-	//		err := file.init(stmt.connection)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//	}
-	//}
 	err := param.encodeValue(int64(size), stmt.connection)
 	if err != nil {
 		return nil, err
@@ -1684,7 +1613,7 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.tracer
+	logger := stmt.connection.logger
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt._hasMoreRows = true
 	useNamedPars := len(namedArgs) > 0
@@ -1697,7 +1626,7 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 			useNamedPars = false
 		}
 		stmt.setParam(x, *par)
-		tracer.Printf("    %d:\n%v", x, namedArgs[x])
+		logger.Debug("bind", "index", x, "value", namedArgs[x])
 	}
 
 	if useNamedPars {
@@ -1718,7 +1647,7 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 	if err != nil {
 		if isBadConn(err) {
 			stmt.connection.setBad()
-			tracer.Print("Error: ", err)
+			logger.Info("bad connection", "error", err)
 			return nil, driver.ErrBadConn
 		}
 		return nil, err
@@ -1752,8 +1681,8 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.tracer
-	tracer.Print("Query With Context:", stmt.text)
+	logger := stmt.connection.logger
+	logger.Debug("query", "query", stmt.text)
 
 	done := stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext(done)
@@ -1897,8 +1826,8 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
-	tracer := stmt.connection.tracer
-	tracer.Printf("Query:\n%s", stmt.text)
+	logger := stmt.connection.logger
+	logger.Debug("query", "query", stmt.text)
 	var dataSet *DataSet
 	var err error
 	if len(args) == 0 {

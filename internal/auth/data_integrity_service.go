@@ -10,7 +10,6 @@ import (
 
 	"github.com/xo/oracle/internal/auth/security"
 	"github.com/xo/oracle/internal/config"
-	"github.com/xo/oracle/internal/trace"
 )
 
 type dataIntegrityService struct {
@@ -20,10 +19,9 @@ type dataIntegrityService struct {
 	//sharedKey []byte
 	//oldIV     []byte
 	//iv        []byte
-	tracer trace.Tracer
 }
 
-func newDataIntegrityService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo, tracer trace.Tracer) (*dataIntegrityService, error) {
+func newDataIntegrityService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo) (*dataIntegrityService, error) {
 	output := &dataIntegrityService{
 		ano:                   ano,
 		level:                 negoInfo.IntServiceLevel,
@@ -31,7 +29,6 @@ func newDataIntegrityService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo, 
 		version:               version,
 		availableServiceNames: []string{"", "MD5", "SHA1", "SHA512", "SHA256", "SHA384"},
 		availableServiceIDs:   []int{0, 1, 3, 4, 5, 6},
-		tracer:                tracer,
 	}
 	err := output.buildServiceList([]string{}, true, true)
 	if err != nil {
@@ -103,13 +100,6 @@ func (serv *dataIntegrityService) readServiceData(subPacketNum int) error {
 	sharedKey.FillBytes(serv.ano.sessionKey)
 	serv.ano.iv = make([]byte, 0x20)
 	copy(serv.ano.iv, serv.ano.sessionKey[0x20:])
-	serv.tracer.Print("Diffie Hellman Keys:")
-	serv.tracer.LogPacket("Generator:", genBytes)
-	serv.tracer.LogPacket("Prime:", primeBytes)
-	serv.tracer.LogPacket("Private Key:", privateKeyBytes)
-	serv.tracer.LogPacket("Public Key:", serv.publicKey)
-	serv.tracer.LogPacket("Server Public Key:", serverPublicKeyBytes)
-	serv.tracer.LogPacket("Shared Key:", serv.ano.sessionKey)
 	return nil
 }
 

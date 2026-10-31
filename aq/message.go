@@ -150,17 +150,6 @@ func (message *Message) read(conn Conn) error {
 		if tempTime != nil {
 			message.EnqTime = tempTime.(time.Time)
 		}
-		//message.EnqTime, err = charset.DecodeDate(temp)
-		//if err != nil {
-		//	return err
-		//}
-		// oracle date and timestamp
-		//this.aqmsta = this.mEngine.UnmarshalSB4(false);
-		//if (this.mEngine.UnmarshalSB4(false) > 0) {
-		//	this.mEngine.UnmarshalCLR(this.aqmeqtBuffer, 0, this.retInt, 7, false);
-		//	OracleDate oracleDate = new OracleDate(this.aqmeqtBuffer);
-		//	this.aqmeqt = new OracleTimestamp(oracleDate.Value);
-		//}
 	}
 	if conn.TTCVersion() >= 3 {
 		num, err = session.ReadInt(2, true, true)

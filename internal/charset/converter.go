@@ -6,6 +6,10 @@ import (
 	"unsafe"
 )
 
+// AL16UTF16 is the ID of the charset UTF-16, big endian, which is the
+// national charset of most databases.
+const AL16UTF16 = 2000
+
 type Converter struct {
 	LangID    int
 	CharWidth int

@@ -27,17 +27,6 @@ type Out struct {
 	In   bool
 }
 
-// internal enum BindDirection
-// {
-// Output = 16,
-// Input = 32,
-// InputOutput = 48,
-// }
-
-//go:generate stringer -type=TNSType
-
-// type ParameterType int
-
 type ParameterInfo struct {
 	Name         string
 	SchemaName   string
@@ -285,10 +274,6 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		if par.VectorFlag&2 == 2 {
 			par.VectorType = oraTypes.VectorSparse
 		}
-		//colMetaData.m_vectorDim = (int)mEngine.UnmarshalUB4(bAsync, false);
-		//colMetaData.m_vectorNumFormat = (VectorNumFormat)mEngine.UnmarshalUB1(bAsync, false);
-		//colMetaData.m_vectorFlag = (int)((byte)mEngine.UnmarshalUB1(bAsync, false));
-		//colMetaData.m_vectorType = (((colMetaData.m_vectorFlag & 2) != 0) ? OracleVectorType.Sparse : OracleVectorType.Dense);
 	} else {
 		_, err = session.ReadInt(4, true, true)
 		if err != nil {
@@ -332,20 +317,6 @@ func (par *ParameterInfo) write(session *tns.Session) error {
 		session.PutInt(par.oaccollid, 4, true, true)
 	}
 	return nil
-}
-
-func (par *ParameterInfo) clone() ParameterInfo {
-	tempPar := ParameterInfo{
-		DataType:    par.DataType,
-		cusType:     par.cusType,
-		TypeName:    par.TypeName,
-		MaxLen:      par.MaxLen,
-		MaxCharLen:  par.MaxCharLen,
-		CharsetID:   par.CharsetID,
-		CharsetForm: par.CharsetForm,
-		Scale:       par.Scale,
-		Precision:   par.Precision}
-	return tempPar
 }
 
 func (par *ParameterInfo) isLongType() bool {
@@ -403,14 +374,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	par.oPrimValue, err = decoder.Decode(conn)
 	return err
 
-	//case XMLType:
-	//	err = decodeObject(conn, par, temporaryLobs)
-	//	if err != nil {
-	//		return err
-	//	}
-	//default:
-	//	return fmt.Errorf("unable to decode oracle type %v to its primitive value", par.DataType)
-	//}
 }
 
 func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {

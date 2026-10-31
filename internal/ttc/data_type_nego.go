@@ -395,10 +395,6 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 	result.addTypeRep(118, 0, TNSTypeRepNative)
 	result.addTypeRep(types.JSONType, types.JSONType, TNSTypeRepUniversal)
 	result.addTypeRep(types.VECTOR, types.VECTOR, TNSTypeRepUniversal)
-	//if (!OracleConfiguration.MapVectorColumnAsClob)
-	//{
-	//	TTCDataTypeNegotiation.AddTypeRepresentation(127, 0, 127, 1);
-	//}
 	result.addTypeRep(121, 0, TNSTypeRepNative)
 	result.addTypeRep(122, 0, TNSTypeRepNative)
 	result.addTypeRep(123, 0, TNSTypeRepNative)
@@ -552,12 +548,11 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 		}
 		level++
 	}
-	tracer := nego.conn.tracer
+	logger := nego.conn.logger
 	if zone != nil {
-		tracer.Print("DB timezone: ", zone)
+		logger.Debug("database time zone", "zone", zone)
 	} else {
-		tracer.Print("DB timezone not retrieved in data type negotiation")
-		tracer.Print("set DB timezone to: UTC(+00:00)")
+		logger.Debug("no database time zone in the negotiation, so UTC")
 		nego.conn.dbTimeZone = time.UTC
 	}
 
@@ -566,7 +561,7 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 	if nego.conn.tcpNego.ServerCompileTimeCaps[7] < nego.conn.session.TTCVersion {
 		nego.conn.session.TTCVersion = nego.conn.tcpNego.ServerCompileTimeCaps[7]
 	}
-	tracer.Print("TTC Version: ", nego.conn.session.TTCVersion)
+	logger.Debug("TTC version", "version", nego.conn.session.TTCVersion)
 	if len(nego.conn.tcpNego.ServerRuntimeCaps) > 6 && nego.conn.tcpNego.ServerRuntimeCaps[6]&4 == 4 {
 		nego.conn.maxLen.varchar = 0x7FFF
 		nego.conn.maxLen.nvarchar = 0x7FFF
@@ -586,7 +581,6 @@ func (nego *DataTypeNego) writeMessage() {
 	session := nego.conn.session
 	session.PutBytes(nego.MessageCode)
 	// client remote in
-	// session.PutBytes(0, 0, 0, 0)
 	session.PutInt(nego.Server.ServerCharset, 2, false, false)
 	// client remote out
 	session.PutInt(nego.Server.ServerCharset, 2, false, false)
@@ -602,7 +596,6 @@ func (nego *DataTypeNego) writeMessage() {
 	}
 	session.PutInt(nego.Server.ServerNCharset, 2, false, false)
 	// marshal type reps
-	//size := nego.RuntimeTypeAndRep[0]
 	if nego.CompileTimeCaps[27] == 0 {
 		for _, x := range nego.RuntimeTypeAndRep {
 			session.PutBytes(uint8(x))

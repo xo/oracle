@@ -3,8 +3,9 @@ package integration
 
 import (
 	"database/sql"
-	"github.com/xo/oracle"
 	"testing"
+
+	"github.com/xo/oracle"
 )
 
 func TestLargeUDTArray(t *testing.T) {

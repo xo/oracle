@@ -12,8 +12,6 @@ the plan.
 [usql](https://github.com/xo/usql), [dbtpl](https://github.com/xo/dbtpl) and
 [dbmeta](https://github.com/xo/dbmeta) read Oracle through this driver.
 
-The code is a major rewrite focused on extensibility, modern Oracle features, and clean architecture. It uses Go interfaces throughout to make adding new types, nested objects, and array types straightforward.
-
 ## Features
 
 - **Pure Go** -- no C dependencies, no Oracle client installation required
@@ -23,8 +21,8 @@ The code is a major rewrite focused on extensibility, modern Oracle features, an
 - **Fast Authentication** -- reduced round-trips with cookie-based caching and token login
 - **TTC v24** -- latest protocol version with FSAP capability
 - **User-Defined Types** -- nested objects, collections, and struct mapping
-- **Extensible type system** -- plug in custom encoders/decoders for any Oracle type
 - **TLS/SSL** -- full support with wallet, mutual TLS, and Kerberos
+- **Logging** -- the packets and events of each connection, through a `*slog.Logger`
 
 ## Installation
 
@@ -148,11 +146,11 @@ v3, _ := oracle.CreateVector([]float64{10.1, 20.2, 30.3})   // FLOAT64
 
 // Scan from database
 var vec oracle.Vector
-row.Scan(&vec)
+err := row.Scan(&vec)
 
-// Copy to typed slices
-var data []float32
-vec.CopyTo(&data)
+// Value returns the slice of its element type
+v, err := vec.Value()
+data := v.([]float32)
 ```
 
 Formats: `INT8` (`[]uint8`), `FLOAT32`, `FLOAT64` -- dense and sparse.
@@ -201,7 +199,7 @@ queue.Enqueue(msg)
 // Dequeue
 msg, err = queue.Dequeue(&aq.DequeueOptions{
     Consumer: "my_consumer",
-    Mode:     aq.DequeueModeBrowse,
+    Mode:     aq.Browse,
     Wait:     5,
 })
 ```
@@ -214,10 +212,10 @@ Features: batch enqueue/dequeue, persistent and buffered delivery, visibility mo
 
 ```go
 // Register with array counterpart
-oracle.RegisterType(db, "MY_OBJECT", "MY_ARRAY", MyStruct{})
+err := oracle.RegisterType(db, "MY_OBJECT", "MY_ARRAY", MyStruct{})
 
 // Register with explicit owner
-oracle.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStruct{})
+err = oracle.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStruct{})
 ```
 
 Supports nested objects, collections (VARRAY, TABLE OF), and struct mapping via `udt` tags.
@@ -234,20 +232,36 @@ c, err := oracle.NewConnector(cfg,
 The connector sets each parameter with `ALTER SESSION` on each connection
 after its logon.
 
+## Logging
+
+The driver logs nothing unless the caller sets `Config.Logger`:
+
+```go
+cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
+```
+
+Each packet that a connection sends and receives goes to the logger at
+`slog.LevelDebug` as a hex dump, with each statement, bind and event of the
+connection. A break and a bad connection go at `slog.LevelInfo`. The packets
+of the logon carry the encrypted password, so the logger gets only their
+length until the logon ends.
+
 ## Architecture
 
 ```
 oracle/
 ├── aq/                # Advanced Queuing
+├── integration/       # Integration tests, which need a server
 ├── internal/
 │   ├── auth/          # Encryption, checksums, Kerberos, NTS, NTLM
-│   ├── codec/         # Type encoding and decoding, and OSON
 │   ├── charset/       # The Oracle charsets, compacted
-│   ├── configurations/ # The configuration of a connection, and wallets
+│   ├── codec/         # Type encoding and decoding, and OSON
+│   ├── config/        # The configuration of a connection, and wallets
+│   ├── repotest/      # Tests of the repository setup
 │   ├── tns/           # TNS packets and the session
-│   ├── types/         # The values of each Oracle type
+│   ├── tnstest/       # Recorded exchanges for the tests
 │   ├── ttc/           # Connections, statements, rows, LOBs, types
-│   └── tnstest/       # Recorded exchanges for the tests
+│   └── types/         # The values of each Oracle type
 ├── testdata/          # Exchanges recorded against each release
 ├── connector.go       # Connector, and the configuration of each connection
 ├── driver.go          # Driver registration, RegisterType
@@ -258,9 +272,9 @@ oracle/
 
 ### Design Principles
 
-- **Interface-based type system** -- each Oracle type has its own `OracleParameterCoder` implementation, making it trivial to add new types
-- **Three-way type mapping** -- Oracle type ID ↔ Go `reflect.Type` ↔ SQL type name
-- **Pluggable coders** -- register custom encoders/decoders without modifying driver internals
+- **One coder for each Oracle type** -- each type has its own `OracleParameterCoder`, and a type switch chooses the coder of a Go value
+- **A connector for each database** -- the registered types, session parameters and fast login cookies of one database reach no other
+- **Context on every call** -- a context that ends breaks the call with an Oracle Net break, and the connection stays usable
 - **MemorySession** -- lightweight in-memory buffer for parameter encoding and AQ message marshaling
 - **No driver-level failover** -- relies on `database/sql` connection pooling and retry logic
 
