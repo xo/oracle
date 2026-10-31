@@ -88,6 +88,8 @@ func TestIssue335(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	// an identifier of over 30 characters needs 12c
+	requireRelease(t, db, 12)
 	defer func() {
 		err = db.Close()
 		if err != nil {

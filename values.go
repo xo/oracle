@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 
-	"github.com/xo/oracle/internal/auth"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/ttc"
 	"github.com/xo/oracle/internal/types"
 )
@@ -26,8 +26,9 @@ type Querier = ttc.Querier
 // time.Time binds as TIMESTAMP. A nullable one is sql.Null[TimestampTZ].
 type TimestampTZ = types.TimestampTZ
 
-// NTSAuth authenticates a Windows user with NTS.
-type NTSAuth = auth.NTSAuthenticator
+// NTS makes the NTLM messages of NTS, the Windows authentication of Oracle
+// Net, for Config.NTS.
+type NTS = config.NTSAuthenticator
 
 // WrapRefCursor returns the rows of cursor, read through q.
 func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows, error) {
@@ -38,12 +39,6 @@ func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows
 // one row of an array bind, for a bulk insert.
 func NewBatch(array driver.Value) driver.Value {
 	return ttc.NewBatch(array)
-}
-
-// SetNTSAuth sets the NTS authenticator of every connection in the process.
-// BACKLOG.md holds the work that moves it to the Connector.
-func SetNTSAuth(m NTSAuth) {
-	ttc.SetNTSAuth(m)
 }
 
 // Clob is a CLOB or an NCLOB. A column scans into it, and it binds as an

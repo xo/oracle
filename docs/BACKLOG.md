@@ -19,15 +19,6 @@ type IDs are constants of `uint16`, and want a named type. `Config` has no keys 
 list of authentication services, out of band breaks or the location of the
 server, which `go-ora` read. Add each when a caller needs it.
 
-### Remove the state that the whole process shares
-
-Step 4 removed the package variable `oracleDriver` (D9). Step 9 moved the fast
-login cookies to the `Connector`, and deleted the Kerberos authenticator of
-the process, since `Config.Kerberos` sets one for each connector. One piece of
-state for the whole process remains: `auth.NTSAuth`, which `SetNTSAuth` sets,
-and which a configuration with an OS password sets for every connection after
-it. Move it to the `Connector`.
-
 ### Build the statement options
 
 `DESIGN.md`, under Options, holds the options of a statement as dbimp D109
@@ -49,12 +40,6 @@ server with ORA-00600 [25026] or [kcbgtcr_1]. The same bind inserts into a JSON
 column, `JSON_SERIALIZE(CAST(:1 AS JSON))` works, and 26ai returns it. Find
 whether the driver can send the bind so that 21c accepts it, as python-oracledb
 does, or record it as a fault of 21c.
-
-### Finish the values of dates
-
-`TestTime` in `integration` fails on 26ai: a timestamp comes back in UTC and
-without its fraction of a second. The table in `DESIGN.md`, under Values,
-says what each date type returns. Fix it with a test in `values_test.go`.
 
 ### Write the integration tests again
 
@@ -84,26 +69,10 @@ that it tested. The vectors of `converters/other_types_test.go` moved to
 
 ### Make the integration tests pass on every release
 
-`integration`, which was `TestIssues`, reads `ORACLE_DSN` and skips without it, and CI sets it from
-`dbrun dsn --json`. On 2026-10-31 it ran against 26ai alone: 42 tests passed
-and 3 failed, the same 3 at `eb5e173` before step 4 and after it. In step 9
-`TestIssue543` makes its own index, where it read one of the APEX schema that
-the free images do not have, so 43 pass and 2 fail.
-
-- `TestColumnType`: `ColumnTypeDatabaseTypeName` returns "" for an `NCHAR`
-  column. sijms/go-ora#760 rewrites the column metadata.
-- `TestTime`: a timestamp comes back in UTC and without its fraction of a
-  second. See Finish the values of dates.
-
-On 11g in step 9, 40 pass and 3 fail. `TestTime` fails as on 26ai.
-`TestIssue186` uses `FETCH NEXT`, and `TestIssue335` an identifier longer than
-30 characters, which 11g does not have. Those two tests need SQL that 11g
-accepts, or a skip on 11g. A second run on the same 11g database also fails
-`TestArray`, because the package body `GOORA_TEMP_PKG` does not compile, and
-`TestColumnType`, as on 26ai. A test leaves an object behind that the next run
-meets. Each test must drop what it makes.
-
-Run it on the other four releases, and fix or record each failure.
+`integration`, which was `TestIssues`, reads `ORACLE_DSN` and skips without
+it, and CI sets it from `dbrun dsn --json`. In step 9 it passes on 11g, with
+3 tests that need 12c skipped through `requireRelease`, and on 26ai. Run it on
+18c, 19c, 21c and 23ai, and fix or record each failure.
 
 ### Make 19c start in CI
 

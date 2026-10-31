@@ -51,6 +51,9 @@ type ParameterInfo struct {
 	cusType           *oraTypes.Object
 	parent            *ParameterInfo
 	Annotations       map[string]string
+	// databaseType is the name of the type of a column, which the define of
+	// an inline LOB cannot change
+	databaseType string
 	codec.BasicParameter
 }
 
@@ -68,6 +71,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.Precision, err = session.ReadByte()
+	float := false
 	switch par.DataType {
 	case oraTypes.NUMBER:
 		fallthrough
@@ -92,6 +96,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 
 		if scale == -127 {
+			float = par.DataType == oraTypes.NUMBER && par.Precision > 0
 			par.Precision = uint8(math.Ceil(float64(par.Precision) * 0.30103))
 			par.Scale = 0xFF
 		} else {
@@ -198,6 +203,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		par.DataType = oraTypes.XMLType
 		par.IsXmlType = true
 	}
+	par.databaseType = databaseTypeName(par.DataType, par.CharsetForm, float, par.TypeName)
 	if session.TTCVersion < 3 {
 		return nil
 	}
@@ -404,4 +410,78 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) er
 	}
 	par.oPrimValue = v
 	return nil
+}
+
+// databaseTypeName returns the name of an Oracle type as the data dictionary
+// writes it. form is the charset form, 2 for the national charset, and float
+// is a NUMBER with a binary precision. An object or a collection is the name
+// of its type.
+func databaseTypeName(dataType uint16, form int, float bool, typeName string) string {
+	national := form == 2
+	switch dataType {
+	case oraTypes.NCHAR:
+		if national {
+			return "NVARCHAR2"
+		}
+		return "VARCHAR2"
+	case oraTypes.CHAR:
+		if national {
+			return "NCHAR"
+		}
+		return "CHAR"
+	case oraTypes.NUMBER:
+		if float {
+			return "FLOAT"
+		}
+		return "NUMBER"
+	case oraTypes.LONG:
+		return "LONG"
+	case oraTypes.ROWID:
+		return "ROWID"
+	case oraTypes.UROWID:
+		return "UROWID"
+	case oraTypes.DATE:
+		return "DATE"
+	case oraTypes.RAW:
+		return "RAW"
+	case oraTypes.LongRaw:
+		return "LONG RAW"
+	case oraTypes.IBFLOAT, oraTypes.BFLOAT:
+		return "BINARY_FLOAT"
+	case oraTypes.IBDOUBLE, oraTypes.BDOUBLE:
+		return "BINARY_DOUBLE"
+	case oraTypes.REFCURSOR:
+		return "REF CURSOR"
+	case oraTypes.OCIClobLocator:
+		if national {
+			return "NCLOB"
+		}
+		return "CLOB"
+	case oraTypes.OCIBlobLocator:
+		return "BLOB"
+	case oraTypes.OCIFileLocator:
+		return "BFILE"
+	case oraTypes.JSONType:
+		return "JSON"
+	case oraTypes.VECTOR:
+		return "VECTOR"
+	case oraTypes.BOOLEAN:
+		return "BOOLEAN"
+	case oraTypes.TimestampDTY, oraTypes.TIMESTAMP:
+		return "TIMESTAMP"
+	case oraTypes.TimestampTZDTY, oraTypes.TIMESTAMPTZ:
+		return "TIMESTAMP WITH TIME ZONE"
+	case oraTypes.TimestampLTZDTY, oraTypes.TimestampLTZ:
+		return "TIMESTAMP WITH LOCAL TIME ZONE"
+	case oraTypes.IntervalYMDTY, oraTypes.INTERVALYM:
+		return "INTERVAL YEAR TO MONTH"
+	case oraTypes.IntervalDSDTY, oraTypes.INTERVALDS:
+		return "INTERVAL DAY TO SECOND"
+	case oraTypes.XMLType, oraTypes.OCIXMLType:
+		if typeName != "" {
+			return typeName
+		}
+		return "XMLTYPE"
+	}
+	return ""
 }

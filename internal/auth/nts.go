@@ -2,33 +2,24 @@ package auth
 
 import (
 	"encoding/binary"
-	"errors"
 
 	"github.com/xo/oracle/internal/auth/ntlmssp"
+	"github.com/xo/oracle/internal/config"
 )
 
-type NTSAuthenticator interface {
-	NewNegotiateMessage(domain, machine string) ([]byte, error)
-	ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error)
-}
+// ntlm is the NTSAuthenticator of the driver, which a connection uses when
+// its configuration names none.
+type ntlm struct{}
 
-var NTSAuth NTSAuthenticator = &NTSAuthDefault{}
-
-type NTSAuthDefault struct{}
-
-type NTSAuthHash struct {
-	NTSAuthDefault
-}
-
-func (nts *NTSAuthDefault) NewNegotiateMessage(domain, machine string) ([]byte, error) {
+func (ntlm) NewNegotiateMessage(domain, machine string) ([]byte, error) {
 	return ntlmssp.NewNegotiateMessage(domain, machine)
 }
 
-func (nts *NTSAuthDefault) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
+func (ntlm) ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error) {
 	return ntlmssp.ProcessChallenge(chaMsgData, user, password)
 }
 
-func createNTSNegoPacket(domain, machine string) ([]byte, error) {
+func createNTSNegoPacket(nts config.NTSAuthenticator, domain, machine string) ([]byte, error) {
 	packetData := []byte{
 		0, 1, 0, 7, 0, 0, 0, 0, 0, 4, 0, 5, 2, 0, 0, 0,
 		0, 4, 0, 4, 0, 0, 0, 9, 0, 4, 0, 4, 0, 0, 0, 2,
@@ -39,10 +30,7 @@ func createNTSNegoPacket(domain, machine string) ([]byte, error) {
 	ret := []byte{0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x99, 0x0B, 0x20, 0x02, 0x00, 0x00, 0x01, 0x00}
 	ret = append(ret, packetData...)
 	sspiOffset := len(ret)
-	if NTSAuth == nil {
-		return nil, errors.New("NTS authentication manager cannot be nil")
-	}
-	negoData, err := NTSAuth.NewNegotiateMessage(domain, machine)
+	negoData, err := nts.NewNegotiateMessage(domain, machine)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +53,7 @@ func createNTSNegoPacket(domain, machine string) ([]byte, error) {
 	return ret, nil
 }
 
-func createNTSAuthPacket(chaMsgData []byte, user, password string) ([]byte, error) {
+func createNTSAuthPacket(nts config.NTSAuthenticator, chaMsgData []byte, user, password string) ([]byte, error) {
 	packetData := []byte{
 		0, 1, 0, 2, 0, 0, 0, 0, 0, 4,
 		0, 1, 55, 0, 0, 0, 0, 55, 0, 1,
@@ -73,10 +61,7 @@ func createNTSAuthPacket(chaMsgData []byte, user, password string) ([]byte, erro
 	ret := []byte{0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x90, 0x0, 0x0, 0x0, 0x0, 0x0, 0x01, 0x0}
 	ret = append(ret, packetData...)
 	sspiOffset := len(ret)
-	if NTSAuth == nil {
-		return nil, errors.New("NTS authentication manager cannot be nil")
-	}
-	authData, err := NTSAuth.ProcessChallenge(chaMsgData, user, password)
+	authData, err := nts.ProcessChallenge(chaMsgData, user, password)
 	if err != nil {
 		return nil, err
 	}

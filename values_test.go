@@ -268,3 +268,38 @@ func TestJSON(t *testing.T) {
 		t.Errorf("jsontext.Value: got %s, %v", raw, err)
 	}
 }
+
+// TestTimeFraction checks that a time.Time keeps its fraction of a second in
+// a TIMESTAMP, and that a DATE, which holds none, takes the whole seconds.
+// go-ora bound every time.Time as a DATE.
+func TestTimeFraction(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	const table = "xo_oracle_time"
+	if _, err := db.ExecContext(ctx, "BEGIN EXECUTE IMMEDIATE 'DROP TABLE "+table+" PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "CREATE TABLE "+table+" (d DATE, ts TIMESTAMP(9))"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE " + table + " PURGE") })
+	v := time.Date(2020, 1, 2, 3, 4, 5, 987_654_321, time.UTC)
+	if _, err := db.ExecContext(ctx, "INSERT INTO "+table+" VALUES (:1, :2)", v, v); err != nil {
+		t.Fatal(err)
+	}
+	var d, ts time.Time
+	if err := db.QueryRowContext(ctx, "SELECT d, ts FROM "+table).Scan(&d, &ts); err != nil {
+		t.Fatal(err)
+	}
+	if want := v.Truncate(time.Second); !d.Equal(want) {
+		t.Errorf("DATE: got %v, want %v", d, want)
+	}
+	if !ts.Equal(v) {
+		t.Errorf("TIMESTAMP(9): got %v, want %v", ts, v)
+	}
+	// a value with no fraction binds as a DATE, and finds the row
+	var n int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM "+table+" WHERE d = :1", v.Truncate(time.Second)).Scan(&n); err != nil || n != 1 {
+		t.Errorf("a DATE bind finds %d rows, %v", n, err)
+	}
+}

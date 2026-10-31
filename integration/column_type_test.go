@@ -1,78 +1,76 @@
 package integration
 
 import (
-	"database/sql"
 	"testing"
 )
 
+// TestColumnType checks the name that ColumnTypeDatabaseTypeName gives each
+// type, which is the name of the data dictionary. go-ora gave none.
 func TestColumnType(t *testing.T) {
-	var createTable = func(db *sql.DB) error {
-		return execCmd(db, `CREATE TABLE GOORA_T_CHAR ( 
-    col1 char(32), 
-    col2 nchar(32), 
-    col3 varchar2(32), 
-    col4 nvarchar2(32))`)
-	}
-
-	var dropTable = func(db *sql.DB) error {
-		return execCmd(db, "drop table GOORA_T_CHAR purge")
-	}
-
-	var insert = func(db *sql.DB) error {
-		return execCmd(db, `INSERT INTO GOORA_T_CHAR VALUES('char','nchar','varchar2','nvarchar2')`)
-	}
-
 	db, err := getDB(t)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-	defer func() {
-		err = db.Close()
-		if err != nil {
-			t.Error(err)
+	t.Cleanup(func() { _ = db.Close() })
+	ctx := t.Context()
+	columns := []struct{ def, want string }{
+		{"CHAR(32)", "CHAR"},
+		{"NCHAR(32)", "NCHAR"},
+		{"VARCHAR2(32)", "VARCHAR2"},
+		{"NVARCHAR2(32)", "NVARCHAR2"},
+		{"NUMBER", "NUMBER"},
+		{"NUMBER(5, 2)", "NUMBER"},
+		{"FLOAT", "FLOAT"},
+		{"BINARY_FLOAT", "BINARY_FLOAT"},
+		{"BINARY_DOUBLE", "BINARY_DOUBLE"},
+		{"DATE", "DATE"},
+		{"TIMESTAMP", "TIMESTAMP"},
+		{"TIMESTAMP WITH TIME ZONE", "TIMESTAMP WITH TIME ZONE"},
+		{"TIMESTAMP WITH LOCAL TIME ZONE", "TIMESTAMP WITH LOCAL TIME ZONE"},
+		{"INTERVAL YEAR TO MONTH", "INTERVAL YEAR TO MONTH"},
+		{"INTERVAL DAY TO SECOND", "INTERVAL DAY TO SECOND"},
+		{"RAW(16)", "RAW"},
+		{"CLOB", "CLOB"},
+		{"NCLOB", "NCLOB"},
+		{"BLOB", "BLOB"},
+	}
+	def := ""
+	for i, c := range columns {
+		if i > 0 {
+			def += ", "
 		}
-	}()
-	err = createTable(db)
+		def += "c" + string(rune('a'+i)) + " " + c.def
+	}
+	_, _ = db.ExecContext(ctx, "DROP TABLE TTB_COLUMN_TYPE PURGE")
+	if _, err := db.ExecContext(ctx, "CREATE TABLE TTB_COLUMN_TYPE ("+def+")"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE TTB_COLUMN_TYPE PURGE") })
+	rows, err := db.QueryContext(ctx, "SELECT * FROM TTB_COLUMN_TYPE")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-	defer func() {
-		err = dropTable(db)
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	err = insert(db)
+	defer rows.Close()
+	types, err := rows.ColumnTypes()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-	rows, err := db.Query("SELECT col1, col2, col3, col4 FROM GOORA_T_CHAR")
+	for i, c := range columns {
+		if got := types[i].DatabaseTypeName(); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.def, got, c.want)
+		}
+	}
+	rows.Close()
+	rows, err = db.QueryContext(ctx, "SELECT ROWID FROM dual")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	for rows.Next() {
-		columns, err := rows.ColumnTypes()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		for key, val := range columns {
-			if (key == 0 || key == 1) && val.DatabaseTypeName() != "CHAR" {
-				t.Errorf("expected: %s and got: %s", "CHAR", val.DatabaseTypeName())
-			}
-			if (key == 2 || key == 3) && val.DatabaseTypeName() != "NCHAR" {
-				t.Errorf("expected: %s and got: %s", "NCHAR", val.DatabaseTypeName())
-			}
-		}
+	defer rows.Close()
+	types, err = rows.ColumnTypes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := types[0].DatabaseTypeName(); got != "ROWID" && got != "UROWID" {
+		t.Errorf("ROWID: got %q", got)
 	}
 }

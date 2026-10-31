@@ -176,6 +176,10 @@ too, so that the next logon is shorter, and each `Connector` keeps its own
 cookies. A cookie of one database never reaches another. That fixes
 sijms/go-ora#692.
 
+The authenticators of Kerberos and NTS are `Config.Kerberos` and `Config.NTS`.
+`go-ora` held each in a variable of the process, which `SetNTSAuth` and
+`SetKerberosAuth` set. With them gone, step 9 left no state in the process.
+
 ## Context
 
 The context comes first, is named `ctx`, and is never stored in a struct. The
@@ -311,6 +315,10 @@ A NULL is nil. A value has the Go type that fits its Oracle type, and `rows`
 implements `driver.RowsColumnScanner`, so that `Scan` fills the destination of
 the caller with no copy through `any`.
 
+`ColumnTypeDatabaseTypeName` gives the name of the data dictionary, such as
+`VARCHAR2`, `NCHAR`, `FLOAT` or `TIMESTAMP WITH TIME ZONE`, and the name of
+its type for an object. `go-ora` gave none. `TestColumnType` holds it.
+
 | Oracle | Go, for a scan into `*any` | Also scans into |
 | --- | --- | --- |
 | `VARCHAR2`, `CHAR`, `NVARCHAR2`, `NCHAR`, `LONG`, `CLOB`, `NCLOB` | `string` | `[]byte`, `Clob` |
@@ -319,7 +327,7 @@ the caller with no copy through `any`.
 | `BINARY_FLOAT`, `BINARY_DOUBLE` | `float64` | `float32` |
 | `DATE`, `TIMESTAMP` | `time.Time` in UTC, because the type holds no zone | |
 | `TIMESTAMP WITH TIME ZONE` | `time.Time` in its zone | |
-| `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` in the zone of the session | |
+| `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` at the same instant, in the time zone of the database | |
 | `INTERVAL YEAR TO MONTH` | `IntervalYM` | `string` |
 | `INTERVAL DAY TO SECOND` | `time.Duration` | `string` |
 | `RAW`, `LONG RAW`, `BLOB` | `[]byte` | `Blob` |
@@ -332,8 +340,15 @@ the caller with no copy through `any`.
 
 Step 6 built the rows of `NUMBER`, `BINARY_FLOAT`, the intervals and
 `RowsColumnScanner`, step 7 built `JSON`, and `values_test.go` checks each
-against a server. The dates keep the behavior of `go-ora` until `TestTime` is
-fixed, which the backlog holds.
+against a server.
+
+A `time.Time` with a fraction of a second binds as a `TIMESTAMP`, and one with
+none as a `DATE`. `go-ora` bound every one as a `DATE`, which dropped the
+fraction. A `DATE` bind keeps the index of a `DATE` column that it meets,
+which a `TIMESTAMP` bind would convert, and a `TIMESTAMP` that goes into a
+`DATE` column loses its fraction, as Oracle truncates it. The zone of a
+`time.Time` is dropped, and the server reads its wall clock in the zone of
+the session. `TimestampTZ` binds with its zone.
 
 The type of a column decides the Go type, and the value never does, so every
 row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,

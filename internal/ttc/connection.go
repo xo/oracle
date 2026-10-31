@@ -1046,10 +1046,6 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 	return stmt.Exec(args)
 }
 
-func SetNTSAuth(newNTSManager auth.NTSAuthenticator) {
-	auth.NTSAuth = newNTSManager
-}
-
 func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
 	// database/sql converts a driver.Valuer, such as sql.Null[T], to its
 	// value, except the few that the driver binds itself

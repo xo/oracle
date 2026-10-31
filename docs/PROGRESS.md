@@ -72,19 +72,13 @@ The second part of step 9 is done (`399f398`). It fixes #698, a batch that
 failed and hung on 11g, #695, #624 and #692, whose cookies are now per
 `Connector`.
 
-The third part of step 9 is staged. It fixes #769, a CLOB with characters
-outside the BMP, which reproduced on 11g, and sends the trace to
-`Config.Logger` (D14), which deletes `internal/trace` and the print on
-reconnect. The `clob` exchanges are recorded again on every release, since
-the driver defines an inline CLOB in the national charset now. The root
-package passes on 11g and 26ai. `integration` gives 43 passes and 2 failures
-on 26ai, and 40 passes and 5 failures on 11g, which `BACKLOG.md` lists. Left
-in `UPSTREAM.md`: #771, which needs an Autonomous Database, and #729, which
-is a feature. The pull requests wait for Ken.
+The third part of step 9 is done (`cda6693`). It fixes #769, sends the trace
+to `Config.Logger` (D14), and sweeps the dead code and the documents.
 
-With it is staged a sweep that Ken asked for. It deletes 10 empty or dead
-files, 860 more lines of code that was commented out, the functions that
-nothing calls, which `deadcode -test` found, the Kerberos authenticator of the
-process, a broken `go:generate` and its stale output, and the error prefix
-`go-ora:`. `README.md`, `DESIGN.md`, `BACKLOG.md` and `CONTRIBUTING.md` now
-match the code.
+The fourth part of step 9 is staged. `ColumnTypeDatabaseTypeName` gives the
+names of the data dictionary, a `time.Time` with a fraction of a second binds
+as a `TIMESTAMP`, and `Config.NTS` replaces `SetNTSAuth`, the last state of
+the process. Three integration tests that need 12c skip on 11g. The root
+package and `integration` pass on 11g and 26ai, with no failure. Left in
+`UPSTREAM.md`: #771, which needs an Autonomous Database, and #729, which is a
+feature. The pull requests wait for Ken.

@@ -7,15 +7,18 @@ import (
 	"time"
 )
 
+// TestTime binds a time.Time with a fraction of a second into each date type,
+// which a TIMESTAMP(9) holds whole. go-ora bound it as a DATE and dropped the
+// fraction.
 func TestTime(t *testing.T) {
 	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `
 CREATE TABLE TTB_TIME(
     ID NUMBER,
     DATE1 DATE,
-    DATE2 TIMESTAMP,
-    DATE3 TIMESTAMP WITH TIME ZONE,
-    DATE4 TIMESTAMP WITH LOCAL TIME ZONE
+    DATE2 TIMESTAMP(9),
+    DATE3 TIMESTAMP(9) WITH TIME ZONE,
+    DATE4 TIMESTAMP(9) WITH LOCAL TIME ZONE
 )`)
 	}
 

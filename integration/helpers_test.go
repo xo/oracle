@@ -114,3 +114,18 @@ func queryStruct(row *sql.Row, s any) error {
 	}
 	return row.Scan(scanValue...)
 }
+
+// requireRelease skips the test when the server is older than the major
+// release, such as 12 for a feature that 11g lacks.
+func requireRelease(t *testing.T, db *sql.DB, major int) {
+	t.Helper()
+	var version int
+	err := db.QueryRowContext(t.Context(), `SELECT TO_NUMBER(REGEXP_SUBSTR(version, '^[0-9]+'))
+		FROM product_component_version WHERE product LIKE 'Oracle%' AND ROWNUM = 1`).Scan(&version)
+	if err != nil {
+		t.Fatalf("reading the release: %v", err)
+	}
+	if version < major {
+		t.Skipf("needs release %d, and the server is %d", major, version)
+	}
+}

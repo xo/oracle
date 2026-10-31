@@ -111,9 +111,10 @@ func (resultSet *ResultSet) Columns() []string {
 	return ret
 }
 
-// ColumnTypeDatabaseTypeName return Col DataType name
+// ColumnTypeDatabaseTypeName returns the name of the type of a column, as
+// the data dictionary writes it, such as VARCHAR2 or TIMESTAMP WITH TIME ZONE.
 func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
-	return ""
+	return (*resultSet.cols)[index].databaseType
 }
 
 // ColumnTypeLength return length of column type

@@ -250,6 +250,7 @@ func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 	if cfg.Kerberos != nil {
 		conn.Kerberos = cfg.Kerberos
 	}
+	conn.NTS = cfg.NTS
 	var err error
 	conn.TLSConfig, err = cfg.tlsConfig()
 	if err != nil {

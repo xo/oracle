@@ -8,6 +8,8 @@ func TestIssue186(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	// FETCH NEXT needs 12c
+	requireRelease(t, db, 12)
 	defer func() {
 		err = db.Close()
 		if err != nil {

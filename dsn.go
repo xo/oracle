@@ -204,6 +204,10 @@ type Config struct {
 	// Kerberos returns the ticket when Auth is AuthKerberos.
 	Kerberos Kerberos
 
+	// NTS makes the messages of NTS when Auth is AuthOS and the server asks
+	// for it. Nil uses the NTLM of the driver.
+	NTS NTS
+
 	// Logger receives the packets and events of each connection. Nil logs
 	// nothing (D14).
 	Logger *slog.Logger

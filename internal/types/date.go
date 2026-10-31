@@ -33,7 +33,13 @@ func (date *Date) Value() (any, error) {
 }
 func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 	if date.dataType == 0 {
+		// a DATE holds no fraction of a second, so a value with one binds
+		// as a TIMESTAMP. A value with none binds as a DATE, so that a
+		// DATE column that it meets keeps its index
 		date.dataType = DATE
+		if input.Nanosecond() != 0 {
+			date.dataType = TIMESTAMP
+		}
 	}
 	switch date.dataType {
 	case DATE:

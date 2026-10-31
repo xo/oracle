@@ -32,12 +32,21 @@ type KerberosAuthenticator interface {
 	Authenticate(server, service string) ([]byte, error)
 }
 
+// NTSAuthenticator makes the NTLM messages of NTS, the Windows
+// authentication of Oracle Net.
+type NTSAuthenticator interface {
+	NewNegotiateMessage(domain, machine string) ([]byte, error)
+	ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error)
+}
+
 type AdvNegoServiceInfo struct {
 	AuthService     []string
 	EncServiceLevel int
 	IntServiceLevel int
-	// Kerberos is an optional session-specific auth, which will be preferred over the global interface if present.
+	// Kerberos authenticates with Kerberos, which needs it.
 	Kerberos KerberosAuthenticator
+	// NTS authenticates with NTS. Nil uses the NTLM of the driver.
+	NTS NTSAuthenticator
 }
 type ConnectionConfig struct {
 	ClientInfo

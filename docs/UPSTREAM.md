@@ -95,6 +95,6 @@ None is applied. Each waits for Ken (D5).
 | sijms/go-ora#775 | Sends 234 as the logon types byte | Skip. `v2` only, and `v3` already sends 234 |
 | sijms/go-ora#770 | Decodes XMLType by its flag bits | Rewrite for `v3` from the issue |
 | sijms/go-ora#773 | Writes a valid replacement for JA16EUC | Rewrite for `v3`, after the charset tables change |
-| sijms/go-ora#760 and sijms/go-ora#761 | Rewrite the column metadata, 1,934 and 2,570 lines | Skip for now. Too large to take before the tests run |
+| sijms/go-ora#760 and sijms/go-ora#761 | Rewrite the column metadata, 1,934 and 2,570 lines | Skip for now. Too large to take before the tests run. Step 9 gives the names of the column types without them |
 | sijms/go-ora#616 | Reads `tnsnames.ora` with its own parser, 1,470 lines | Skip for now. Ken decides whether the driver reads `TNS_ADMIN` |
 | sijms/go-ora#743 | Changes the CI of three modules | Skip. The workflow here is new (D7) |

@@ -204,7 +204,11 @@ func (nego *AdvNego) Read() error {
 		}
 	}
 	if nego.authNTS {
-		ntsPacket, err := createNTSNegoPacket(nego.clientInfo.DomainName, nego.clientInfo.HostName)
+		var nts config.NTSAuthenticator = ntlm{}
+		if nego.negoInfo.NTS != nil {
+			nts = nego.negoInfo.NTS
+		}
+		ntsPacket, err := createNTSNegoPacket(nts, nego.clientInfo.DomainName, nego.clientInfo.HostName)
 		if err != nil {
 			return err
 		}
@@ -224,7 +228,7 @@ func (nego *AdvNego) Read() error {
 		if err != nil {
 			return err
 		}
-		ntsPacket, err = createNTSAuthPacket(chaData, nego.clientInfo.OSUserName,
+		ntsPacket, err = createNTSAuthPacket(nts, chaData, nego.clientInfo.OSUserName,
 			nego.clientInfo.OSPassword)
 		if err != nil {
 			return err

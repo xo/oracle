@@ -289,6 +289,7 @@ oracle/
 | `go_ora.AddSessionParam` / `DelSessionParam` | `oracle.WithSessionParam` on the connector |
 | `go_ora.NewConnector(dsn)`, `Dialer`, `WithTLSConfig` | `oracle.NewConnector(cfg)` with `Config.Dialer` and `Config.TLS` |
 | `go_ora.AddParameterCoder`, `SetStringConverter`, `RegisterConnConfig` | Removed |
+| `go_ora.SetNTSAuth`, `SetKerberosAuth` | `Config.NTS` and `Config.Kerberos` on the connector |
 | `go_ora.BuildUrl`, `BuildJDBC` | `Config.DSN` |
 | The package `go_ora` | The package `oracle` |
 
