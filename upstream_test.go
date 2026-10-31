@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -390,9 +392,10 @@ type xoNumbers struct {
 
 // TestObjectCollection is sijms/go-ora#721: a VARRAY in an object went as
 // its body alone, which the server read as a length that it never stopped
-// allocating for, and a NULL object read two bytes too many. A VARRAY of
-// any size, a NULL one, an empty one, and a NULL object each go and come
-// back whole.
+// allocating for, a NULL object read two bytes too many, and a NULL object
+// in a batch was stored as the object of the row before. A VARRAY of any
+// size, a NULL one, an empty one, and a NULL object each go and come back
+// whole, one by one and in a batch.
 func TestObjectCollection(t *testing.T) {
 	db := openLive(t)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -433,15 +436,17 @@ func TestObjectCollection(t *testing.T) {
 		{ID: 5, Vals: big},
 	}
 	for k, o := range want {
-		var err error
-		if o == nil {
-			_, err = db.ExecContext(ctx, "INSERT INTO xo_oracle_objects VALUES (:1, NULL)", k)
-		} else {
-			_, err = db.ExecContext(ctx, "INSERT INTO xo_oracle_objects VALUES (:1, :2)", k, *o)
-		}
-		if err != nil {
+		if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_objects VALUES (:1, :2)", k, o); err != nil {
 			t.Fatalf("row %d: %v", k, err)
 		}
+	}
+	// the same rows again, as one batch, at k + 10
+	keys := make([]int64, len(want))
+	for k := range want {
+		keys[k] = int64(k + 10)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_objects VALUES (:1, :2)", keys, want); err != nil {
+		t.Fatalf("the batch: %v", err)
 	}
 	rows, err := db.QueryContext(ctx, "SELECT k, o FROM xo_oracle_objects ORDER BY k")
 	if err != nil {
@@ -456,6 +461,7 @@ func TestObjectCollection(t *testing.T) {
 			t.Fatal(err)
 		}
 		n++
+		k %= 10
 		if want[k] == nil {
 			if got != nil {
 				t.Errorf("row %d: got %v, want NULL", k, got)
@@ -466,7 +472,76 @@ func TestObjectCollection(t *testing.T) {
 			t.Errorf("row %d: got %#v, want %#v", k, got, *want[k])
 		}
 	}
-	if err := rows.Err(); err != nil || n != len(want) {
+	if err := rows.Err(); err != nil || n != 2*len(want) {
 		t.Errorf("read %d rows, %v", n, err)
+	}
+}
+
+// resetListener accepts each connection and resets it, as a gateway that
+// accepts the dial to a port that nothing listens on does. It returns its
+// port.
+func resetListener(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			if tc, ok := c.(*net.TCPConn); ok {
+				_ = tc.SetLinger(0)
+			}
+			_ = c.Close()
+		}
+	}()
+	return l.Addr().(*net.TCPAddr).Port
+}
+
+// TestFailover is sijms/go-ora#619 and sijms/go-ora#707: a server whose dial
+// succeeds and whose connection resets gave an error, where the next server
+// was not tried. The next server takes the connection, named with server
+// and in a descriptor of two addresses.
+func TestFailover(t *testing.T) {
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn == "" {
+		t.Skip("ORACLE_DSN is empty")
+	}
+	live, err := oracle.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.Host == "" || live.Service == "" || (live.SSLMode != "" && live.SSLMode != oracle.SSLDisable) {
+		t.Skip("ORACLE_DSN names no host and service over plain TCP")
+	}
+	port := live.Port
+	if port == 0 {
+		port = oracle.DefaultPort
+	}
+	dead := resetListener(t)
+	withServer := live
+	withServer.Host, withServer.Port = "127.0.0.1", dead
+	withServer.Servers = []string{net.JoinHostPort(live.Host, strconv.Itoa(port))}
+	withDescriptor := live
+	withDescriptor.Host, withDescriptor.Port, withDescriptor.Service = "", 0, ""
+	withDescriptor.Descriptor = fmt.Sprintf("(DESCRIPTION=(FAILOVER=ON)(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT=%d))(ADDRESS=(PROTOCOL=TCP)(HOST=%s)(PORT=%d)))(CONNECT_DATA=(SERVICE_NAME=%s)))", dead, live.Host, port, live.Service)
+	for name, cfg := range map[string]oracle.Config{"server": withServer, "descriptor": withDescriptor} {
+		c, err := oracle.NewConnector(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		db := sql.OpenDB(c)
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+		var n int
+		err = db.QueryRowContext(ctx, "SELECT 1 FROM dual").Scan(&n)
+		cancel()
+		db.Close()
+		if err != nil || n != 1 {
+			t.Errorf("%s: got %d, %v", name, n, err)
+		}
 	}
 }

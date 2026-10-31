@@ -87,10 +87,13 @@ fault of long text on 18c, and the sixth part covers every release before
 The sixth part of step 9 is done (`a06284d`, pushed). It replaces a missing
 character with '?' (#773), reads `DBMS_OUTPUT` (D19), and covers 18c.
 
-The seventh part of step 9 is staged. A collection in an object goes as an
-image of its own, which fixes a hang of the server for any VARRAY in an
-object (#721), and a NULL object reads. The keys `alias` and `tns_admin`
-read `tnsnames.ora` (D20), and `skip_nls` skips the NLS query (#611). The
-root package and `integration` pass on 11g, 26ai and both Autonomous
-Database releases. Left: the NULL row of an array bind of objects (#721),
-OCI IAM tokens, streaming, failover (D21), and #729.
+The seventh part of step 9 is done (`42b556e`, pushed). It encodes
+collections in objects (#721), reads `tnsnames.ora` (D20), and adds
+`skip_nls` (#611).
+
+The eighth part of step 9 is staged. A NULL object in a batch was stored as
+the object of the row before, and is NULL now (#721). A handshake that fails
+after the dial tries the next address (#619 and #707). The root package and
+`integration` pass on 11g, 26ai and both Autonomous Database releases. Left:
+streaming of LOBs and rows (D21), which needs a design, and #729, which needs
+a server that requires network encryption.

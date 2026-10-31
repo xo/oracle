@@ -220,6 +220,15 @@ func (param *ObjectParameter) encapsulate() (err error) {
 
 func (param *ObjectParameter) Write(session tns.SessionWriter) error {
 	if param.PSession == nil {
+		if param.BValue == nil && !param.IsArrayPar {
+			// a NULL is the envelope with an image of length 0 and no
+			// image. go-ora wrote an image of 0xFD, which the server read
+			// in a batch as the object of the row before, sijms/go-ora#721
+			session.PutBytes(0, 0, 0, 0)
+			session.PutUint(0, 4, true, true)
+			session.PutBytes(1, 1)
+			return nil
+		}
 		if param.BValue == nil {
 			if param.isArray {
 				param.BValue = []byte{0xFF}

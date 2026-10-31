@@ -482,22 +482,33 @@ func (session *Session) Connect(ctx context.Context) error {
 	} else {
 		session.reader = bufio.NewReaderSize(session.conn, readBufferSize)
 	}
+	// next tries the next server when the handshake with this one fails. A
+	// gateway or a VPN can accept the dial to a port that nothing listens
+	// on, and reset the connection after it, sijms/go-ora#619
+	next := func(err error) error {
+		session.logger.Debug("handshake", "address", host.NetworkAddr(), "error", err)
+		session.Disconnect()
+		if ctx.Err() != nil || connOption.ActiveServer(true) == nil {
+			return err
+		}
+		return session.Connect(ctx)
+	}
 	session.logger.Debug("open", "connect data", connOption.ConnectionData())
 	connectPacket := newConnectPacket(session.Context)
 	err = session.writePacket(connectPacket)
 	if err != nil {
-		return err
+		return next(err)
 	}
 	if uint16(connectPacket.length) == connectPacket.dataOffset {
 		session.PutBytes(connectPacket.buffer...)
 		err = session.Write()
 		if err != nil {
-			return err
+			return next(err)
 		}
 	}
 	pck, err := session.readPacket()
 	if err != nil {
-		return err
+		return next(err)
 	}
 
 	if acceptPacket, ok := pck.(*AcceptPacket); ok {
@@ -534,7 +545,7 @@ func (session *Session) Connect(ctx context.Context) error {
 		}
 		return session.Connect(ctx)
 	}
-	return errors.New("connection refused by the server due to unknown reason")
+	return next(errors.New("connection refused by the server due to unknown reason"))
 }
 
 func (session *Session) WriteFinalPacket() error {

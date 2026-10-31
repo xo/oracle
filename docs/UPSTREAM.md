@@ -68,7 +68,13 @@ cursors), sijms/go-ora#611 (skip the NLS query at connect), sijms/go-ora#584
 (`v$session.terminal`), sijms/go-ora#560 (`/ as sysdba`), sijms/go-ora#530 (OCI
 IAM tokens), sijms/go-ora#640 (pool settings), sijms/go-ora#618 (TimesTen) and
 sijms/go-ora#403 (ASM). Step 9 built #611 as the key `skip_nls`, which
-`TestSkipNLS` holds. Ken decided to take #611, #530, #681, #559, #664,
+`TestSkipNLS` holds. It made a handshake that fails after the dial try the
+next address, as a gateway or a VPN that accepts the dial and resets the
+connection needs (#619), which also serves the failover of a descriptor of
+many addresses (#707), and `TestFailover` holds both. #530 asked for the
+logon with an OCI IAM token, which the `v3` code had already as
+`auth=token` with `token` and `token_key`, and which no `dbrun` release can
+test. Ken decided to take #611, #530, #681, #559, #664,
 #707 and #619 (D21). The rest wait for Ken.
 
 sijms/go-ora#649 asks for smaller charset tables, which step 8 built. sijms/go-ora#653 (VECTOR) and sijms/go-ora#365 (Advanced Queuing) are in
@@ -93,7 +99,7 @@ and #773, each written again for this code (D18). The rest wait for Ken (D5).
 | sijms/go-ora#766 | Checks the certificate against the original host, for sijms/go-ora#765 | Not needed. Step 4 fixed sijms/go-ora#765 and sijms/go-ora#757 in its own code |
 | sijms/go-ora#747 | Accepts named types through `reflect.Kind`, for sijms/go-ora#699 | Not needed. Step 9 fixed sijms/go-ora#699 through `driver.ErrSkip` |
 | sijms/go-ora#734 | Stops `putString` writing UTF-16BE into an AL32UTF8 CLOB, for sijms/go-ora#733 | Not applied, though D18 took it. sijms/go-ora#733 does not reproduce: text outside ASCII written through the LOB API reads back whole on 11g, 26ai and `oracle-adb-19c`, because a locator of variable width wants UTF-16, which this code writes. The pull request writes AL32UTF8 there. `TestClobCharset` holds the case |
-| sijms/go-ora#721 | Encodes a NULL or large VARRAY and a NULL object, as in `SDO_GEOMETRY` | Written again in step 9 (D18). In `v3` a VARRAY in an object went as its body alone, of any size, and the server read it as a length that it never stopped allocating for, so an insert hung and its session held its lock until the server restarted. Each collection in an object is an image of its own now, with its header and its length in the form of python-oracledb, a NULL one is 0xFF, a nil slice is NULL, and a NULL object reads no bytes it was not sent. `TestObjectCollection` holds it on 11g, 26ai and `oracle-adb-26ai`. The NULL object in an array bind of the pull request is not tested yet |
+| sijms/go-ora#721 | Encodes a NULL or large VARRAY and a NULL object, as in `SDO_GEOMETRY` | Written again in step 9 (D18). In `v3` a VARRAY in an object went as its body alone, of any size, and the server read it as a length that it never stopped allocating for, so an insert hung and its session held its lock until the server restarted. Each collection in an object is an image of its own now, with its header and its length in the form of python-oracledb, a NULL one is 0xFF, a nil slice is NULL, and a NULL object reads no bytes it was not sent. A NULL object is the envelope with no image, where an image of 0xFD made a batch store the object of the row before. `TestObjectCollection` holds it on 11g, 26ai and `oracle-adb-26ai`, one by one and in a batch |
 | sijms/go-ora#775 | Sends 234 as the logon types byte | Skip. `v2` only, and `v3` already sends 234 |
 | sijms/go-ora#770 | Decodes XMLType by its flag bits | Written again in step 9 (D18), as `xmlParameter`, with its own tests |
 | sijms/go-ora#773 | Writes a valid replacement for JA16EUC | Written again in step 9 (D18), for every charset: each of the 236 tables names U+FFFD as its replacement, and go-ora wrote its low byte, 0xFD, which is ý in WE8ISO8859P1. A character that a charset lacks is the '?' of that charset, 0x3F in JA16EUC as Oracle writes it, and 0x6F in EBCDIC. `TestEncodeReplacement` holds it |

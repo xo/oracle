@@ -65,9 +65,12 @@ that it tested. The vectors of `converters/other_types_test.go` moved to
 Build the requests of D21, each with a test. Step 9 built the key
 `skip_nls` (sijms/go-ora#611). The query that it skips reads settings that
 nothing uses, so delete it outright when the exchanges of every release can
-be recorded again, 19c among them. Left: a logon with an OCI IAM token (#530),
-streaming of LOBs and rows (#681, #559 and #664), and failover to the next
-address of a descriptor (#707 and #619).
+be recorded again, 19c among them. Step 9 also made a failed handshake try
+the next address (#619 and #707), and found the logon with an OCI IAM token
+(#530) in the code already, as `auth=token`, with no release to test it.
+Left: streaming of LOBs and rows (#681, #559 and #664), which needs a design
+first: a row or a LOB that a caller reads in pieces, with the context of
+each read.
 
 ### Reproduce the refusal of required network encryption
 
@@ -81,8 +84,7 @@ negotiation (D21).
 Ken decided to take sijms/go-ora#734, #721, #770 and #773 (D18). Step 9 wrote
 #770, which reads XMLType, #773, which replaces a character that a charset
 lacks, and #721, which encodes a collection in an object. #734 is not
-applied, because its fault does not reproduce, as `UPSTREAM.md` says. Left
-of #721: an array bind of objects with a NULL row, which needs a test. `UPSTREAM.md` says what each does. On 2026-10-31
+applied, because its fault does not reproduce, as `UPSTREAM.md` says. `UPSTREAM.md` says what each does. On 2026-10-31
 `dbrun` added the Autonomous Database Free image as `oracle-adb-26ai` and
 `oracle-adb-19c`, which CI leaves out. The driver connects to both with
 `sslmode=require` in place of the query that `dbrun dsn` prints, which names
