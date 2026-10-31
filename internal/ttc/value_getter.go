@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	oraTypes "github.com/xo/oracle/types"
+	oraTypes "github.com/xo/oracle/internal/types"
 )
 
 // ======== get primitive data from original data types ========//

@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 type numberField struct {

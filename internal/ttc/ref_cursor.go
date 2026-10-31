@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 
 	"github.com/xo/oracle/internal/tns"
-	oraTypes "github.com/xo/oracle/types"
+	oraTypes "github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/configurations"
 )

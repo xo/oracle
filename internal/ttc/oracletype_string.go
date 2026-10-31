@@ -5,7 +5,7 @@ package ttc
 import (
 	//"strconv"
 
-	oraTypes "github.com/xo/oracle/types"
+	oraTypes "github.com/xo/oracle/internal/types"
 )
 
 func _() {
@@ -51,8 +51,8 @@ func _() {
 	_ = x[oraTypes.TimeTZ-186]
 	_ = x[oraTypes.TIMESTAMP-187]
 	_ = x[oraTypes.TIMESTAMPTZ-188]
-	_ = x[oraTypes.IntervalYM-189]
-	_ = x[oraTypes.IntervalDS-190]
+	_ = x[oraTypes.INTERVALYM-189]
+	_ = x[oraTypes.INTERVALDS-190]
 	_ = x[oraTypes.UROWID-208]
 	_ = x[oraTypes.TimeStampLTZ_DTY-231]
 	_ = x[oraTypes.TimeStampLTZ-232]

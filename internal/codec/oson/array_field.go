@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 type arrayField struct {

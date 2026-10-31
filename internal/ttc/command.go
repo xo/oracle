@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/xo/oracle/internal/lazyinit"
+	oraTypes "github.com/xo/oracle/internal/types"
 	"github.com/xo/oracle/internal/utils"
-	oraTypes "github.com/xo/oracle/types"
 
 	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/tns"

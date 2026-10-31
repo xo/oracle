@@ -1,7 +1,7 @@
 package codec
 
 import (
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 type BFileParameter struct {

@@ -229,6 +229,9 @@ into `*any` as an `*apd.Decimal`, from `github.com/cockroachdb/apd/v3`, as in
 dbimp D33. It is the one dependency of the module. `NUMBER` holds 38 digits,
 and a `float64` loses them.
 
+Step 6 built it on 2026-10-31. A `NUMBER` with a scale of 0 and a precision
+from 1 to 18 is an `int64`, and any other is an `*apd.Decimal`.
+
 ## Open questions for Ken
 
 1. Does the work go in the order that `DESIGN.md` gives, with nothing tagged

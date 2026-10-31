@@ -24,6 +24,8 @@ var (
 	TyBytes       = reflect.TypeFor[[]byte]()
 	TyString      = reflect.TypeFor[string]()
 	TyTime        = reflect.TypeFor[time.Time]()
+	TyDuration    = reflect.TypeFor[time.Duration]()
+	TyIntervalYM  = reflect.TypeFor[IntervalYM]()
 	TyNullByte    = reflect.TypeFor[sql.NullByte]()
 	TyNullInt16   = reflect.TypeFor[sql.NullInt16]()
 	TyNullInt32   = reflect.TypeFor[sql.NullInt32]()

@@ -7,7 +7,7 @@ package ttc
 //	"fmt"
 //
 //	"github.com/xo/oracle/internal/converters"
-//	oraTypes "github.com/xo/oracle/types"
+//	oraTypes "github.com/xo/oracle/internal/types"
 //
 //	"math"
 //	"reflect"

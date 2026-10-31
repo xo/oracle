@@ -1,6 +1,7 @@
 package types
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -64,32 +65,48 @@ func TestDecodeTimestampTZ(t *testing.T) {
 	}
 }
 
-// The interval vectors hold what Oracle prints for each value. Interval.Value
-// decodes none of them correctly. It returns a time.Time, so a year to month
-// interval of +2021-10 comes back as 2021-09-30, and it multiplies the
-// nanoseconds of a day to second interval by 1000. DESIGN.md replaces the
-// type, and BACKLOG.md holds the fault.
+// The interval vectors hold what Oracle prints for each value. Each field is
+// signed, so a negative interval has every field zero or negative.
 
 func TestDecodeIntervalYM(t *testing.T) {
-	t.Skip("Interval.Value decodes year to month intervals wrongly. See docs/BACKLOG.md")
 	// SELECT dump(cast(TO_YMINTERVAL('2021-10') as INTERVAL YEAR TO MONTH)) FROM dual
-	_ = []struct {
-		raw          []byte
-		years, month int
+	tests := []struct {
+		raw  []byte
+		want IntervalYM
+		text string
 	}{
-		{[]byte{128, 0, 7, 229, 70}, 2021, 10},
-		{[]byte{127, 255, 248, 27, 50}, -2021, -10},
-		{[]byte{127, 255, 255, 251, 50}, -5, -10},
-		{[]byte{127, 255, 255, 251, 57}, -5, -3},
-		{[]byte{128, 0, 0, 0, 70}, 0, 10},
-		{[]byte{128, 0, 0, 0, 57}, 0, -3},
+		{[]byte{128, 0, 7, 229, 70}, IntervalYM{2021, 10}, "+2021-10"},
+		{[]byte{127, 255, 248, 27, 50}, IntervalYM{-2021, -10}, "-2021-10"},
+		{[]byte{127, 255, 255, 251, 50}, IntervalYM{-5, -10}, "-05-10"},
+		{[]byte{127, 255, 255, 251, 57}, IntervalYM{-5, -3}, "-05-03"},
+		{[]byte{128, 0, 0, 0, 70}, IntervalYM{0, 10}, "+00-10"},
+		{[]byte{128, 0, 0, 0, 57}, IntervalYM{0, -3}, "-00-03"},
+	}
+	for _, test := range tests {
+		iv := &Interval{Basic{bValue: test.raw, dataType: INTERVALYM_DTY}}
+		got, err := iv.Value()
+		if err != nil {
+			t.Fatalf("decoding %v: %v", test.raw, err)
+		}
+		if got != test.want {
+			t.Errorf("decoding %v: got %v, want %v", test.raw, got, test.want)
+		}
+		if s := test.want.String(); s != test.text {
+			t.Errorf("String of %v: got %q, want %q", test.want, s, test.text)
+		}
+		var enc Interval
+		if err := enc.SetValue(test.want); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(enc.Bytes(), test.raw) {
+			t.Errorf("encoding %v: got %v, want %v", test.want, enc.Bytes(), test.raw)
+		}
 	}
 }
 
 func TestDecodeIntervalDS(t *testing.T) {
-	t.Skip("Interval.Value decodes day to second intervals wrongly. See docs/BACKLOG.md")
 	// SELECT dump(cast(TO_DSINTERVAL('2 12:23:34.456') as INTERVAL DAY TO SECOND)) FROM dual
-	_ = []struct {
+	tests := []struct {
 		raw  []byte
 		want time.Duration
 	}{
@@ -98,5 +115,22 @@ func TestDecodeIntervalDS(t *testing.T) {
 		{[]byte{128, 0, 0, 0, 70, 80, 90, 155, 58, 12, 8}, 10*time.Hour + 20*time.Minute + 30*time.Second + 456789*time.Microsecond},
 		{[]byte{128, 0, 0, 0, 50, 40, 30, 100, 197, 243, 248}, -(10*time.Hour + 20*time.Minute + 30*time.Second + 456789*time.Microsecond)},
 		{[]byte{128, 0, 0, 0, 50, 40, 30, 128, 0, 0, 0}, -(10*time.Hour + 20*time.Minute + 30*time.Second)},
+	}
+	for _, test := range tests {
+		iv := &Interval{Basic{bValue: test.raw, dataType: INTERVALDS_DTY}}
+		got, err := iv.Value()
+		if err != nil {
+			t.Fatalf("decoding %v: %v", test.raw, err)
+		}
+		if got != test.want {
+			t.Errorf("decoding %v: got %v, want %v", test.raw, got, test.want)
+		}
+		var enc Interval
+		if err := enc.SetValue(test.want); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(enc.Bytes(), test.raw) {
+			t.Errorf("encoding %v: got %v, want %v", test.want, enc.Bytes(), test.raw)
+		}
 	}
 }

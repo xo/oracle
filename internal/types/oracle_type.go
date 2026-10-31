@@ -48,8 +48,8 @@ const (
 	TimeTZ                    uint16 = 186
 	TIMESTAMP                 uint16 = 187
 	TIMESTAMPTZ               uint16 = 188
-	IntervalYM                uint16 = 189
-	IntervalDS                uint16 = 190
+	INTERVALYM                uint16 = 189
+	INTERVALDS                uint16 = 190
 	UROWID                    uint16 = 208
 	TimeStampLTZ_DTY          uint16 = 231
 	TimeStampLTZ              uint16 = 232

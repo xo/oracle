@@ -69,7 +69,7 @@ sent the same packets.
 
 | Path | Holds | In `go-ora` |
 | --- | --- | --- |
-| `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package. Step 4 moves `configurations` and `types` here |
+| `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package. Step 6 moved `types` to `internal/types`, and the root package names the types a caller uses, as aliases |
 | `aq/` | Advanced Queuing | `aq` |
 | `internal/ttc/` | The connection, statements, rows, transactions, LOBs, cursors, user defined types, the negotiation of data types, O5LOGON, and the registry of types | the root package, which step 4b moved |
 | `internal/configurations/` | The configuration of the protocol code, and wallets | `configurations` |
@@ -327,7 +327,27 @@ the caller with no copy through `any`.
 | `VECTOR` | `Vector` | the slices of each element type |
 | `ROWID`, `UROWID` | `string` | `RowID` |
 | `REF CURSOR` | `*sql.Rows` through `driver.Rows` | |
-| An object or a collection | the type that `WithType` registered | |
+| An object or a collection | the type that `RegisterType` registered | |
+
+Step 6 built the rows of `NUMBER`, `BINARY_FLOAT`, the intervals and
+`RowsColumnScanner`, and `values_test.go` checks each against a server. These
+rows are not built yet: `JSON` and OSON on `encoding/json/v2` are step 7, and
+the dates keep the behavior of `go-ora` until `TestTime` is fixed. The
+backlog holds both.
+
+The type of a column decides the Go type, and the value never does, so every
+row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,
+so it is an `*apd.Decimal`, and it scans into an `*int64`.
+
+`ScanColumn` stores a value as dbimp `Assign` does. A `*any` receives it as it
+is, and an `*apd.Decimal` receives a decimal. Every other pair goes to
+`sql.ConvertAssign`, and a decimal goes to it as text.
+
+An interval is an `IntervalYM` or a `time.Duration`, and both bind as an
+argument. `go-ora` read an interval as a `time.Time`, so `+2021-10` came back
+as 2021-09-30, and it wrote the nanoseconds of a day to second interval as
+microseconds and read them back multiplied by 1000. The same fault sent the
+time zone of the client at logon with 30 days added.
 
 A decimal is an `*apd.Decimal` from `github.com/cockroachdb/apd/v3`, a new one
 for each value, as in dbimp D33 (D16). `NUMBER` holds 38 digits, which neither

@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/xo/oracle/internal/codec"
-	oraTypes "github.com/xo/oracle/types"
+	oraTypes "github.com/xo/oracle/internal/types"
 )
 
 // func (par *ParameterInfo) enocde_(conn *Connection, value interface{}) error {

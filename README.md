@@ -119,20 +119,35 @@ Each connector holds the state of its own database: the session parameters,
 the registered types and the coders. Two databases in one process share none
 of it.
 
+## Values
+
+A NULL scans as nil, and a nullable column scans into `sql.Null[T]`. The type
+of a column decides the Go type that a scan into `*any` gets:
+
+| Oracle | Go |
+| --- | --- |
+| `NUMBER` with a scale of 0 and a precision of 18 or less | `int64` |
+| Any other `NUMBER`, such as `COUNT(*)` | `*apd.Decimal`, from `github.com/cockroachdb/apd/v3` |
+| `BINARY_FLOAT`, `BINARY_DOUBLE` | `float64` |
+| `INTERVAL YEAR TO MONTH` | `oracle.IntervalYM` |
+| `INTERVAL DAY TO SECOND` | `time.Duration` |
+
+A decimal scans into a `*string`, a `*float64` or an `*int64` too. Both
+interval types bind as arguments. `docs/DESIGN.md`, under Values, holds the
+whole table.
+
 ## New Types
 
 ### VECTOR (Oracle 23ai)
 
 ```go
-import "github.com/xo/oracle/types"
-
 // Create from Go slices
-v1, _ := types.CreateVector([]uint8{10, 20, 30})          // INT8
-v2, _ := types.CreateVector([]float32{-10.1, -20.2})       // FLOAT32
-v3, _ := types.CreateVector([]float64{10.1, 20.2, 30.3})   // FLOAT64
+v1, _ := oracle.CreateVector([]uint8{10, 20, 30})          // INT8
+v2, _ := oracle.CreateVector([]float32{-10.1, -20.2})       // FLOAT32
+v3, _ := oracle.CreateVector([]float64{10.1, 20.2, 30.3})   // FLOAT64
 
 // Scan from database
-var vec types.Vector
+var vec oracle.Vector
 row.Scan(&vec)
 
 // Copy to typed slices
@@ -145,7 +160,7 @@ Formats: `INT8` (`[]uint8`), `FLOAT32`, `FLOAT64` -- dense and sparse.
 ### JSON (Oracle 21c+)
 
 ```go
-var js types.Json
+var js oracle.JSON
 js.SetValue(`{"key": "value"}`)
 
 var s string
@@ -160,7 +175,7 @@ The driver encodes and decodes Oracle Binary JSON (OSON) itself.
 ### BOOLEAN (Oracle 23c+)
 
 ```go
-input := types.Bool{}
+input := oracle.Bool{}
 input.SetValue(true)
 
 db.Exec("BEGIN my_proc(:1, :2); END;", input, oracle.Out{Dest: &message})
@@ -219,13 +234,13 @@ after its logon.
 ```
 oracle/
 ├── aq/                # Advanced Queuing
-├── types/             # Oracle type implementations
 ├── internal/
 │   ├── auth/          # Encryption, checksums, Kerberos, NTS, NTLM
 │   ├── codec/         # Type encoding and decoding, and OSON
 │   ├── converters/    # Charsets, NUMBER, dates
 │   ├── configurations/ # The configuration of a connection, and wallets
 │   ├── tns/           # TNS packets and the session
+│   ├── types/         # The values of each Oracle type
 │   ├── ttc/           # Connections, statements, rows, LOBs, types
 │   └── tnstest/       # Recorded exchanges for the tests
 ├── testdata/          # Exchanges recorded against each release
@@ -249,7 +264,7 @@ oracle/
 | go-ora v2 | oracle |
 |----|-----|
 | `github.com/sijms/go-ora/v2` | `github.com/xo/oracle` |
-| Types in driver package | Types in `github.com/xo/oracle/types` |
+| Types in the driver package | Types in the driver package, such as `oracle.Clob` and `oracle.Vector` |
 | `go_ora/dbms.NewAQ` | `aq.CreateQueue` |
 | Manual UDT setup | `oracle.RegisterType` with struct tags |
 | `go_ora.AddSessionParam` / `DelSessionParam` | `oracle.WithSessionParam` on the connector |

@@ -3,7 +3,7 @@ package ttc
 import (
 	"reflect"
 
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // set number value from supported types

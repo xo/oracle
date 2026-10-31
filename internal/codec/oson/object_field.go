@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/xo/oracle/internal/types"
 	"github.com/xo/oracle/internal/utils"
-	"github.com/xo/oracle/types"
 )
 
 type objectField struct {

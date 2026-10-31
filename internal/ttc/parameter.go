@@ -9,7 +9,7 @@ import (
 	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/tns"
-	oraTypes "github.com/xo/oracle/types"
+	oraTypes "github.com/xo/oracle/internal/types"
 )
 
 type (
@@ -105,7 +105,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		fallthrough
 	case oraTypes.TIMESTAMPTZ:
 		fallthrough
-	case oraTypes.IntervalDS:
+	case oraTypes.INTERVALDS:
 		fallthrough
 	case oraTypes.TimeStampLTZ_DTY:
 		fallthrough
@@ -154,9 +154,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		fallthrough
 	case oraTypes.INTERVALDS_DTY:
 		fallthrough
-	case oraTypes.IntervalYM:
+	case oraTypes.INTERVALYM:
 		fallthrough
-	case oraTypes.IntervalDS:
+	case oraTypes.INTERVALDS:
 		par.MaxLen = 11
 	}
 	par.ArraySize, err = session.GetInt(4, true, true)
@@ -573,78 +573,18 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 }
 
 func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
-	// var err error
-	//if !udt && connection.connOption.Lob == configurations.INLINE && (par.isLobType()) {
-	//	session := connection.session
-	//	maxSize, err := session.GetInt(4, true, true)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if maxSize > 0 {
-	//		/*size*/ _, err = session.GetInt(8, true, true)
-	//		if err != nil {
-	//			return err
-	//		}
-	//		/*chunkSize*/ _, err = session.GetInt(4, true, true)
-	//		if err != nil {
-	//			return err
-	//		}
-	//		if par.DataType == oraTypes.OCIClobLocator {
-	//			flag, err := session.GetByte()
-	//			if err != nil {
-	//				return err
-	//			}
-	//			par.CharsetID = 0
-	//			if flag == 1 {
-	//				par.CharsetID, err = session.GetInt(2, true, true)
-	//				if err != nil {
-	//					return err
-	//				}
-	//			}
-	//			tempByte, err := session.GetByte()
-	//			if err != nil {
-	//				return err
-	//			}
-	//			par.CharsetForm = int(tempByte)
-	//			if par.CharsetID == 0 {
-	//				if par.CharsetForm == 1 {
-	//					par.CharsetID = connection.tcpNego.ServerCharset
-	//				} else {
-	//					par.CharsetID = connection.tcpNego.ServernCharset
-	//				}
-	//			}
-	//		}
-	//		par.BValue, err = session.GetClr()
-	//		if err != nil {
-	//			return err
-	//		}
-	//		_ /*locator*/, err = session.GetClr()
-	//		if err != nil {
-	//			return err
-	//		}
-	//		if par.DataType == oraTypes.OCIClobLocator {
-	//			strConv, err := connection.GetStringCoder(par.CharsetID, par.CharsetForm)
-	//			if err != nil {
-	//				return err
-	//			}
-	//			par.oPrimValue = strConv.Decode(par.BValue)
-	//		} else if par.DataType == oraTypes.VECTOR {
-	//			//v := Vector{}
-	//			//err = v.decode(par.BValue)
-	//			//if err != nil {
-	//			//	return err
-	//			//}
-	//			//par.oPrimValue = v.Data
-	//
-	//		} else {
-	//			par.oPrimValue = par.BValue
-	//		}
-	//
-	//	} else {
-	//		par.oPrimValue = nil
-	//	}
-	//	return nil
-	//}
-	// par.Value, err = par.decodeValue(connection, udt)
-	return par.decodePrimValue(connection, udt)
+	if err := par.decodePrimValue(connection, udt); err != nil {
+		return err
+	}
+	if udt {
+		// the attribute of an object goes to a field of a struct, which the
+		// copy of the object fills from the value of the decoder
+		return nil
+	}
+	v, err := columnValue(par, par.oPrimValue)
+	if err != nil {
+		return err
+	}
+	par.oPrimValue = v
+	return nil
 }

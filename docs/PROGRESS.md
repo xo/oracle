@@ -31,13 +31,16 @@ variable.
 Step 4b is done (`cbc4d30`). The TTC code is in `internal/ttc`, and the root
 package exports 31 names.
 
-Step 5 is done and staged. `context.AfterFunc` sends the break when a context
-ends, and no goroutine starts for each call. A transaction keeps no context,
-which fixes sijms/go-ora#767. The library calls neither
-`context.Background()` nor `context.TODO()`. `context_test.go` holds five
-integration tests, and they pass on 11g, 21c and 26ai with `-race`. The 30
-exchanges pass, and `TestIssues` on 26ai gives the same 42 passes and 3
-failures as before, with no data race.
+Step 5 is done (`3982ceb`). `context.AfterFunc` breaks a call when its context
+ends, and a transaction keeps no context, which fixed sijms/go-ora#767.
 
-The next step is step 6: change the values to the table in `DESIGN.md`, and
-add `RowsColumnScanner`.
+Step 6 is done and staged. A `NUMBER` is an `int64` or an `*apd.Decimal` by its
+column type (D16), a `BINARY_FLOAT` is a `float64`, and the intervals are
+`IntervalYM` and `time.Duration`, decoded and encoded right for the first time.
+`DataSet` implements `RowsColumnScanner`. `types` moved to `internal/types`,
+and `values.go` names the types a caller uses. `values_test.go` passes on 26ai,
+and `TestIssues` gives the same 42 passes and 3 failures.
+
+The next step is the one Ken asked about: drop `NullTimeStampTZ` and the
+special cases of the `sql.NullX` types, so that `sql.Null[T]` binds and scans
+everywhere. Step 7 then moves JSON and OSON to `encoding/json/v2`.

@@ -11,7 +11,7 @@ import (
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/codec/oson"
 	"github.com/xo/oracle/internal/configurations"
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // Registry holds the type coders and the registered types of one database.
@@ -116,6 +116,8 @@ func (driver *Registry) init() {
 	driver.goTypeCoder[types.TyBoolean] = &codec.BoolParameter{}
 
 	driver.goTypeCoder[types.TyTime] = &codec.DateParameter{}
+	driver.goTypeCoder[types.TyDuration] = &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}}
+	driver.goTypeCoder[types.TyIntervalYM] = &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}}
 	driver.goTypeCoder[types.TyNullTime] = &codec.DateParameter{}
 	driver.goTypeCoder[types.TyDate] = &codec.DateParameter{}
 

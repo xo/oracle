@@ -68,8 +68,8 @@ yourself and do not write it as though it were settled.
   of `internal/ttc` that a caller uses.
 - `internal/ttc` holds the connection, statements, rows and the rest of the
   protocol above TNS (D12).
-- `types` and `aq` are public. Step 6 moves the values of `types` into the
-  root package.
+- `aq` is public. `internal/types` holds the value types, and `values.go`
+  names the ones a caller uses.
 - `internal/` holds everything that a caller does not use, and the table in
   `docs/DESIGN.md`, under Packages, says what each package holds (D12).
 - `internal/repotest` holds the tests of the repository setup.

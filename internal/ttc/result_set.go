@@ -4,15 +4,16 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-
-	"github.com/xo/oracle/internal/tns"
-	"github.com/xo/oracle/internal/trace"
-	"github.com/xo/oracle/internal/utils"
-	types "github.com/xo/oracle/types"
-
 	"io"
 	"reflect"
 	"strings"
+
+	"github.com/cockroachdb/apd/v3"
+
+	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/trace"
+	types "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/utils"
 )
 
 type Row []driver.Value
@@ -157,11 +158,10 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	col := (*resultSet.cols)[index]
 	switch col.DataType {
 	case types.NUMBER:
-		if col.Precision > 0 {
-			return types.TyFloat64
-		} else {
+		if col.Scale == 0 && col.Precision >= 1 && col.Precision <= 18 {
 			return types.TyInt64
 		}
+		return reflect.TypeFor[*apd.Decimal]()
 	case types.ROWID, types.UROWID:
 		fallthrough
 	case types.CHAR, types.NCHAR:
@@ -185,7 +185,7 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
 		return types.TyTime
 	case types.IBFLOAT:
-		return types.TyFloat32
+		return types.TyFloat64
 	case types.IBDOUBLE:
 		return types.TyFloat64
 	case types.INTERVALDS_DTY, types.INTERVALYM_DTY:

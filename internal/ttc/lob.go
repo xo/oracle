@@ -8,7 +8,7 @@ import (
 	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/trace"
-	ora_types "github.com/xo/oracle/types"
+	ora_types "github.com/xo/oracle/internal/types"
 )
 
 //type Clob struct {

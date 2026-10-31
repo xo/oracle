@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // TestResultSetColumnsNilSafe verifies that Columns() does not panic when the

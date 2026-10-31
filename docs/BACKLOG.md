@@ -42,14 +42,11 @@ Move each to the `Connector` or to the connection.
 reconnects after a bad connection. The driver logs nothing (D14). Send it to
 `Config.Logger`, or return the error.
 
-### Fix the decoding of intervals
+### Finish the values of dates
 
-`Interval.Value` decodes no interval correctly. It returns a `time.Time`, so a
-year to month interval of `+2021-10` comes back as 2021-09-30, and a negative
-one comes back as an unrelated date. It multiplies the fractional seconds of a
-day to second interval by 1000. The vectors from Oracle are in
-`types/vectors_test.go`, in two tests that skip. Step 6 of `DESIGN.md` replaces
-the type with `IntervalYM` and `time.Duration`. Remove the skips then.
+`TestTime` in `TestIssues` fails on 26ai: a timestamp comes back in UTC and
+without its fraction of a second. The table in `DESIGN.md`, under Values,
+says what each date type returns. Fix it with a test in `values_test.go`.
 
 ### Size the OUT parameters again
 
@@ -107,7 +104,7 @@ and 3 failed, the same 3 at `eb5e173` before step 4 and after it.
   column. sijms/go-ora#760 rewrites the column metadata.
 - `TestIssue543`: a query returns no row where the test expects one.
 - `TestTime`: a timestamp comes back in UTC and without its fraction of a
-  second. Step 6 of `DESIGN.md` changes the values of dates.
+  second. See Finish the values of dates.
 
 Run it on the other five releases, and fix or record each failure.
 

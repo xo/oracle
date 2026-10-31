@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/xo/oracle/internal/codec"
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 	//"github.com/xo/oracle/type_coder"
 )
 

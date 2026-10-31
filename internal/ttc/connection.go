@@ -21,7 +21,7 @@ import (
 	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/lazyinit"
 	"github.com/xo/oracle/internal/trace"
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/auth"
 	"github.com/xo/oracle/internal/converters"

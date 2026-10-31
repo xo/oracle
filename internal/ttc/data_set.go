@@ -23,6 +23,8 @@ var (
 type DataSet struct {
 	resultSets []ResultSet
 	index      int
+	// row is the current row of NextRow, which ScanColumn reads
+	row []driver.Value
 	//columnCount     int
 	//rowCount        int
 	//uACBufferLength int

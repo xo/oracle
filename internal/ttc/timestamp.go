@@ -6,7 +6,7 @@ package ttc
 //	"encoding/json"
 //	"errors"
 //	"github.com/xo/oracle/internal/converters"
-//	oraTypes "github.com/xo/oracle/types"
+//	oraTypes "github.com/xo/oracle/internal/types"
 //	"time"
 //)
 //

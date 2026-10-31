@@ -7,7 +7,7 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 /*

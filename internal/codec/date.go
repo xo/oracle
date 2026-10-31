@@ -2,7 +2,7 @@ package codec
 
 import (
 	"github.com/xo/oracle/internal/tns"
-	"github.com/xo/oracle/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 type DateParameter struct {

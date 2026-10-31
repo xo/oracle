@@ -2,8 +2,8 @@ package codec
 
 import (
 	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/types"
 	"github.com/xo/oracle/internal/utils"
-	"github.com/xo/oracle/types"
 )
 
 type StringParameter struct {

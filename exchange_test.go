@@ -28,8 +28,16 @@ import (
 //	ORACLE_DSN=$(dbrun dsn --json oracle-26ai | jq -r '.[0].url') \
 //	ORACLE_RELEASE=oracle-26ai go test -run TestRecordExchanges -record .
 //
+// A change that keeps the packets and changes a result, such as the Go type of
+// a column, rewrites the results with -update:
+//
+//	go test -run TestExchanges -update .
+//
 // See D15 and docs/DESIGN.md, under Testing.
-var record = flag.Bool("record", false, "record the exchanges against ORACLE_DSN into testdata/exchanges/$ORACLE_RELEASE")
+var (
+	record = flag.Bool("record", false, "record the exchanges against ORACLE_DSN into testdata/exchanges/$ORACLE_RELEASE")
+	update = flag.Bool("update", false, "rewrite the results of each exchange from its replay, and keep its packets")
+)
 
 // exchangeHost and exchangePort are the address that every recorded
 // connection names. The connect packet holds it, so a fixed one keeps the
@@ -308,6 +316,19 @@ func TestExchanges(t *testing.T) {
 					t.Fatalf("reading the result %s: %v", v, err)
 				}
 				want = append(want, l)
+			}
+			if *update && !slices.Equal(got, want) {
+				notes := slices.DeleteFunc(slices.Clone(ex.Notes), func(n string) bool {
+					return strings.HasPrefix(n, "result:")
+				})
+				for _, l := range got {
+					notes = append(notes, "result: "+strconv.Quote(l))
+				}
+				ex.Notes = notes
+				if err := ex.WriteFile(file); err != nil {
+					t.Fatal(err)
+				}
+				return
 			}
 			if !slices.Equal(got, want) {
 				t.Errorf("results differ\n got: %q\nwant: %q", got, want)
