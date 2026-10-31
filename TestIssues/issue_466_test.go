@@ -15,7 +15,7 @@ func TestIssue466(t *testing.T) {
 	}
 	var generateRows = func(startIndex, count int) []string {
 		rows := make([]string, count)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rows[i] = fmt.Sprintf("ID%02d", i+startIndex)
 		}
 		return rows
@@ -34,7 +34,7 @@ func TestIssue466(t *testing.T) {
 		}
 		return nil
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

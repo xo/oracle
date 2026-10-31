@@ -13,7 +13,7 @@ func (val *TimeStampTZ) Value() (driver.Value, error) {
 	return val, nil
 }
 
-func (val *TimeStampTZ) Scan(value interface{}) error {
+func (val *TimeStampTZ) Scan(value any) error {
 	switch temp := value.(type) {
 	case TimeStampTZ:
 		*val = temp
@@ -56,7 +56,7 @@ func (val NullTimeStampTZ) Value() (driver.Value, error) {
 	}
 }
 
-func (val *NullTimeStampTZ) Scan(value interface{}) error {
+func (val *NullTimeStampTZ) Scan(value any) error {
 	if value == nil {
 		val.Valid = false
 		return nil

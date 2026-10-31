@@ -141,7 +141,7 @@ jobs:
           DBMETA_OWNER_NAME: ci
         run: |
           "${{ runner.temp }}/bin/dbrun" start "${{ matrix.server }}"
-          echo "ORACLE_DSN=$("${{ runner.temp }}/bin/dbrun" dsn "${{ matrix.server }}")" >> "$GITHUB_ENV"
+          echo "ORACLE_DSN=$("${{ runner.temp }}/bin/dbrun" dsn --json "${{ matrix.server }}" | jq -r '.[0].url')" >> "$GITHUB_ENV"
 
       - name: Test against ${{ matrix.server }}
         run: go test -count=1 ./TestIssues/...

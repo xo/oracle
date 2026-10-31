@@ -20,7 +20,7 @@ func (param *CursorParameter) Init() {
 	param.DataType = types.REFCURSOR
 }
 
-func (param *CursorParameter) Encode(input interface{}, _ IConnection) error {
+func (param *CursorParameter) Encode(input any, _ IConnection) error {
 	param.Init()
 	param.BValue = nil
 	return nil
@@ -35,6 +35,6 @@ func (param *CursorParameter) Read(session network.SessionReader) error {
 	return nil
 }
 
-func (param *CursorParameter) Decode(_ IConnection) (interface{}, error) {
+func (param *CursorParameter) Decode(_ IConnection) (any, error) {
 	return nil, nil
 }

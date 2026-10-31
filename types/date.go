@@ -47,7 +47,7 @@ func (date *Date) GetMaxLen() int64 {
 		return MaxLenTimeStampTZ
 	}
 }
-func (date *Date) Value() (interface{}, error) {
+func (date *Date) Value() (any, error) {
 	if len(date.bValue) == 0 {
 		return nil, nil
 	}
@@ -110,7 +110,7 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 	return
 }
 
-func (date *Date) SetValue(input interface{}) (err error) {
+func (date *Date) SetValue(input any) (err error) {
 	defer func(input *Date) {
 		if input.dataType == 0 {
 			input.dataType = DATE
@@ -226,7 +226,7 @@ func (date *Date) decode() (output time.Time, err error) {
 	}
 	return
 }
-func (date *Date) Scan(value interface{}) (err error) {
+func (date *Date) Scan(value any) (err error) {
 	return date.SetValue(value)
 }
 

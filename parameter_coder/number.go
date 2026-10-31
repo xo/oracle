@@ -24,7 +24,7 @@ func (param *NumberParameter) Init() {
 	//param.MaxLen = 0x16
 }
 
-func (param *NumberParameter) Encode(input interface{}, _ IConnection) error {
+func (param *NumberParameter) Encode(input any, _ IConnection) error {
 	param.Init()
 	encoder := types.Number{}
 	//encoder.SetDataType(param.DataType)
@@ -42,7 +42,7 @@ func (param *NumberParameter) Encode(input interface{}, _ IConnection) error {
 	return nil
 }
 
-func (param *NumberParameter) Decode(_ IConnection) (interface{}, error) {
+func (param *NumberParameter) Decode(_ IConnection) (any, error) {
 	decoder := types.Number{}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)

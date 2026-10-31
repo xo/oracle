@@ -12,13 +12,11 @@ type supervisorService struct {
 
 func newSupervisorService(ano *AdvNego) (*supervisorService, error) {
 	output := &supervisorService{
-		defaultService: defaultService{
-			ano:         ano,
-			serviceType: 4,
-			version:     version,
-		},
-		cid:       []byte{0, 0, 16, 28, 102, 236, 40, 234},
-		servArray: []int{4, 1, 2, 3},
+		ano:         ano,
+		serviceType: 4,
+		version:     version,
+		cid:         []byte{0, 0, 16, 28, 102, 236, 40, 234},
+		servArray:   []int{4, 1, 2, 3},
 	}
 	return output, nil
 }

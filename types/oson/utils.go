@@ -129,7 +129,7 @@ var jsonEncoder map[reflect.Type]FieldCreator
 //		jsonEncoder[tyValue] = value
 //		return nil
 //	}
-func Encode(mainObj interface{}) ([]byte, error) {
+func Encode(mainObj any) ([]byte, error) {
 	header := &header{
 		flags: 0x2106,
 		keys:  keyCollection{},
@@ -154,13 +154,13 @@ func Encode(mainObj interface{}) ([]byte, error) {
 		}
 	}
 	switch mainObj := mainObj.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		obj, err := NewobjectField(mainObj, header)
 		if err != nil {
 			return nil, err
 		}
 		objectData, err = obj.Encode()
-	case []interface{}:
+	case []any:
 		obj, err := NewarrayField(mainObj, header)
 		if err != nil {
 			return nil, err
@@ -365,7 +365,7 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 		}
 
 		if isArray(opCode) {
-			value := make([]interface{}, childCount)
+			value := make([]any, childCount)
 			if childCount > 0 {
 				for index = 0; index < childCount; index++ {
 					value[index], err = children[index].Value()
@@ -375,20 +375,16 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 				}
 			}
 			return &arrayField{
-				value: value,
-				structField: structField{
-					basicField: basicField{
-						opCode:   opCode,
-						keyIndex: 0,
-						offset:   0,
-						children: children,
-					},
-				},
+				value:    value,
+				opCode:   opCode,
+				keyIndex: 0,
+				offset:   0,
+				children: children,
 			}, nil
 		}
 		if isObject(opCode) {
 
-			value := make(map[string]interface{})
+			value := make(map[string]any)
 			if childCount > 0 {
 				for index = 0; index < childCount; index++ {
 					key := header.keys[children[index].KeyIndex()-1]
@@ -399,15 +395,11 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 				}
 			}
 			return &objectField{
-				value: value,
-				structField: structField{
-					basicField: basicField{
-						opCode:   opCode,
-						keyIndex: 0,
-						offset:   0,
-						children: children,
-					},
-				},
+				value:    value,
+				opCode:   opCode,
+				keyIndex: 0,
+				offset:   0,
+				children: children,
 			}, nil
 		}
 	}
@@ -425,19 +417,17 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 	switch opCode {
 	case 0x30:
 		return &nullField{
-			basicField: basicField{
-				opCode: opCode,
-			},
+			opCode: opCode,
 		}, nil
 	case 0x31:
 		return &booleanField{
-			value:      true,
-			basicField: basicField{opCode: opCode},
+			value:  true,
+			opCode: opCode,
 		}, nil
 	case 0x32:
 		return &booleanField{
-			value:      false,
-			basicField: basicField{opCode: opCode},
+			value:  false,
+			opCode: opCode,
 		}, nil
 	case 0x33:
 		var stringLen uint8
@@ -465,8 +455,8 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 			return nil, err
 		}
 		field := &numberField{
-			value:      types.Number{},
-			basicField: basicField{opCode: opCode},
+			value:  types.Number{},
+			opCode: opCode,
 		}
 		field.value.SetBytes(numberBytes)
 		return field, nil
@@ -474,10 +464,8 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 		var temp = make([]byte, 8)
 		_, err = buffer.Read(temp)
 		field := &binaryDoubleField{
-			value: types.Number{},
-			basicField: basicField{
-				opCode: opCode,
-			},
+			value:  types.Number{},
+			opCode: opCode,
 		}
 		field.value.SetBytes(temp)
 		return field, nil
@@ -522,8 +510,8 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 			return nil, err
 		}
 		field := &numberField{
-			value:      types.Number{},
-			basicField: basicField{opCode: opCode},
+			value:  types.Number{},
+			opCode: opCode,
 		}
 		field.value.SetBytes(numberBytes)
 		return field, nil
@@ -531,10 +519,8 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 		var temp = make([]byte, 4)
 		_, err = buffer.Read(temp)
 		field := &binaryFloatField{
-			value: types.Number{},
-			basicField: basicField{
-				opCode: opCode,
-			},
+			value:  types.Number{},
+			opCode: opCode,
 		}
 		field.value.SetBytes(temp)
 		return field, nil
@@ -548,8 +534,8 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 			return nil, err
 		}
 		field := &numberField{
-			value:      types.Number{},
-			basicField: basicField{opCode: opCode},
+			value:  types.Number{},
+			opCode: opCode,
 		}
 		field.value.SetBytes(numberBytes)
 		return field, nil
@@ -563,8 +549,8 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 			return nil, err
 		}
 		field := &numberField{
-			value:      types.Number{},
-			basicField: basicField{opCode: opCode},
+			value:  types.Number{},
+			opCode: opCode,
 		}
 		field.value.SetBytes(numberBytes)
 		return field, nil
@@ -572,7 +558,7 @@ func decodeNode(buffer *bytes.Reader, header *header) (Field, error) {
 	return nil, fmt.Errorf("unsupported type code: %d", opCode)
 }
 
-func Decode(data []byte) (interface{}, error) {
+func Decode(data []byte) (any, error) {
 	buffer := bytes.NewReader(data)
 	header := &header{}
 	err := header.read(buffer)

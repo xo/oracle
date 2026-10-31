@@ -4,7 +4,7 @@ import "testing"
 
 // this issue occur when passsing input parameter as nested pointers
 func TestIssue_485(t *testing.T) {
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

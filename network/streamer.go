@@ -17,8 +17,8 @@ type SessionReader interface {
 	GetKeyVal() (key, val []byte, num int, err error)
 }
 type SessionWriter interface {
-	PutInt(number interface{}, size uint8, bigEndian, compress bool)
-	PutUint(number interface{}, size uint8, bigEndian, compress bool)
+	PutInt(number any, size uint8, bigEndian, compress bool)
+	PutUint(number any, size uint8, bigEndian, compress bool)
 	PutBytes(data ...byte)
 	PutClr(data []byte)
 	PutCHR(data []byte)
@@ -39,7 +39,7 @@ type SessionReadWriter interface {
 }
 
 type ValueStreamReader interface {
-	Read(session SessionReader) (interface{}, error)
+	Read(session SessionReader) (any, error)
 }
 type ValueStreamWriter interface {
 	Write(session SessionWriter) error

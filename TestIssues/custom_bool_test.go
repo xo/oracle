@@ -18,7 +18,7 @@ func (b OracleBool) Value() (driver.Value, error) {
 	return "N", nil
 }
 
-func (b *OracleBool) Scan(value interface{}) error {
+func (b *OracleBool) Scan(value any) error {
 	if val, ok := value.(string); ok {
 		*b = val == "J"
 	} else {
@@ -72,7 +72,7 @@ func TestCustomBool(t *testing.T) {
 		}
 		return nil
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

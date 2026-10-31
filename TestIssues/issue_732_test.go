@@ -11,10 +11,10 @@ import (
 func TestIssue732(t *testing.T) {
 	// FastLogin is on by default; we explicitly ensure it is not disabled
 	// so this test exercises the cookie-replay path.
-	urlOptions["FAST+LOGIN"] = "true"
-	defer delete(urlOptions, "FAST+LOGIN")
+	urlOptions["FAST LOGIN"] = "true"
+	defer delete(urlOptions, "FAST LOGIN")
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Fatal(err)
 	}

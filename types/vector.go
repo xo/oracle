@@ -41,7 +41,7 @@ func (vector *Vector) Upload() error {
 	return vector.uploadData(vector.bValue, 0, 0)
 }
 
-func (vector *Vector) SetValue(input interface{}) error {
+func (vector *Vector) SetValue(input any) error {
 	if input == nil {
 		vector.bValue = nil
 		return nil
@@ -53,7 +53,7 @@ func (vector *Vector) SetValue(input interface{}) error {
 		length uint32
 		err    error
 		buffer = &bytes.Buffer{}
-		data   interface{}
+		data   any
 	)
 	switch value := input.(type) {
 	case Vector:
@@ -198,7 +198,7 @@ func (vector *Vector) SetValue(input interface{}) error {
 	return nil
 }
 
-func (vector *Vector) Value() (interface{}, error) {
+func (vector *Vector) Value() (any, error) {
 	if len(vector.bValue) == 0 {
 		return nil, nil
 	}
@@ -348,7 +348,7 @@ func (vector *Vector) Value() (interface{}, error) {
 var vectorTypeError = errors.New("unexpected data for vector type")
 
 // CreateVector : create vector from supported array type: uint8, float32 and float64
-func CreateVector(array interface{}) (*Vector, error) {
+func CreateVector(array any) (*Vector, error) {
 	v := new(Vector)
 	return v, v.SetValue(array)
 }
@@ -519,7 +519,7 @@ func (vector *Vector) Read(ctx context.Context) error {
 //	return nil
 //}
 
-func (vector *Vector) Scan(input interface{}) error {
+func (vector *Vector) Scan(input any) error {
 	return vector.SetValue(input)
 	//var err error
 	//if input == nil {

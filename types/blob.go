@@ -17,7 +17,7 @@ func (blob *Blob) Upload() error {
 	return blob.uploadData(blob.bValue, 0, 0)
 }
 
-func (blob *Blob) SetValue(input interface{}) error {
+func (blob *Blob) SetValue(input any) error {
 	var err error
 	switch input := input.(type) {
 	case Blob:
@@ -48,7 +48,7 @@ func (blob *Blob) SetValue(input interface{}) error {
 //	UploadCtx context.Context
 //}
 
-func CreateBlob(db *sql.DB, uploadCtx context.Context, input interface{}) (*Blob, error) {
+func CreateBlob(db *sql.DB, uploadCtx context.Context, input any) (*Blob, error) {
 	var err error
 	ret := &Blob{}
 	ret.UploadCtx = uploadCtx
@@ -59,7 +59,7 @@ func CreateBlob(db *sql.DB, uploadCtx context.Context, input interface{}) (*Blob
 	return ret, ret.SetValue(input)
 }
 
-func NewBlob(stream LobStreamer, uploadCtx context.Context, input interface{}) (*Blob, error) {
+func NewBlob(stream LobStreamer, uploadCtx context.Context, input any) (*Blob, error) {
 	ret := &Blob{}
 	ret.UploadCtx = uploadCtx
 	ret.stream = stream
@@ -105,7 +105,7 @@ func (blob *Blob) CopyTo(dest driver.Value) error {
 	}
 	return nil
 }
-func (blob *Blob) Scan(src interface{}) error {
+func (blob *Blob) Scan(src any) error {
 	return blob.SetValue(src)
 }
 

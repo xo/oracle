@@ -50,7 +50,7 @@ func TestIssue422(t *testing.T) {
 		dumpTime(r)
 		return nil
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

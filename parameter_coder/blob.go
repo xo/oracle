@@ -17,7 +17,7 @@ func (param *BlobParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.OCIBlobLocator
 }
-func (param *BlobParameter) Encode(input interface{}, conn IConnection) (err error) {
+func (param *BlobParameter) Encode(input any, conn IConnection) (err error) {
 	param.Init()
 	encoder := &types.Blob{}
 	encoder.SetDataType(param.DataType)
@@ -41,7 +41,7 @@ func (param *BlobParameter) Encode(input interface{}, conn IConnection) (err err
 	param.BValue = encoder.GetLocator()
 	return
 }
-func (param *BlobParameter) Decode(_ IConnection) (interface{}, error) {
+func (param *BlobParameter) Decode(_ IConnection) (any, error) {
 	decoder := &types.Blob{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)

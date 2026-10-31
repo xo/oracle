@@ -72,7 +72,7 @@ END;`, (waitTime / time.Second), arraySize)
 		return messages, err
 	}
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewLazyInit_SuccessInitialize(t *testing.T) {
-	lazy := NewLazyInit(func() (interface{}, error) {
+	lazy := NewLazyInit(func() (any, error) {
 		return 123, nil
 	})
 	v, err := lazy.GetValue()
@@ -27,7 +27,7 @@ func TestNewLazyInit_SuccessInitialize(t *testing.T) {
 }
 
 func TestNewLazyInit_FailInitialize(t *testing.T) {
-	lazy := NewLazyInit(func() (interface{}, error) {
+	lazy := NewLazyInit(func() (any, error) {
 		return 0, fmt.Errorf("error")
 	})
 	v, err := lazy.GetValue()

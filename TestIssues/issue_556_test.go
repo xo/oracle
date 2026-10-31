@@ -9,7 +9,7 @@ import (
 )
 
 func TestIssue556(t *testing.T) {
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

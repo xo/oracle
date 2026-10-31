@@ -6,7 +6,7 @@ import (
 
 func TestIssue543(t *testing.T) {
 	expected := "CASE  WHEN \"SESSION_ID\" IS NULL THEN \"SECURITY_GROUP_ID\" END "
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

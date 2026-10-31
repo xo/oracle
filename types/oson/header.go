@@ -201,7 +201,7 @@ func (h *header) readKeys(buffer *bytes.Reader, keysCount int) error {
 		return err
 	}
 	var stringLen uint8
-	for index = 0; index < keysCount; index++ {
+	for index = range keysCount {
 		// seek to the start of the key
 		_, err = buffer.Seek(baseOffset+int64(h.keys[index].offset), io.SeekStart)
 		if err != nil {

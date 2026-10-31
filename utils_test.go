@@ -7,11 +7,10 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestGetValue(t *testing.T) {
-	var val interface{}
+	var val any
 	var err error
 	// passing nil
 	val, err = getValue(nil)
@@ -62,7 +61,7 @@ func TestGetValue(t *testing.T) {
 }
 
 func TestGetInt(t *testing.T) {
-	checkGetInt := func(testedValue interface{}, expectedValue int64) error {
+	checkGetInt := func(testedValue any, expectedValue int64) error {
 		val, err := getInt(testedValue)
 		if err != nil {
 			return err
@@ -110,22 +109,22 @@ func TestGetInt(t *testing.T) {
 		t.Error(err)
 	}
 	// passing NullFlat
-	err = checkGetInt(sql.NullFloat64{5.78, true}, 5)
+	err = checkGetInt(sql.NullFloat64{Float64: 5.78, Valid: true}, 5)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing NullInt
-	err = checkGetInt(sql.NullInt64{2, true}, 2)
+	err = checkGetInt(sql.NullInt64{Int64: 2, Valid: true}, 2)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing *NullFloat
-	err = checkGetInt(&sql.NullFloat64{8.44, true}, 8)
+	err = checkGetInt(&sql.NullFloat64{Float64: 8.44, Valid: true}, 8)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing *NullInt
-	err = checkGetInt(&sql.NullInt64{10, true}, 10)
+	err = checkGetInt(&sql.NullInt64{Int64: 10, Valid: true}, 10)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,12 +141,12 @@ func TestGetInt(t *testing.T) {
 	}
 
 	// passing NullString
-	err = checkGetInt(sql.NullString{"12", true}, 12)
+	err = checkGetInt(sql.NullString{String: "12", Valid: true}, 12)
 	if err != nil {
 		t.Error(err)
 	}
 	// passing *NullString
-	err = checkGetInt(&sql.NullString{"13", true}, 13)
+	err = checkGetInt(&sql.NullString{String: "13", Valid: true}, 13)
 	if err != nil {
 		t.Error(err)
 	}
@@ -202,22 +201,22 @@ func TestGetInt(t *testing.T) {
 //		t.Error(err)
 //	}
 //	// passing NullFlat
-//	err = checkGetFloat(sql.NullFloat64{5.43, true}, 5.43)
+//	err = checkGetFloat(sql.NullFloat64{Float64: 5.43, Valid: true}, 5.43)
 //	if err != nil {
 //		t.Error(err)
 //	}
 //	// passing NullInt
-//	err = checkGetFloat(sql.NullInt64{2, true}, 2)
+//	err = checkGetFloat(sql.NullInt64{Int64: 2, Valid: true}, 2)
 //	if err != nil {
 //		t.Error(err)
 //	}
 //	// passing *NullFloat
-//	err = checkGetFloat(&sql.NullFloat64{8.44, true}, 8.44)
+//	err = checkGetFloat(&sql.NullFloat64{Float64: 8.44, Valid: true}, 8.44)
 //	if err != nil {
 //		t.Error(err)
 //	}
 //	// passing *NullInt
-//	err = checkGetFloat(&sql.NullInt64{10, true}, 10)
+//	err = checkGetFloat(&sql.NullInt64{Int64: 10, Valid: true}, 10)
 //	if err != nil {
 //		t.Error(err)
 //	}
@@ -234,73 +233,16 @@ func TestGetInt(t *testing.T) {
 //	}
 //
 //	// passing NullString
-//	err = checkGetFloat(sql.NullString{"12.8", true}, 12.8)
+//	err = checkGetFloat(sql.NullString{String: "12.8", Valid: true}, 12.8)
 //	if err != nil {
 //		t.Error(err)
 //	}
 //	// passing *NullString
-//	err = checkGetFloat(&sql.NullString{"13.2", true}, 13.2)
+//	err = checkGetFloat(&sql.NullString{String: "13.2", Valid: true}, 13.2)
 //	if err != nil {
 //		t.Error(err)
 //	}
 //}
-
-func TestSetString(t *testing.T) {
-	var intVar int
-	err := setString(reflect.ValueOf(&intVar).Elem(), "15")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(intVar)
-	var uint8Var uint8
-	err = setString(reflect.ValueOf(&uint8Var).Elem(), "17")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(uint8Var)
-	var int32Var sql.NullInt32
-	err = setString(reflect.ValueOf(&int32Var).Elem(), "18")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(int32Var)
-}
-
-func TestSetFieldValue(t *testing.T) {
-	var testString *sql.NullString
-	err := setFieldValue(reflect.ValueOf(&testString).Elem(), nil, "this is a test")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(*testString)
-	type test1 struct {
-		Id   int
-		Name string
-		Date sql.NullTime
-	}
-	test := test1{}
-	sField := reflect.Indirect(reflect.ValueOf(&test))
-	err = setFieldValue(sField.Field(0), nil, int64(15))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	err = setFieldValue(sField.Field(1), nil, "this is a test")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	err = setFieldValue(sField.Field(2), nil, time.Now().Format(time.RFC3339))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(test)
-}
 
 func TestSetArray(t *testing.T) {
 	var array []int
@@ -314,29 +256,6 @@ func TestSetArray(t *testing.T) {
 		return
 	}
 	fmt.Println(array)
-}
-
-func TestSetNull(t *testing.T) {
-	var x int = 10
-	var xx float64 = 3.3
-	var xxx string = "test"
-	rx := reflect.ValueOf(&x).Elem()
-	rxx := reflect.ValueOf(&xx).Elem()
-	rxxx := reflect.ValueOf(&xxx).Elem()
-	// var xx = reflect.ValueOf(float64(3.3))
-	// var xxx = reflect.ValueOf("test")
-	setNull(rx)
-	setNull(rxx)
-	setNull(rxxx)
-	if x != 0 {
-		t.Error("expected 0 get ", x)
-	}
-	if xx != 0 {
-		t.Error("expected 0 get: ", xx)
-	}
-	if xxx != "" {
-		t.Error("expected empty get: ", xxx)
-	}
 }
 
 func TestParseSqlText(t *testing.T) {

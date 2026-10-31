@@ -72,7 +72,7 @@ func (dataSet *DataSet) Next_() bool {
 }
 
 // Scan act like scan in sql package return row values to dest variable pointers
-func (dataSet *DataSet) Scan(dest ...interface{}) error {
+func (dataSet *DataSet) Scan(dest ...any) error {
 	return dataSet.currentResultSet().Scan(dest...)
 }
 

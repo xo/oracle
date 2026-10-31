@@ -88,7 +88,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 		return []byte(input)
 	case 2000:
 		output := make([]byte, 0, len(temp)*2)
-		for x := 0; x < len(temp); x++ {
+		for x := range temp {
 			tempbyte := []byte{0, 0}
 			binary.BigEndian.PutUint16(tempbyte, temp[x])
 			output = append(output, tempbyte...)
@@ -96,7 +96,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 		return output
 	case 2002:
 		output := make([]byte, 0, len(temp)*2)
-		for x := 0; x < len(temp); x++ {
+		for x := range temp {
 			tempbyte := []byte{0, 0}
 			binary.LittleEndian.PutUint16(tempbyte, temp[x])
 			output = append(output, tempbyte...)
@@ -107,7 +107,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 			return []byte(input)
 		}
 		output := make([]byte, 0, len(temp))
-		for x := 0; x < len(temp); x++ {
+		for x := range temp {
 			if ch, ok := conv.eBuffer[int(temp[x])]; ok {
 				if ch < 0x100 {
 					output = append(output, uint8(ch))

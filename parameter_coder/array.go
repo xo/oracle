@@ -27,14 +27,14 @@ func (param *ArrayParameter) Init() {
 	param.Flag = 0x43
 }
 
-func (param *ArrayParameter) FillAttrib(input interface{}, conn IConnection) error {
+func (param *ArrayParameter) FillAttrib(input any, conn IConnection) error {
 	var err error
 	if param.attrib == nil {
 		inputType := utils.GetType(input)
 		if inputType != nil {
 			itemType := inputType.Elem()
 			if itemType != nil {
-				for itemType.Kind() == reflect.Ptr {
+				for itemType.Kind() == reflect.Pointer {
 					itemType = itemType.Elem()
 				}
 			}
@@ -49,7 +49,7 @@ func (param *ArrayParameter) FillAttrib(input interface{}, conn IConnection) err
 	return err
 }
 
-func (param *ArrayParameter) Encode(input interface{}, conn IConnection) (err error) {
+func (param *ArrayParameter) Encode(input any, conn IConnection) (err error) {
 	param.Init()
 	inputType := utils.GetType(input)
 	if inputType.Kind() == reflect.Array || inputType.Kind() == reflect.Slice {
@@ -70,7 +70,7 @@ func (param *ArrayParameter) Encode(input interface{}, conn IConnection) (err er
 			session := network.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
 			session.PutUint(param.ArraySize, 4, true, true)
 			if length > 0 {
-				for i := 0; i < length; i++ {
+				for i := range length {
 					var item driver.Value
 					if rValue.Index(i).CanInterface() {
 						item, err = utils.GetValue(rValue.Index(i).Interface())
@@ -119,7 +119,7 @@ func (param *ArrayParameter) Encode(input interface{}, conn IConnection) (err er
 	return
 }
 
-func (param *ArrayParameter) Decode(conn IConnection) (value interface{}, err error) {
+func (param *ArrayParameter) Decode(conn IConnection) (value any, err error) {
 	err = param.FillAttrib(nil, conn)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (param *ArrayParameter) Decode(conn IConnection) (value interface{}, err er
 	session := conn.GetSession()
 	if param.ArraySize > 0 {
 		//decoders := make([]parameter_coder.OracleParameterCoder, param.ArraySize)
-		items := make([]interface{}, param.ArraySize)
+		items := make([]any, param.ArraySize)
 		for i := 0; i < param.ArraySize; i++ {
 			decoder := param.attrib.Copy()
 			decoder.UpdateParameterInfo(param.GetParameterInfo())

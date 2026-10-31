@@ -54,7 +54,7 @@ func (clob *Clob) Upload() error {
 // SetValue use stream to get charset converter
 // call basic SetValue
 // upload value to server
-func (clob *Clob) SetValue(input interface{}) error {
+func (clob *Clob) SetValue(input any) error {
 	var err error
 	charsetForm := 1
 	if clob.UseNCharset {
@@ -183,7 +183,7 @@ func (clob *Clob) SetValue(input interface{}) error {
 //		return err
 //	}
 
-func CreateClob(db *sql.DB, uploadCtx context.Context, input interface{}, useNClob bool) (*Clob, error) {
+func CreateClob(db *sql.DB, uploadCtx context.Context, input any, useNClob bool) (*Clob, error) {
 	var err error
 	ret := &Clob{}
 	ret.UseNCharset = useNClob
@@ -267,7 +267,7 @@ func (clob *Clob) CopyTo(dest driver.Value) error {
 	}
 	return nil
 }
-func (clob *Clob) Scan(value interface{}) error {
+func (clob *Clob) Scan(value any) error {
 	return clob.SetValue(value)
 }
 

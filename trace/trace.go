@@ -11,11 +11,11 @@ import (
 // a full tracer : traceWriter
 // a no-tracer: nilTracer
 type Tracer interface {
-	Close() error                      // To close file
-	Print(vs ...interface{})           // like fmt.Print(a,b,c ...)
-	Printf(f string, s ...interface{}) // like fmt.Printf("%d: %s",1254,"Hello")
-	LogPacket(s string, p []byte)      // to dump packet like hexdump -C f
-	IsOn() bool                        // To check if trace is enabled
+	Close() error                 // To close file
+	Print(vs ...any)              // like fmt.Print(a,b,c ...)
+	Printf(f string, s ...any)    // like fmt.Printf("%d: %s",1254,"Hello")
+	LogPacket(s string, p []byte) // to dump packet like hexdump -C f
+	IsOn() bool                   // To check if trace is enabled
 }
 
 type traceWriter struct {
@@ -35,7 +35,7 @@ func (t *traceWriter) Close() (err error) {
 }
 func (t traceWriter) IsOn() bool { return true }
 
-func (t traceWriter) Print(vs ...interface{}) {
+func (t traceWriter) Print(vs ...any) {
 	if t.w == nil {
 		return
 	}
@@ -46,7 +46,7 @@ func (t traceWriter) Print(vs ...interface{}) {
 	t.w.Write([]byte{'\n'})
 }
 
-func (t traceWriter) Printf(f string, s ...interface{}) {
+func (t traceWriter) Printf(f string, s ...any) {
 	if t.w != nil {
 		t.Print(fmt.Sprintf(f, s...))
 	}
@@ -63,9 +63,9 @@ func (t traceWriter) LogPacket(s string, p []byte) {
 type nilTracer struct{}
 
 // NilTracer instantiate a no-tracer
-func NilTracer() *nilTracer                         { return &nilTracer{} }
-func (nilTracer) IsOn() bool                        { return false }
-func (nilTracer) Close() error                      { return nil }
-func (nilTracer) Print(vs ...interface{})           {}
-func (nilTracer) Printf(f string, s ...interface{}) {}
-func (nilTracer) LogPacket(s string, p []byte)      {}
+func NilTracer() *nilTracer                    { return &nilTracer{} }
+func (nilTracer) IsOn() bool                   { return false }
+func (nilTracer) Close() error                 { return nil }
+func (nilTracer) Print(vs ...any)              {}
+func (nilTracer) Printf(f string, s ...any)    {}
+func (nilTracer) LogPacket(s string, p []byte) {}

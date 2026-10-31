@@ -37,7 +37,7 @@ func (interval *Interval) GetMaxLen() int64 {
 		return MaxLenIntervalDS
 	}
 }
-func (interval *Interval) Value() (interface{}, error) {
+func (interval *Interval) Value() (any, error) {
 	if len(interval.bValue) == 0 {
 		return nil, nil
 	}
@@ -120,7 +120,7 @@ func (interval *Interval) encode(input time.Time) error {
 	interval.bValue = buffer.Bytes()
 	return nil
 }
-func (interval *Interval) SetValue(input interface{}) error {
+func (interval *Interval) SetValue(input any) error {
 	if input == nil {
 		interval.bValue = nil
 		return nil
@@ -140,7 +140,7 @@ func (interval *Interval) SetValue(input interface{}) error {
 	return nil
 }
 
-func (interval *Interval) Scan(value interface{}) error {
+func (interval *Interval) Scan(value any) error {
 	return interval.SetValue(value)
 }
 

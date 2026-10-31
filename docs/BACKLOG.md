@@ -9,27 +9,60 @@ decided on the way (D3).
 
 ## Repository
 
-### Settle the package name
+### Rename the package
 
-The package is `go_ora`, which is not an idiomatic name. See the open
-question in `PLAN.md`.
+D8 settled the name as `oracle`. The package is still `go_ora`, and step 4 of
+`DESIGN.md` renames it.
 
-### Make the tests build
+### Fix the decoding of intervals
 
-`go vet ./...` fails on tests that came with the code and no longer match it.
-`TestIssues` imports `github.com/godoes/gorm-oracle`, which the module does not
-require. `converters/other_types_test.go` calls `ConvertBinaryFloat`, which no
-longer exists. The root package tests use `NCHAR`, `Number` and `BulkCopy`,
-which that package does not define. `result_set_test.go` had a missing brace,
-which is fixed. A test that needs a database must skip without one
-(AGENTS.md rule 5).
+`Interval.Value` decodes no interval correctly. It returns a `time.Time`, so a
+year to month interval of `+2021-10` comes back as 2021-09-30, and a negative
+one comes back as an unrelated date. It multiplies the fractional seconds of a
+day to second interval by 1000. The vectors from Oracle are in
+`types/vectors_test.go`, in two tests that skip. Step 6 of `DESIGN.md` replaces
+the type with `IntervalYM` and `time.Duration`. Remove the skips then.
 
-### Wire the integration tests to dbrun
+### Size the OUT parameters again
 
-`TestIssues` and `module_test` read their connection string from variables
-that upstream set by hand. Make them read the URL that `dbrun dsn oracle`
-prints, and skip without one (D6). Check that `dbmeta` has Oracle 11g, 12c and
-18c releases for `dbrun`, because `dbrun list oracle` names only `oracle-26ai`.
+`ParameterInfo.encodeValue` in `parameter_encode.go` ended in a block after its
+`return nil`, so it never ran. The block set `MaxCharLen` and `MaxLen` of an
+`NCHAR` or `RAW` OUT parameter from its size, and cleared `BValue` of every
+OUT parameter. Step 1 deleted it as dead code, which changed nothing. An OUT
+string with no size breaking the connection, sijms/go-ora#703, can be the
+fault that this block was written for. Look at it with that issue.
+
+### Write the integration tests again
+
+Step 1 deleted the files of `TestIssues` that did not build against the `v3`
+code. They used the API of `v2`, such as `go_ora.Clob`, `go_ora.Object` and
+`go_ora.NVarChar`, or a package that the module does not carry: `gorm`, `xorm`
+and the `dbms` package of `v2`. Each one is in commit `d9fa927` and earlier.
+Step 9 of `DESIGN.md` writes a test for each again, on the new API:
+
+- `bool_type_test.go`, `emoji_test.go`, `long_input_test.go`,
+  `regular_type_array_test.go`, `udt_string_test.go`, `varray_test.go` and
+  `vector_test.go`.
+- `bulkinsert_bfile_test.go`, `bulkinsert_blob_test.go`, `inout_lob_test.go`
+  and `lob_test.go`.
+- `issue_173_test.go`, `issue_264_test.go`, `issue_320_test.go` and
+  `issue_363_test.go`.
+- `dbms_aq_test.go` and `dbms_output_test.go`. The `aq` package replaces the
+  first. Nothing in `v3` replaces `DBMS_OUTPUT`, which `v2` read through
+  `dbms.NewOutput`. Ask Ken whether the driver reads it.
+- `gorm_test.go`, which tests `gorm` and not this driver. It does not come back.
+
+Step 1 also deleted the unit tests of functions that `v3` removed:
+`parameter_encode_test.go`, `bulkcopy_test.go`, the tests of `setString`,
+`setFieldValue` and `setNull`, and `TestCreateNewType` with the dead function
+that it tested. The vectors of `converters/other_types_test.go` moved to
+`types/vectors_test.go`.
+
+### Make 11g to 19c pass
+
+`TestIssues` reads `ORACLE_DSN` and skips without it, and CI sets it from
+`dbrun dsn --json`. Nothing ran it against a server yet. Run it on every
+release, and fix or record each failure.
 
 ### Make 18c and 19c start in CI
 
@@ -66,20 +99,10 @@ large literal table that can be data.
 `StringConverter.Clone()` does not copy the `leading` table, so a clone of an
 EUC style charset, such as 0x35C and 0x35F, decodes wrongly. Add a test.
 
-### Set the minimum Go version
-
-The owner of the earlier analysis wanted Go 1.26 as the minimum and no new
-dependency. `go.mod` says `go 1.24`. Ask Ken, then raise it and run `go fix`,
-which turns `interface{}` into `any` and uses `reflect.TypeFor` and ranges over
-integers. `go fix` refuses a package whose tests do not build, so fix those
-first (see Make the tests build).
-
 ### Fix the root level leftovers
 
-The earlier analysis also found `go test ./types/` panics in `TestCreateNewType`
-(`reflect.Set: value of type *types.Blob is not assignable to types.Blob`), and
-that most other tests need a live database. Only `./types/oson/...` passes alone.
-`data_type_nego.go.old` was a v1 leftover and is already deleted here.
+Only `./types/oson/...` and a few other unit tests run with no server. Most
+tests need a live database.
 
 ### Tell dburl when the parser lands
 

@@ -26,7 +26,7 @@ func TestCrud(t *testing.T) {
 		// insert 10 rows
 		var temp = INPUT{}
 		var err error
-		for x := 0; x < 10; x++ {
+		for x := range 10 {
 			temp.ID = x + 1
 			temp.Name = strings.Repeat("-", x)
 			temp.Val += 1.1
@@ -51,7 +51,7 @@ func TestCrud(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		for x := 0; x < 10; x++ {
+		for x := range 10 {
 			temp.ID = x + 1
 			temp.Name = strings.Repeat("-", x+1)
 			temp.Val += 1.1
@@ -120,7 +120,7 @@ func TestCrud(t *testing.T) {
 		return execCmd(db, "DELETE FROM TTB_MAIN")
 	}
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

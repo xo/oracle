@@ -133,14 +133,14 @@ func refineSqlText(text string) string {
 	return strings.TrimSpace(string(textBuffer))
 }
 
-var parameterNameRegexp = lazy_init.NewLazyInit(func() (interface{}, error) {
+var parameterNameRegexp = lazy_init.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`:(\w+)`)
 })
 
 func parseQueryParametersNames(text string) (names []string, err error) {
 	refinedSql := refineSqlText(text)
 
-	var parameterNameRegexpAny interface{}
+	var parameterNameRegexpAny any
 	parameterNameRegexpAny, err = parameterNameRegexp.GetValue()
 	if err != nil {
 		return nil, err
@@ -628,7 +628,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		Direction: Input,
 	}
 	fieldValue := structValue.Field(fieldIndex)
-	for fieldValue.Type().Kind() == reflect.Ptr {
+	for fieldValue.Type().Kind() == reflect.Pointer {
 		if fieldValue.IsNil() {
 			tempPar.Value = nil
 			return

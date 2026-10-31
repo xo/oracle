@@ -63,7 +63,7 @@ func TestDataType_Money(t *testing.T) {
 			dataMoney8: math.Round(vMoneyLarge*1e8) / 1e8,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{row.id, row.dataMoney2, row.dataMoney4, row.dataMoney6, row.dataMoney8}
+		params := []any{row.id, row.dataMoney2, row.dataMoney4, row.dataMoney6, row.dataMoney8}
 		_, err := db.Exec(sql, params...)
 		if err != nil {
 			fmt.Printf("%s\n%#v\n", sql, params)

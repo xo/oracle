@@ -44,7 +44,7 @@ func TestPrefetchLargeBlob(t *testing.T) {
 		length := 10
 		input := make([]Table, 0, length)
 
-		for x := 0; x < length; x++ {
+		for x := range length {
 			temp := Table{
 				Id:    x + 1,
 				Data1: bytes.Repeat([]byte{35, 36}, 50000),
@@ -128,7 +128,7 @@ VALUES(:ID, :DATA1, :SEP1, :DATA2, :SEP2, :DATA3, :SEP3, :DATA4, :SEP4)`, input)
 		return nil
 	}
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

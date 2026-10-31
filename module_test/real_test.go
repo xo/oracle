@@ -83,7 +83,7 @@ func TestDataType_Real(t *testing.T) {
 			dataFloat8:  math.Round(vReal*1e8) / 1e8,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{
+		params := []any{
 			row.id, row.dataFloat, row.dataDouble, row.dataReal,
 			row.dataDecimal, row.dataNumeric, row.dataNumeric,
 			row.dataFloat32, row.dataFloat64, row.dataFloat4, row.dataFloat8,
@@ -267,7 +267,7 @@ func TestDataType_RealNonFraction(t *testing.T) {
 			dataFloat8:  math.Round(vReal*1e8) / 1e8,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{
+		params := []any{
 			row.id, row.dataFloat, row.dataDouble, row.dataReal,
 			row.dataDecimal, row.dataNumeric, row.dataNumeric,
 			row.dataFloat32, row.dataFloat64, row.dataFloat4, row.dataFloat8,

@@ -77,7 +77,7 @@ END GOORA_TEMP;`)
 		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC_BYTEARRAY(:1); END;`, input)
 		return err
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

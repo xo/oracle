@@ -14,11 +14,11 @@ type RowID struct {
 	SlotNumber  int64
 }
 
-func (rowid RowID) SetValue(_ interface{}) error {
+func (rowid RowID) SetValue(_ any) error {
 	return fmt.Errorf("row id is returned from server only")
 }
 
-func (rowid RowID) Value() (interface{}, error) {
+func (rowid RowID) Value() (any, error) {
 	switch rowid.dataType {
 	case ROWID:
 		return string(rowid.decode()), nil

@@ -116,11 +116,11 @@ func (collection *keyCollection) Add(input *key) {
 	}
 	*collection = append(*collection, *input)
 }
-func (collection *keyCollection) extractKeys(obj interface{}) {
+func (collection *keyCollection) extractKeys(obj any) {
 	rValue := reflect.ValueOf(obj)
 	switch rValue.Kind() {
 	case reflect.Map:
-		if temp, ok := obj.(map[string]interface{}); ok {
+		if temp, ok := obj.(map[string]any); ok {
 			for key, value := range temp {
 				collection.Add(NewKey(key))
 				collection.extractKeys(value)

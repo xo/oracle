@@ -31,8 +31,8 @@ type LobStreamer interface {
 }
 
 type OracleType interface {
-	SetValue(input interface{}) error
-	Value() (interface{}, error)
+	SetValue(input any) error
+	Value() (any, error)
 	CopyTo(dest driver.Value) error
 	SetDataType(dt uint16)
 	GetDataType() uint16

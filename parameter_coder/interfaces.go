@@ -15,7 +15,7 @@ type IConnection interface {
 	//GetGoParameterCoder(goType reflect.Type) OracleParameterCoder
 	//GetOracleParameterCoder(oracleType uint16) OracleParameterCoder
 	//GetNameParameterCoder(nameType string) OracleParameterCoder
-	GetParameterCoder(input interface{}) (OracleParameterCoder, error)
+	GetParameterCoder(input any) (OracleParameterCoder, error)
 	SendTimeAsUTC() bool
 	GetDBTimeZone() *time.Location
 	GetDBServerTimeZone() *time.Location
@@ -37,7 +37,7 @@ type (
 		//IsChild() bool
 	}
 	OracleParameterEncoder interface {
-		Encode(input interface{}, conn IConnection) error
+		Encode(input any, conn IConnection) error
 		network.ValueStreamWriter
 		GetParameterInfo() BasicParameter
 		UpdateParameterInfo(data BasicParameter)
@@ -45,7 +45,7 @@ type (
 
 	OracleParameterDecoder interface {
 		Read(session network.SessionReader) error
-		Decode(conn IConnection) (interface{}, error)
+		Decode(conn IConnection) (any, error)
 		SetLobStreamer(lobStreamer types.LobStreamer)
 		SetParameterInfo(data BasicParameter)
 		SetBytes(data []byte)

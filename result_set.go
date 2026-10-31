@@ -77,8 +77,8 @@ func (resultSet *ResultSet) setBitVector(bitVector []byte) {
 		index++
 	}
 	if len(bitVector) > 0 {
-		for x := 0; x < len(bitVector); x++ {
-			for i := 0; i < 8; i++ {
+		for x := range bitVector {
+			for i := range 8 {
 				if (x*8)+i < resultSet.columnCount {
 					(*resultSet.cols)[(x*8)+i].getDataFromServer = bitVector[x]&(1<<i) > 0
 				}
@@ -208,7 +208,7 @@ func (resultSet *ResultSet) setObjectValue(obj reflect.Value, colIndex int) erro
 }
 
 // Scan act like scan in sql package return row values to dest variable pointers
-func (resultSet *ResultSet) Scan(dest ...interface{}) error {
+func (resultSet *ResultSet) Scan(dest ...any) error {
 	if resultSet.lastErr != nil {
 		return resultSet.lastErr
 	}
@@ -220,7 +220,7 @@ func (resultSet *ResultSet) Scan(dest ...interface{}) error {
 			return fmt.Errorf("go-ora: argument %d is nil", destIndex)
 		}
 		destTyp := reflect.TypeOf(dest[destIndex])
-		if destTyp.Kind() != reflect.Ptr {
+		if destTyp.Kind() != reflect.Pointer {
 			return errors.New("go-ora: argument in scan should be passed as pointers")
 		}
 		destTyp = destTyp.Elem()
@@ -317,10 +317,7 @@ func (resultSet *ResultSet) Next(dest []driver.Value) error {
 	}
 
 	if noOfRowsToFetch > 0 && resultSet.index%noOfRowsToFetch < len(resultSet.rows) {
-		length := len(resultSet.rows[resultSet.index%noOfRowsToFetch])
-		if len(dest) < length {
-			length = len(dest)
-		}
+		length := min(len(dest), len(resultSet.rows[resultSet.index%noOfRowsToFetch]))
 		for x := 0; x < length; x++ {
 			dest[x] = resultSet.rows[resultSet.index%noOfRowsToFetch][x]
 		}

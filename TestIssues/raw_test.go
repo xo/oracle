@@ -20,7 +20,7 @@ func TestRaw(t *testing.T) {
 			Data []byte    `db:"DATA"`
 		}
 		args := make([]TempStruct, length)
-		for x := 0; x < length; x++ {
+		for x := range length {
 			args[x] = TempStruct{
 				Id:   x + 1,
 				Name: strings.Repeat("*", 20),
@@ -35,7 +35,7 @@ func TestRaw(t *testing.T) {
 		_, err := db.Exec(sqlText, args)
 		return err
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

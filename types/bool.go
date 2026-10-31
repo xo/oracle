@@ -11,7 +11,7 @@ type Bool struct {
 	Basic
 }
 
-func (bl *Bool) SetValue(input interface{}) error {
+func (bl *Bool) SetValue(input any) error {
 	if input == nil {
 		bl.bValue = nil
 		return nil
@@ -39,7 +39,7 @@ func (bl *Bool) SetValue(input interface{}) error {
 	return nil
 }
 
-func (bl *Bool) Value() (interface{}, error) {
+func (bl *Bool) Value() (any, error) {
 	if bl.bValue == nil {
 		return nil, nil
 	}
@@ -49,7 +49,7 @@ func (bl *Bool) Value() (interface{}, error) {
 	return false, nil
 }
 
-func (bl *Bool) Scan(input interface{}) error {
+func (bl *Bool) Scan(input any) error {
 	return bl.SetValue(input)
 }
 

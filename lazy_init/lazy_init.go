@@ -6,13 +6,13 @@ import "sync"
 // It helps construct object on access and only once.
 type LazyInit struct {
 	// constructor is an object construction function.
-	constructor func() (interface{}, error)
+	constructor func() (any, error)
 
 	// once is a synchronization object to make initialization only once.
 	once sync.Once
 
 	// value is a lazy initialized value variable.
-	value interface{}
+	value any
 
 	// err is an error which is got on initialization.
 	err error
@@ -20,12 +20,12 @@ type LazyInit struct {
 
 // NewLazyInit creates a new lazy initialization variable.
 // It takes a constructor function to make an object.
-func NewLazyInit(constructor func() (interface{}, error)) *LazyInit {
+func NewLazyInit(constructor func() (any, error)) *LazyInit {
 	return &LazyInit{constructor: constructor}
 }
 
 // GetValue returns initialized value or error if something wrong happened.
-func (l *LazyInit) GetValue() (interface{}, error) {
+func (l *LazyInit) GetValue() (any, error) {
 	l.once.Do(func() {
 		l.value, l.err = l.constructor()
 	})

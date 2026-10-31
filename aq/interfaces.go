@@ -18,7 +18,7 @@ type (
 		//GetGoParameterCoder(goType reflect.Type) OracleParameterCoder
 		//GetOracleParameterCoder(oracleType uint16) OracleParameterCoder
 		//GetNameParameterCoder(nameType string) OracleParameterCoder
-		GetParameterCoder(input interface{}) (parameter_coder.OracleParameterCoder, error)
+		GetParameterCoder(input any) (parameter_coder.OracleParameterCoder, error)
 		SendTimeAsUTC() bool
 		GetDBTimeZone() *time.Location
 		GetDBServerTimeZone() *time.Location

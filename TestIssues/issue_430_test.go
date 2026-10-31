@@ -47,7 +47,7 @@ END;`, &result)
 		}
 		return nil
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

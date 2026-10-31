@@ -22,7 +22,7 @@ func TestColumnType(t *testing.T) {
 		return execCmd(db, `INSERT INTO GOORA_T_CHAR VALUES('char','nchar','varchar2','nvarchar2')`)
 	}
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

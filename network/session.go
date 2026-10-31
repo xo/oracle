@@ -71,11 +71,9 @@ type Session struct {
 
 func NewSessionWithInputBufferForDebug(input []byte) *Session {
 	options := &configurations.ConnectionConfig{
-		AdvNegoServiceInfo: configurations.AdvNegoServiceInfo{AuthService: nil},
-		SessionInfo: configurations.SessionInfo{
-			SessionDataUnitSize:   0xFFFF,
-			TransportDataUnitSize: 0xFFFF,
-		},
+		AuthService:           nil,
+		SessionDataUnitSize:   0xFFFF,
+		TransportDataUnitSize: 0xFFFF,
 	}
 	ret := &Session{
 		// ctx:        context.Background(),

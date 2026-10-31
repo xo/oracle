@@ -21,7 +21,7 @@ func (param *RawParameter) Init() {
 	param.DataType = types.RAW
 }
 
-func (param *RawParameter) Encode(input interface{}, conn IConnection) error {
+func (param *RawParameter) Encode(input any, conn IConnection) error {
 	param.Init()
 	encoder := types.Raw{}
 	encoder.SetDataType(param.DataType)
@@ -47,7 +47,7 @@ func (param *RawParameter) Encode(input interface{}, conn IConnection) error {
 	return nil
 }
 
-func (param *RawParameter) Decode(_ IConnection) (interface{}, error) {
+func (param *RawParameter) Decode(_ IConnection) (any, error) {
 	decoder := types.Raw{}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)

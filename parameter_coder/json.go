@@ -42,7 +42,7 @@ func (param *JsonParameter) Init() {
 	param.DataType = types.JSON
 }
 
-func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error) {
+func (param *JsonParameter) Encode(input any, _ IConnection) (err error) {
 	param.Init()
 	encoder := &types.Json{}
 	encoder.Coder = &oson.Oson{}
@@ -62,7 +62,7 @@ func (param *JsonParameter) Encode(input interface{}, _ IConnection) (err error)
 	return
 }
 
-func (param *JsonParameter) Decode(_ IConnection) (interface{}, error) {
+func (param *JsonParameter) Decode(_ IConnection) (any, error) {
 	decoder := &types.Json{}
 	decoder.Coder = &oson.Oson{}
 	decoder.SetStreamer(param.streamer)

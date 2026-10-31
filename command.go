@@ -220,7 +220,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	} else {
 		al8i4[9] &= -0x8000
 	}
-	for x := 0; x < len(al8i4); x++ {
+	for x := range al8i4 {
 		session.PutUint(al8i4[x], 4, true, true)
 	}
 	if define {
@@ -304,7 +304,7 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 	return rs.rowsAffected, nil
 }
 
-var sqlQueryReturnStatementRegexp = lazy_init.NewLazyInit(func() (interface{}, error) {
+var sqlQueryReturnStatementRegexp = lazy_init.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`(\bRETURNING\b|\bRETURN\b)\s+.*\s+\bINTO\b`)
 })
 
@@ -798,7 +798,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 					for x := 0; x < len(stmt.Pars); x++ {
 						if stmt.Pars[x].DataType == oraTypes.REFCURSOR {
 							typ := reflect.TypeOf(stmt.Pars[x].Value)
-							if typ.Kind() == reflect.Ptr {
+							if typ.Kind() == reflect.Pointer {
 								if cursor, ok := stmt.Pars[x].Value.(*RefCursor); ok {
 									cursor.connection = stmt.connection
 									cursor.parent = stmt
@@ -860,7 +860,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			if err != nil {
 				return err
 			}
-			for x := 0; x < 2; x++ {
+			for x := range 2 {
 				stmt.scnForSnapshot[x], err = session.GetInt(4, true, true)
 				if err != nil {
 					return err
@@ -912,7 +912,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				}
 				// for (int index = 0; index < length3; ++index)
 				//	rowsAffectedByArrayBind[index] = this.m_marshallingEngine.UnmarshalSB8();
-				for i := 0; i < length; i++ {
+				for range length {
 					_, err = session.GetInt(8, true, true)
 					if err != nil {
 						return err
@@ -1017,12 +1017,12 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				return err
 			}
 			stmt.multiSet = make([]RefCursor, 0, count)
-			for x := 0; x < count; x++ {
+			for range count {
 				// this function is equal to load cursor so each item is a cursor
-				cursor := RefCursor{}
-				cursor.connection = stmt.connection
-				cursor.parent = stmt
-				cursor.autoClose = true
+				cursor := RefCursor{
+					connection: stmt.connection,
+					parent:     stmt,
+					autoClose:  true}
 				err = cursor.load()
 				if err != nil {
 					return err
@@ -1289,11 +1289,11 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 func (stmt *Stmt) fillStructPar(parValue driver.Value) error {
 	structType := reflect.TypeOf(parValue)
 	structVal := reflect.ValueOf(parValue)
-	if parValue != nil && structType.Kind() == reflect.Ptr && structVal.Elem().Kind() == reflect.Struct {
+	if parValue != nil && structType.Kind() == reflect.Pointer && structVal.Elem().Kind() == reflect.Struct {
 		structType = structType.Elem()
 		structVal = structVal.Elem()
 		structFieldCount := structType.NumField()
-		for i := 0; i < structFieldCount; i++ {
+		for i := range structFieldCount {
 			name, _, _, dir := utils.ExtractTag(structType.Field(i).Tag.Get("db"))
 			var err error
 			if len(name) > 0 && ParameterDirection(dir) != Input {
@@ -1407,7 +1407,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		fieldValue := field.Interface()
 		fieldType := field.Type()
 		hasNullValue := false
-		if fieldType.Kind() == reflect.Ptr {
+		if fieldType.Kind() == reflect.Pointer {
 			if structValue.Field(fieldIndex).IsNil() {
 				hasNullValue = true
 				fieldType = fieldType.Elem()
@@ -1549,7 +1549,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			//}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "":
-			if field.Kind() == reflect.Ptr {
+			if field.Kind() == reflect.Pointer {
 				if field.IsNil() {
 					field.Set(reflect.New(fieldType))
 				}
@@ -1569,7 +1569,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 	if parValue != nil && tempType.Kind() == reflect.Struct {
 		structFieldCount := tempType.NumField()
 
-		for i := 0; i < structFieldCount; i++ {
+		for i := range structFieldCount {
 			name, _type, _, _ := utils.ExtractTag(tempType.Field(i).Tag.Get("db"))
 			if name != "" {
 				var tempPar *ParameterInfo
@@ -1589,11 +1589,11 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 	}
 
 	// deal with Ptr struct types
-	if parValue != nil && tempType.Kind() == reflect.Ptr && structValue.Elem().Kind() == reflect.Struct {
+	if parValue != nil && tempType.Kind() == reflect.Pointer && structValue.Elem().Kind() == reflect.Struct {
 		tempType = tempType.Elem()
 		structValue = structValue.Elem()
 		structFieldCount := tempType.NumField()
-		for i := 0; i < structFieldCount; i++ {
+		for i := range structFieldCount {
 			name, _type, size, dir := utils.ExtractTag(tempType.Field(i).Tag.Get("db"))
 			if dir == 0 {
 				dir = 1
@@ -1626,7 +1626,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	useNamedPars := len(args) > 0
 	parIndex := 0
 	structPars := make([]driver.Value, 0, 2)
-	for x := 0; x < len(args); x++ {
+	for x := range args {
 		var par *ParameterInfo
 		switch tempOut := args[x].Value.(type) {
 		case sql.Out:
@@ -1689,7 +1689,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		if stmt.bulkExec {
 			tempType := reflect.TypeOf(args[x].Value)
 			tempVal := reflect.ValueOf(args[x].Value)
-			if args[x].Value != nil && tempType != reflect.TypeOf([]byte{}) && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
+			if args[x].Value != nil && tempType != reflect.TypeFor[[]byte]() && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
 				// setup array count
 				if stmt.arrayBindCount == 0 {
 					stmt.arrayBindCount = tempVal.Len()
@@ -1704,7 +1704,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				if firstItem.Kind() == reflect.Struct {
 					fieldCount := firstItem.NumField()
 					structArrayAsNamedPars := make([]driver.NamedValue, 0, fieldCount)
-					for fieldIndex := 0; fieldIndex < fieldCount; fieldIndex++ {
+					for fieldIndex := range fieldCount {
 						name, _type, _, _ := utils.ExtractTag(firstItem.Type().Field(fieldIndex).Tag.Get("db"))
 						if name != "" {
 							arrayValues := make([]driver.Value, stmt.arrayBindCount)
@@ -1801,7 +1801,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	for _, par := range stmt.Pars {
 		if par.Direction != Input && par.DataType != oraTypes.REFCURSOR {
 			fieldValue := reflect.ValueOf(par.Value)
-			if fieldValue.Kind() != reflect.Ptr {
+			if fieldValue.Kind() != reflect.Pointer {
 				return nil, errors.New("output parameter should be pointer type")
 			}
 			fieldValue = fieldValue.Elem()
@@ -1864,7 +1864,7 @@ func (stmt *Stmt) useNamedParameters() error {
 	}
 	parCollection := make([]ParameterInfo, 0, len(names))
 	if stmt.stmtType == SELECT || stmt.stmtType == DML {
-		for x := 0; x < len(names); x++ {
+		for x := range names {
 			found := false
 			for _, par := range stmt.Pars {
 				if strings.ToLower(par.Name) == strings.ToLower(names[x]) {
@@ -1884,7 +1884,7 @@ func (stmt *Stmt) useNamedParameters() error {
 			}
 		}
 	} else {
-		for x := 0; x < len(names); x++ {
+		for x := range names {
 			// search if name is repeated
 			repeated := false
 			for y := x - 1; y >= 0; y-- {
@@ -1930,7 +1930,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		result, err = stmt._exec(nil)
 	} else {
 		namedArgs := make([]driver.NamedValue, len(args))
-		for x := 0; x < len(args); x++ {
+		for x := range args {
 			namedArgs[x].Value = args[x]
 		}
 		result, err = stmt._exec(namedArgs)
@@ -2031,7 +2031,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
 	stmt._hasMoreRows = true
 	useNamedPars := len(namedArgs) > 0
-	for x := 0; x < len(namedArgs); x++ {
+	for x := range namedArgs {
 		par, err := stmt.NewParam(namedArgs[x].Name, namedArgs[x].Value, 0, Input)
 		if err != nil {
 			return nil, err
@@ -2298,7 +2298,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 		dataSet, err = stmt.Query_(nil)
 	} else {
 		namedArgs := make([]driver.NamedValue, len(args))
-		for x := 0; x < len(args); x++ {
+		for x := range args {
 			namedArgs[x].Value = args[x]
 		}
 		dataSet, err = stmt.Query_(namedArgs)

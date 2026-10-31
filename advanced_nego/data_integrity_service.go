@@ -25,15 +25,13 @@ type dataIntegrityService struct {
 
 func newDataIntegrityService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo, tracer trace.Tracer) (*dataIntegrityService, error) {
 	output := &dataIntegrityService{
-		defaultService: defaultService{
-			ano:                   ano,
-			level:                 negoInfo.IntServiceLevel,
-			serviceType:           3,
-			version:               version,
-			availableServiceNames: []string{"", "MD5", "SHA1", "SHA512", "SHA256", "SHA384"},
-			availableServiceIDs:   []int{0, 1, 3, 4, 5, 6},
-		},
-		tracer: tracer,
+		ano:                   ano,
+		level:                 negoInfo.IntServiceLevel,
+		serviceType:           3,
+		version:               version,
+		availableServiceNames: []string{"", "MD5", "SHA1", "SHA512", "SHA256", "SHA384"},
+		availableServiceIDs:   []int{0, 1, 3, 4, 5, 6},
+		tracer:                tracer,
 	}
 	err := output.buildServiceList([]string{}, true, true)
 	// output.selectedServ, err = output.validate(strings.Split(str,","), true)

@@ -10,21 +10,21 @@ import (
 )
 
 type arrayField struct {
-	value []interface{}
+	value []any
 	structField
 }
 
-func (array *arrayField) Value() (interface{}, error) {
+func (array *arrayField) Value() (any, error) {
 	return array.value, nil
 }
 
-func NewarrayField(value interface{}, header *header) (*arrayField, error) {
+func NewarrayField(value any, header *header) (*arrayField, error) {
 	ret := new(arrayField)
 	ret.header = header
 	var err error
 	rValue := reflect.ValueOf(value)
 	length := rValue.Len()
-	for i := 0; i < length; i++ {
+	for i := range length {
 		var field Field
 		item := rValue.Index(i)
 		if item.IsNil() || !item.IsValid() {
@@ -52,7 +52,7 @@ func NewarrayField(value interface{}, header *header) (*arrayField, error) {
 					return nil, err
 				}
 			case reflect.Map:
-				if temp, ok := item.Interface().(map[string]interface{}); ok {
+				if temp, ok := item.Interface().(map[string]any); ok {
 					field, err = NewobjectField(temp, header)
 					if err != nil {
 						return nil, err

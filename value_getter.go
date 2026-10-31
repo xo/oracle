@@ -19,7 +19,7 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 		return nil, nil
 	}
 	rOriginal := reflect.ValueOf(origVal)
-	if rOriginal.Kind() == reflect.Ptr && rOriginal.IsNil() {
+	if rOriginal.Kind() == reflect.Pointer && rOriginal.IsNil() {
 		return nil, nil
 	}
 	proVal := reflect.Indirect(rOriginal)
@@ -31,7 +31,7 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 func getType(value driver.Value) reflect.Type {
 	valueType := reflect.TypeOf(value)
 	if valueType != nil {
-		for valueType.Kind() == reflect.Ptr {
+		for valueType.Kind() == reflect.Pointer {
 			valueType = valueType.Elem()
 		}
 	}
@@ -54,7 +54,7 @@ func getType(value driver.Value) reflect.Type {
 //	}
 //
 // get string value from supported types
-func getString(col interface{}) string {
+func getString(col any) string {
 	//if val, ok := col.(oraTypes.Clob); ok {
 	//	return val.Data().String
 	//}
@@ -86,7 +86,7 @@ func getString(col interface{}) string {
 }
 
 // get bool value from supported types
-func getBool(col interface{}) (bool, error) {
+func getBool(col any) (bool, error) {
 	col, err := getValue(col)
 	if err != nil {
 		return false, err
@@ -99,7 +99,7 @@ func getBool(col interface{}) (bool, error) {
 }
 
 // get int64 value from supported types
-func getInt(col interface{}) (int64, error) {
+func getInt(col any) (int64, error) {
 	var err error
 	col, err = getValue(col)
 	if err != nil {
@@ -135,7 +135,7 @@ func getInt(col interface{}) (int64, error) {
 }
 
 // get time.Time from supported types
-func getDate(col interface{}) (time.Time, error) {
+func getDate(col any) (time.Time, error) {
 	var err error
 	col, err = getValue(col)
 	if err != nil {
@@ -159,11 +159,11 @@ func getDate(col interface{}) (time.Time, error) {
 }
 
 // get []byte from supported types
-func getBytes(col interface{}) ([]byte, error) {
+func getBytes(col any) ([]byte, error) {
 	var err error
 	switch val := col.(type) {
 	case oraTypes.Blob:
-		var temp interface{}
+		var temp any
 		temp, err = val.Value()
 		if err != nil {
 			return nil, err
@@ -175,7 +175,7 @@ func getBytes(col interface{}) ([]byte, error) {
 		//return val.Data(), nil
 	case *oraTypes.Blob:
 		//return (*val).Data(), nil
-		var temp interface{}
+		var temp any
 		temp, err = val.Value()
 		if err != nil {
 			return nil, err
@@ -200,7 +200,7 @@ func getBytes(col interface{}) ([]byte, error) {
 	//case Blob:
 	//	return val.Data, nil
 	case oraTypes.Blob:
-		var temp interface{}
+		var temp any
 		temp, err = val.Value()
 		if err != nil {
 			return nil, err

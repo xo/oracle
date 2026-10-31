@@ -16,19 +16,15 @@ import (
 // See issue #736.
 func TestConnectDisconnectRace(t *testing.T) {
 	connOption := &configurations.ConnectionConfig{
-		DatabaseInfo: configurations.DatabaseInfo{
-			Servers: []configurations.ServerAddr{
-				{Addr: "192.0.2.1", Port: 1521}, // TEST-NET-1: TCP handshake never completes
-			},
-			ServiceName: "svc",
+		Servers: []configurations.ServerAddr{
+			{Addr: "192.0.2.1", Port: 1521}, // TEST-NET-1: TCP handshake never completes
 		},
-		SessionInfo: configurations.SessionInfo{
-			SessionDataUnitSize:   0xFFFF,
-			TransportDataUnitSize: 0xFFFF,
-		},
+		ServiceName:           "svc",
+		SessionDataUnitSize:   0xFFFF,
+		TransportDataUnitSize: 0xFFFF,
 	}
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		session := NewSession(connOption, trace.NilTracer())
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 

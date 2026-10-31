@@ -3,7 +3,7 @@ package TestIssues
 import "testing"
 
 func TestBinaryDouble(t *testing.T) {
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

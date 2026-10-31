@@ -355,16 +355,16 @@ func (par *ParameterInfo) write(session *network.Session) error {
 }
 
 func (par *ParameterInfo) clone() ParameterInfo {
-	tempPar := ParameterInfo{}
-	tempPar.DataType = par.DataType
-	tempPar.cusType = par.cusType
-	tempPar.TypeName = par.TypeName
-	tempPar.MaxLen = par.MaxLen
-	tempPar.MaxCharLen = par.MaxCharLen
-	tempPar.CharsetID = par.CharsetID
-	tempPar.CharsetForm = par.CharsetForm
-	tempPar.Scale = par.Scale
-	tempPar.Precision = par.Precision
+	tempPar := ParameterInfo{
+		DataType:    par.DataType,
+		cusType:     par.cusType,
+		TypeName:    par.TypeName,
+		MaxLen:      par.MaxLen,
+		MaxCharLen:  par.MaxCharLen,
+		CharsetID:   par.CharsetID,
+		CharsetForm: par.CharsetForm,
+		Scale:       par.Scale,
+		Precision:   par.Precision}
 	return tempPar
 }
 
@@ -549,7 +549,6 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	//default:
 	//	return fmt.Errorf("unable to decode oracle type %v to its primitive value", par.DataType)
 	//}
-	return nil
 }
 
 func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {

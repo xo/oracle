@@ -38,7 +38,7 @@ func TestIssue662(t *testing.T) {
 		return nil
 	}
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

@@ -12,7 +12,7 @@ import (
 )
 
 type Queue interface {
-	NewMessage(data interface{}) (*Message, error)
+	NewMessage(data any) (*Message, error)
 	Enqueue(message *Message) error
 	EnqueueMessages(messages []*Message) error
 	Dequeue(options *DequeueOptions) (*Message, error)
@@ -66,7 +66,7 @@ func (qu *queue) SetAutoCommit(autoCommit bool) {
 	qu.AutoCommit = autoCommit
 }
 
-func (qu *queue) NewMessage(data interface{}) (*Message, error) {
+func (qu *queue) NewMessage(data any) (*Message, error) {
 	var err error
 	message := &Message{
 		messageID:        nil,
@@ -481,7 +481,7 @@ func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
 		return err
 	}
 
-	for i := 0; i < numResp; i++ {
+	for i := range numResp {
 		if i >= len(messages) {
 			break
 		}

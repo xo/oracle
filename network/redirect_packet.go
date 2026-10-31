@@ -24,12 +24,10 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 		return nil
 	}
 	pck := RedirectPacket{
-		Packet: Packet{
-			dataOffset: 10,
-			length:     uint32(binary.BigEndian.Uint16(packetData)),
-			packetType: PacketType(packetData[4]),
-			flag:       packetData[5],
-		},
+		dataOffset: 10,
+		length:     uint32(binary.BigEndian.Uint16(packetData)),
+		packetType: PacketType(packetData[4]),
+		flag:       packetData[5],
 	}
 	return &pck
 }

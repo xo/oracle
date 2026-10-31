@@ -113,10 +113,7 @@ func (sec *OracleNetworkDESCryptor) decryptBlocks(dst, src []byte) {
 }
 
 func xorBytes(des, a, b []byte) {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
+	n := min(len(b), len(a))
 	if n == 0 {
 		return
 	}

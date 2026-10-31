@@ -13,7 +13,7 @@ import (
 var truthy = []string{"true", "1"}
 
 func setNil(dest reflect.Value) error {
-	if dest.Kind() == reflect.Ptr && dest.IsNil() {
+	if dest.Kind() == reflect.Pointer && dest.IsNil() {
 		return nil
 	}
 	// if the value is support scanner interface call it
@@ -178,7 +178,7 @@ func copyString(dest reflect.Value, src string) error {
 	return nil
 }
 
-func copyArray(dest reflect.Value, src []interface{}) error {
+func copyArray(dest reflect.Value, src []any) error {
 	if dest.Kind() != reflect.Slice {
 		return defaultCopy(dest, src)
 	}

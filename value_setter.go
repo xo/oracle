@@ -413,7 +413,7 @@ import (
 //}
 
 func setArray(value reflect.Value, input []ParameterInfo) error {
-	if value.Kind() == reflect.Ptr {
+	if value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			value.Set(reflect.New(value.Type().Elem()))
 		}

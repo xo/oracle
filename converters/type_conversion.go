@@ -269,7 +269,7 @@ func DecodeInt(inputData []byte) int64 {
 //
 // Ex When parsing a float into an int64, the driver will try to cast the float64 into the int64.
 // If the float64 can't be represented by an int64, Parse will issue an error "invalid syntax"
-func DecodeNumber(inputData []byte) interface{} {
+func DecodeNumber(inputData []byte) any {
 	powerOfTen := [...]uint64{
 		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
 		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,

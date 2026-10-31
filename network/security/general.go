@@ -51,10 +51,8 @@ type OracleNetworkHash2 struct {
 
 func NewOracleNetworkHash(hash hash.Hash, key, iv []byte, useNew bool) (*OracleNetworkHash, error) {
 	output := &OracleNetworkHash{
-		baseHash: baseHash{
-			useNew: useNew,
-			Hash:   hash,
-		},
+		useNew: useNew,
+		Hash:   hash,
 	}
 	var err error
 	keySize := output.getKeySize()
@@ -83,10 +81,8 @@ func NewOracleNetworkHash2(hash hash.Hash, key, iv []byte, useNew bool) (*Oracle
 		buffer: make([]byte, 32),
 		output: make([]byte, hash.Size()),
 		input:  make([]byte, hash.Size()),
-		baseHash: baseHash{
-			Hash:   hash,
-			useNew: useNew,
-		},
+		Hash:   hash,
+		useNew: useNew,
 	}
 	aesKey := make([]byte, 16)
 	keySize := output.getKeySize()

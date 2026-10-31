@@ -13,7 +13,7 @@ type stringField struct {
 	basicField
 }
 
-func (field *stringField) Value() (interface{}, error) {
+func (field *stringField) Value() (any, error) {
 	return field.value, nil
 }
 

@@ -61,7 +61,7 @@ const connRef = "--GET-CONNECTION-REF--"
 
 // Querier is the QueryContext of sql.Conn.
 type Querier interface {
-	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
 //type Executer interface {
@@ -893,10 +893,7 @@ func (conn *Connection) freeTemporaryLobs() error {
 	end := 0
 	session.ResetBuffer()
 	for start < len(conn.temporaryLocs) {
-		end = start + 25000
-		if end > len(conn.temporaryLocs) {
-			end = len(conn.temporaryLocs)
-		}
+		end = min(start+25000, len(conn.temporaryLocs))
 		freeTemp(conn.temporaryLocs[start:end])
 		start += end
 	}
@@ -1023,7 +1020,7 @@ func (conn *Connection) doAuth() error {
 				return err
 			}
 			conn.SessionProperties = make(map[string]string, dictLen)
-			for x := 0; x < dictLen; x++ {
+			for range dictLen {
 				key, val, _, err := conn.session.GetKeyVal()
 				if err != nil {
 					return err
@@ -1065,7 +1062,7 @@ func (conn *Connection) loadNLSData() error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < length; i++ {
+	for range length {
 		nlsKey, nlsVal, nlsCode, err := conn.session.GetKeyVal()
 		if err != nil {
 			return err
@@ -1112,7 +1109,7 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 			return err
 		}
 		// get nls data
-		for i := 0; i < length; i++ {
+		for range length {
 			nlsKey, nlsVal, nlsCode, err := session.GetKeyVal()
 			if err != nil {
 				return err
@@ -1287,7 +1284,7 @@ func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
 	advanced_nego.NTSAuth = newNTSManager
 }
 
-var insertQueryBracketsRegexp = lazy_init.NewLazyInit(func() (interface{}, error) {
+var insertQueryBracketsRegexp = lazy_init.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`\((.*?)\)`)
 })
 
@@ -1431,18 +1428,16 @@ func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows
 	return q.QueryContext(ctx, wrapResultset, rows)
 }
 
-func (conn *Connection) encodeData(data interface{}) ([]byte, error) {
+func (conn *Connection) encodeData(data any) ([]byte, error) {
 	par := ParameterInfo{}
 	par.Value = data
 	err := par.encodeValue(0, conn)
 	return par.BValue, err
 }
 
-func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtName string) (interface{}, error) {
+func (conn *Connection) decodeData(data []byte, messageType aq.MessageType, udtName string) (any, error) {
 	par := ParameterInfo{
-		BasicParameter: parameter_coder.BasicParameter{
-			BValue: data,
-		},
+		BValue: data,
 	}
 	var err error
 	switch messageType {
@@ -1641,7 +1636,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			if err != nil {
 				return err
 			}
-			for i := 0; i < length; i++ {
+			for range length {
 				_, err = session.GetInt(8, true, true)
 				if err != nil {
 					return err
@@ -1768,7 +1763,7 @@ func (conn *Connection) NewLobStreamer() types.LobStreamer {
 	return &LobStream{conn: conn}
 }
 
-func (conn *Connection) GetParameterCoder(input interface{}) (parameter_coder.OracleParameterCoder, error) {
+func (conn *Connection) GetParameterCoder(input any) (parameter_coder.OracleParameterCoder, error) {
 	switch input := input.(type) {
 	case reflect.Type:
 		if coder, ok := conn.goTypeCoder[input]; ok {

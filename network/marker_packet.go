@@ -23,13 +23,11 @@ func (pck *MarkerPacket) bytes() []byte {
 
 func newMarkerPacket(markerType uint8, sessionCtx *SessionContext) *MarkerPacket {
 	return &MarkerPacket{
-		Packet: Packet{
-			sessionCtx: sessionCtx,
-			dataOffset: 0,
-			length:     0xB,
-			packetType: MARKER,
-			flag:       0x20,
-		},
+		sessionCtx: sessionCtx,
+		dataOffset: 0,
+		length:     0xB,
+		packetType: MARKER,
+		flag:       0x20,
 		markerType: markerType,
 	}
 }
@@ -39,12 +37,10 @@ func newMarkerPacketFromData(packetData []byte, sessionCtx *SessionContext) *Mar
 		return nil
 	}
 	pck := MarkerPacket{
-		Packet: Packet{
-			sessionCtx: sessionCtx,
-			dataOffset: 0,
-			packetType: PacketType(packetData[4]),
-			flag:       packetData[5],
-		},
+		sessionCtx: sessionCtx,
+		dataOffset: 0,
+		packetType: PacketType(packetData[4]),
+		flag:       packetData[5],
 		markerType: packetData[10],
 	}
 	if sessionCtx.handshakeComplete && sessionCtx.Version >= 315 {

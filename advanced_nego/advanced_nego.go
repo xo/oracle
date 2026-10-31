@@ -147,7 +147,7 @@ func (nego *AdvNego) Read() error {
 		return err
 	}
 	nego.version = uint32(version)
-	for i := 0; i < count; i++ {
+	for range count {
 		serviceType, subPacket, err := nego.readServiceHeader()
 		if err != nil {
 			return err
@@ -495,18 +495,12 @@ func (nego *AdvNego) SetKeyFolding(key []byte, isExternalAuth, isSys bool) error
 		return nil
 	}
 
-	length := len(key)
-	if length > len(nego.sessionKey) {
-		length = len(nego.sessionKey)
-	}
+	length := min(len(key), len(nego.sessionKey))
 	for i := 0; i < length; i++ {
 		nego.sessionKey[i] ^= key[i]
 	}
 	if nego.IsNewVersion(ENCRYPTION_SERVICE_ID) || nego.IsNewVersion(DATA_INTEGRITY_SERVICE_ID) {
-		length = len(key)
-		if length > len(nego.iv) {
-			length = len(nego.iv)
-		}
+		length = min(len(key), len(nego.iv))
 		for i := 0; i < length; i++ {
 			nego.iv[i] ^= key[i]
 		}

@@ -114,7 +114,7 @@ func (param *ObjectParameter) Init() {
 // func (param *ObjectParameter) encodeArray(input interface{}, conn parameter_coder.IConnection) (err error) {
 //
 // }
-func (param *ObjectParameter) Encode(input interface{}, conn parameter_coder.IConnection) (err error) {
+func (param *ObjectParameter) Encode(input any, conn parameter_coder.IConnection) (err error) {
 	param.Init()
 	session := network.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
 	inputType := getType(input)
@@ -136,7 +136,7 @@ func (param *ObjectParameter) Encode(input interface{}, conn parameter_coder.ICo
 			} else {
 				session.PutUint(size, 2, true, false)
 			}
-			for i := 0; i < size; i++ {
+			for i := range size {
 				var item driver.Value
 				if rValue.Index(i).CanInterface() {
 					item, err = getValue(rValue.Index(i).Interface())
@@ -267,7 +267,7 @@ func (param *ObjectParameter) Write(session network.SessionWriter) error {
 	return nil
 }
 
-func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (interface{}, error) {
+func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (any, error) {
 	// need main session to get its properties
 	var objectType uint8
 	var err error
@@ -315,7 +315,7 @@ func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (interfac
 				return nil, err
 			}
 		}
-		items := make([]interface{}, itemsLen)
+		items := make([]any, itemsLen)
 		for i := 0; i < itemsLen; i++ {
 			decoder := param.attribs[""].Copy()
 			decoder.UpdateParameterInfo(param.GetParameterInfo())
@@ -335,7 +335,7 @@ func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (interfac
 		return nil, nil
 	case 0x84:
 		retObj := reflect.New(param.typ)
-		var value interface{}
+		var value any
 		for _, field := range param.fields {
 			attrib := param.attribs[field].Copy()
 			//temp, err := session.Peek()

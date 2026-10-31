@@ -104,23 +104,19 @@ func ParseConfig(dsn string) (*ConnectionConfig, error) {
 	}
 	q := u.Query()
 	config := &ConnectionConfig{
-		PrefetchRows: 25,
-		FastLogin:    true,
-		SessionInfo: SessionInfo{
-			ConnectTimeout: time.Duration(60 * time.Second),
-			Timeout:        0,
-			// TransportDataUnitSize: 0xFFFF,
-			// SessionDataUnitSize:   0xFFFF,
-			TransportDataUnitSize: 0x200000,
-			SessionDataUnitSize:   0x200000,
-			Protocol:              "tcp",
-			SSL:                   false,
-			SSLVerify:             true,
-		},
-		DatabaseInfo: DatabaseInfo{
-			Servers: make([]ServerAddr, 0, 3),
-		},
-		ClientInfo: ClientInfo{Territory: "AMERICA", Language: "AMERICAN"},
+		PrefetchRows:   25,
+		FastLogin:      true,
+		ConnectTimeout: time.Duration(60 * time.Second),
+		Timeout:        0,
+		// TransportDataUnitSize: 0xFFFF,
+		// SessionDataUnitSize:   0xFFFF,
+		TransportDataUnitSize: 0x200000,
+		SessionDataUnitSize:   0x200000,
+		Protocol:              "tcp",
+		SSL:                   false,
+		SSLVerify:             true,
+		Servers:               make([]ServerAddr, 0, 3),
+		Territory:             "AMERICA", Language: "AMERICAN",
 	}
 	// ret := &ConnectionString{
 	// Port:         defaultPort,

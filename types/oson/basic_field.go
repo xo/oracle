@@ -4,10 +4,9 @@ type (
 	FieldEncoder interface {
 		Encode() ([]byte, error)
 	}
-	FieldDecoder interface {
-	}
+	FieldDecoder any
 	FieldCreator interface {
-		CreateField(input interface{}, header *header) (Field, error)
+		CreateField(input any, header *header) (Field, error)
 	}
 )
 type Field interface {
@@ -18,7 +17,7 @@ type Field interface {
 	Offset() int
 	SetOffset(int)
 	Children() []Field
-	Value() (interface{}, error)
+	Value() (any, error)
 }
 
 type basicField struct {
@@ -74,7 +73,7 @@ type nullField struct {
 	basicField
 }
 
-func (field *nullField) Value() (interface{}, error) {
+func (field *nullField) Value() (any, error) {
 	return nil, nil
 }
 
@@ -96,7 +95,7 @@ type booleanField struct {
 	basicField
 }
 
-func (field *booleanField) Value() (interface{}, error) {
+func (field *booleanField) Value() (any, error) {
 	return field.value, nil
 }
 

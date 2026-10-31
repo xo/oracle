@@ -35,14 +35,14 @@ func CreateQuasiLocator(dataLength uint64) []byte {
 }
 
 var (
-	TyFloat64 = reflect.TypeOf((*float64)(nil)).Elem()
-	TyFloat32 = reflect.TypeOf((*float32)(nil)).Elem()
-	TyInt64   = reflect.TypeOf((*int64)(nil)).Elem()
-	TyBool    = reflect.TypeOf((*bool)(nil)).Elem()
-	TyBytes   = reflect.TypeOf((*[]byte)(nil)).Elem()
-	TyString  = reflect.TypeOf((*string)(nil)).Elem()
+	TyFloat64 = reflect.TypeFor[float64]()
+	TyFloat32 = reflect.TypeFor[float32]()
+	TyInt64   = reflect.TypeFor[int64]()
+	TyBool    = reflect.TypeFor[bool]()
+	TyBytes   = reflect.TypeFor[[]byte]()
+	TyString  = reflect.TypeFor[string]()
 	//TyNVarChar        = reflect.TypeOf((*NVarChar)(nil)).Elem()
-	TyTime = reflect.TypeOf((*time.Time)(nil)).Elem()
+	TyTime = reflect.TypeFor[time.Time]()
 	//TyTimeStamp       = reflect.TypeOf((*TimeStamp)(nil)).Elem()
 	//TyTimeStampTZ     = reflect.TypeOf((*TimeStampTZ)(nil)).Elem()
 	//TyClob            = reflect.TypeOf((*Clob)(nil)).Elem()
@@ -50,24 +50,24 @@ var (
 	//TyBlob            = reflect.TypeOf((*Blob)(nil)).Elem()
 	//TyBFile           = reflect.TypeOf((*BFile)(nil)).Elem()
 	//TyVector          = reflect.TypeOf((*Vector)(nil)).Elem()
-	TyNullByte    = reflect.TypeOf((*sql.NullByte)(nil)).Elem()
-	TyNullInt16   = reflect.TypeOf((*sql.NullInt16)(nil)).Elem()
-	TyNullInt32   = reflect.TypeOf((*sql.NullInt32)(nil)).Elem()
-	TyNullInt64   = reflect.TypeOf((*sql.NullInt64)(nil)).Elem()
-	TyNullFloat64 = reflect.TypeOf((*sql.NullFloat64)(nil)).Elem()
-	TyNullBool    = reflect.TypeOf((*sql.NullBool)(nil)).Elem()
-	TyNullString  = reflect.TypeOf((*sql.NullString)(nil)).Elem()
+	TyNullByte    = reflect.TypeFor[sql.NullByte]()
+	TyNullInt16   = reflect.TypeFor[sql.NullInt16]()
+	TyNullInt32   = reflect.TypeFor[sql.NullInt32]()
+	TyNullInt64   = reflect.TypeFor[sql.NullInt64]()
+	TyNullFloat64 = reflect.TypeFor[sql.NullFloat64]()
+	TyNullBool    = reflect.TypeFor[sql.NullBool]()
+	TyNullString  = reflect.TypeFor[sql.NullString]()
 	//TyNullNVarChar    = reflect.TypeOf((*NullNVarChar)(nil)).Elem()
-	TyNullTime = reflect.TypeOf((*sql.NullTime)(nil)).Elem()
+	TyNullTime = reflect.TypeFor[sql.NullTime]()
 	//TyNullTimeStamp   = reflect.TypeOf((*NullTimeStamp)(nil)).Elem()
 	//TyNullTimeStampTZ = reflect.TypeOf((*NullTimeStampTZ)(nil)).Elem()
 	//TyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
 	//TyPLBool          = reflect.TypeOf((*PLBool)(nil)).Elem()
 	//TyObject          = reflect.TypeOf((*Object)(nil)).Elem()
 	//TyNumber          = reflect.TypeOf((*Number)(nil)).Elem()
-	TyFloat32Array = reflect.TypeOf((*[]float32)(nil)).Elem()
-	TyUint8Array   = reflect.TypeOf((*[]uint8)(nil)).Elem()
-	TyFloat64Array = reflect.TypeOf((*[]float64)(nil)).Elem()
+	TyFloat32Array = reflect.TypeFor[[]float32]()
+	TyUint8Array   = reflect.TypeFor[[]uint8]()
+	TyFloat64Array = reflect.TypeFor[[]float64]()
 )
 
 func IsSigned(input reflect.Type) bool {
@@ -114,7 +114,7 @@ func GetValue(origVal driver.Value) (driver.Value, error) {
 		return nil, nil
 	}
 	rOriginal := reflect.ValueOf(origVal)
-	if rOriginal.Kind() == reflect.Ptr && rOriginal.IsNil() {
+	if rOriginal.Kind() == reflect.Pointer && rOriginal.IsNil() {
 		return nil, nil
 	}
 	proVal := reflect.Indirect(rOriginal)
@@ -127,7 +127,7 @@ func GetValue(origVal driver.Value) (driver.Value, error) {
 func GetType(value driver.Value) reflect.Type {
 	valueType := reflect.TypeOf(value)
 	if valueType != nil {
-		for valueType.Kind() == reflect.Ptr {
+		for valueType.Kind() == reflect.Pointer {
 			valueType = valueType.Elem()
 		}
 	}

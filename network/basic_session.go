@@ -239,7 +239,7 @@ func (session *basicSession) Peek() (byte, error) {
 }
 
 // PutInt write int number with size entered either use bigEndian or not and use compression or not to
-func (session *basicSession) PutInt(number interface{}, size uint8, bigEndian bool, compress bool) {
+func (session *basicSession) PutInt(number any, size uint8, bigEndian bool, compress bool) {
 	var num int64
 	switch number := number.(type) {
 	case int64:
@@ -314,7 +314,7 @@ func (session *basicSession) PutInt(number interface{}, size uint8, bigEndian bo
 }
 
 // PutUint write uint number with size entered either use bigEndian or not and use compression or not to
-func (session *basicSession) PutUint(number interface{}, size uint8, bigEndian, compress bool) {
+func (session *basicSession) PutUint(number any, size uint8, bigEndian, compress bool) {
 	var num uint64
 	switch number := number.(type) {
 	case int64:
@@ -409,10 +409,7 @@ func (session *basicSession) PutClr(data []byte) {
 		session.outBuffer.WriteByte(0xFE)
 		start := 0
 		for start < dataLen {
-			end := start + session.ClrChunkSize
-			if end > dataLen {
-				end = dataLen
-			}
+			end := min(start+session.ClrChunkSize, dataLen)
 			temp := data[start:end]
 			if session.UseBigClrChunks {
 				session.PutInt(len(temp), 4, true, true)

@@ -77,20 +77,20 @@ func (driver *OracleDriver) init() {
 	driver.oracleTypeCoder[types.RAW] = &parameter_coder.RawParameter{}
 	driver.oracleTypeCoder[types.LongRaw] = &parameter_coder.RawParameter{}
 
-	driver.oracleTypeCoder[types.NUMBER] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}}
-	driver.oracleTypeCoder[types.IBFLOAT] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}}
-	driver.oracleTypeCoder[types.IBDOUBLE] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}}
+	driver.oracleTypeCoder[types.NUMBER] = &parameter_coder.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
+	driver.oracleTypeCoder[types.IBFLOAT] = &parameter_coder.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
+	driver.oracleTypeCoder[types.IBDOUBLE] = &parameter_coder.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
 
-	driver.oracleTypeCoder[types.DATE] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}}
-	driver.oracleTypeCoder[types.TIMESTAMP] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStamp}}
-	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimeStampTZ}}
-	driver.oracleTypeCoder[types.TimeStampDTY] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampDTY, MaxLen: types.MaxLenTimeStampTZ}}
-	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
-	driver.oracleTypeCoder[types.TimeStampLTZ] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampLTZ, MaxLen: types.MaxLenTimeStampTZ}}
-	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.oracleTypeCoder[types.DATE] = &parameter_coder.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
+	driver.oracleTypeCoder[types.TIMESTAMP] = &parameter_coder.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStamp}
+	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampDTY] = &parameter_coder.DateParameter{DataType: types.TimeStampDTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &parameter_coder.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampLTZ] = &parameter_coder.DateParameter{DataType: types.TimeStampLTZ, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &parameter_coder.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
 
-	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &parameter_coder.IntervalParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}}
-	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &parameter_coder.IntervalParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}}
+	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &parameter_coder.IntervalParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}
+	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &parameter_coder.IntervalParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}
 
 	driver.oracleTypeCoder[types.VECTOR] = &parameter_coder.VectorParameter{}
 	driver.oracleTypeCoder[types.JSON] = &parameter_coder.JsonParameter{}
@@ -146,17 +146,17 @@ func (driver *OracleDriver) init() {
 	driver.goTypeCoder[types.TyBlob] = &parameter_coder.BlobParameter{}
 	driver.goTypeCoder[types.TyBFile] = &parameter_coder.BFileParameter{}
 
-	driver.goTypeCoder[reflect.TypeOf((*RefCursor)(nil)).Elem()] = &parameter_coder.CursorParameter{}
+	driver.goTypeCoder[reflect.TypeFor[RefCursor]()] = &parameter_coder.CursorParameter{}
 
 	// name type coder
-	driver.nameTypeCoder["NUMBER"] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}}
-	driver.nameTypeCoder["IBFLOAT"] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}}
-	driver.nameTypeCoder["IBDOUBLE"] = &parameter_coder.NumberParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}}
+	driver.nameTypeCoder["NUMBER"] = &parameter_coder.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
+	driver.nameTypeCoder["IBFLOAT"] = &parameter_coder.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
+	driver.nameTypeCoder["IBDOUBLE"] = &parameter_coder.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
 	driver.nameTypeCoder["VARCHAR2"] = &parameter_coder.StringParameter{}
-	driver.nameTypeCoder["NVARCHAR2"] = &parameter_coder.StringParameter{BasicParameter: parameter_coder.BasicParameter{CharsetForm: 2}}
-	driver.nameTypeCoder["TIMESTAMP"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStampTZ}}
-	driver.nameTypeCoder["DATE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}}
-	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &parameter_coder.DateParameter{BasicParameter: parameter_coder.BasicParameter{DataType: types.TimeStampLTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.nameTypeCoder["NVARCHAR2"] = &parameter_coder.StringParameter{CharsetForm: 2}
+	driver.nameTypeCoder["TIMESTAMP"] = &parameter_coder.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStampTZ}
+	driver.nameTypeCoder["DATE"] = &parameter_coder.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
+	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &parameter_coder.DateParameter{DataType: types.TimeStampLTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
 	driver.nameTypeCoder["RAW"] = &parameter_coder.RawParameter{}
 	driver.nameTypeCoder["BLOB"] = &parameter_coder.BlobParameter{}
 	driver.nameTypeCoder["CLOB"] = &parameter_coder.ClobParameter{}
@@ -363,7 +363,7 @@ func AddParameterCoder(db *sql.DB, go_type reflect.Type, oracle_type uint16, cod
 // 	return nil
 // }
 
-func RegisterType(db *sql.DB, typeName, arrayTypeName string, typeObj interface{}) error {
+func RegisterType(db *sql.DB, typeName, arrayTypeName string, typeObj any) error {
 	// ping first to avoid error when calling register type after open connection
 	err := db.Ping()
 	if err != nil {
@@ -376,7 +376,7 @@ func RegisterType(db *sql.DB, typeName, arrayTypeName string, typeObj interface{
 	return errors.New("the driver used is not a go-ora driver type")
 }
 
-func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, typeObj interface{}) error {
+func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, typeObj any) error {
 	if len(owner) == 0 {
 		return errors.New("owner can't be empty")
 	}
@@ -390,7 +390,7 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 	typ := getType(typeObj)
 	if typeObj != nil {
 		switch typ.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			return errors.New("unsupported type object: Ptr")
 		case reflect.Array:
 			return errors.New("unsupported type object: Array")

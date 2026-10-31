@@ -25,7 +25,7 @@ func (param *StringParameter) Init() {
 	}
 }
 
-func (param *StringParameter) Encode(input interface{}, conn IConnection) error {
+func (param *StringParameter) Encode(input any, conn IConnection) error {
 	param.Init()
 	switch temp := input.(type) {
 	case types.String:
@@ -72,7 +72,7 @@ func (param *StringParameter) Encode(input interface{}, conn IConnection) error 
 	return nil
 }
 
-func (param *StringParameter) Decode(conn IConnection) (interface{}, error) {
+func (param *StringParameter) Decode(conn IConnection) (any, error) {
 	conv, err := conn.GetStringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return nil, err

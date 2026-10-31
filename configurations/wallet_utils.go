@@ -48,7 +48,7 @@ func fillWithRepeats(input []byte, v int) []byte {
 func convertToBigEndianUtf16(input []byte) []byte {
 	temp := utf16.Encode([]rune(string(input)))
 	output := make([]byte, 0, (len(temp)*2)+2)
-	for x := 0; x < len(temp); x++ {
+	for x := range temp {
 		tempByte := []byte{0, 0}
 		binary.BigEndian.PutUint16(tempByte, temp[x])
 		output = append(output, tempByte...)

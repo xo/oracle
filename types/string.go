@@ -14,7 +14,7 @@ type String struct {
 	UseNCharset bool
 }
 
-func (str *String) Value() (interface{}, error) {
+func (str *String) Value() (any, error) {
 	if str.bValue == nil {
 		return nil, nil
 	}
@@ -24,7 +24,7 @@ func (str *String) Value() (interface{}, error) {
 	return str.Conv.Decode(str.bValue), nil
 }
 
-func (str *String) SetValue(input interface{}) error {
+func (str *String) SetValue(input any) error {
 	if input == nil {
 		str.bValue = nil
 		return nil
@@ -76,7 +76,7 @@ func (str *String) SetValue(input interface{}) error {
 	}
 	return nil
 }
-func (str *String) Scan(input interface{}) error {
+func (str *String) Scan(input any) error {
 	return str.SetValue(input)
 }
 

@@ -39,15 +39,13 @@ func newDataPacket(initialData []byte, sessionCtx *SessionContext, tracer trace.
 	}
 
 	return &DataPacket{
-		Packet: Packet{
-			sessionCtx: sessionCtx,
-			dataOffset: 0xA,
-			length:     uint32(len(initialData)) + 0xA,
-			packetType: DATA,
-			flag:       0,
-		},
-		dataFlag: dataFlag,
-		buffer:   initialData,
+		sessionCtx: sessionCtx,
+		dataOffset: 0xA,
+		length:     uint32(len(initialData)) + 0xA,
+		packetType: DATA,
+		flag:       0,
+		dataFlag:   dataFlag,
+		buffer:     initialData,
 	}, nil
 }
 
@@ -58,15 +56,13 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, tracer
 		return nil, errors.New("not data packet")
 	}
 	pck := &DataPacket{
-		Packet: Packet{
-			sessionCtx: sessionCtx,
-			dataOffset: 0xA,
-			// length:     binary.BigEndian.Uint16(packetData),
-			packetType: PacketType(packetData[4]),
-			flag:       packetData[5],
-		},
-		dataFlag: binary.BigEndian.Uint16(packetData[8:]),
-		buffer:   packetData[10:],
+		sessionCtx: sessionCtx,
+		dataOffset: 0xA,
+		// length:     binary.BigEndian.Uint16(packetData),
+		packetType: PacketType(packetData[4]),
+		flag:       packetData[5],
+		dataFlag:   binary.BigEndian.Uint16(packetData[8:]),
+		buffer:     packetData[10:],
 	}
 	if sessionCtx.handshakeComplete && sessionCtx.Version >= 315 {
 		pck.length = binary.BigEndian.Uint32(packetData)

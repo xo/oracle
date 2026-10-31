@@ -2,7 +2,7 @@ package oson
 
 type (
 	NumberEncoder interface {
-		EncodeNumber(input interface{}) ([]byte, error)
+		EncodeNumber(input any) ([]byte, error)
 	}
 	NumberDecoder interface {
 		DecodeNumber(input []byte) (string, error)
@@ -20,9 +20,9 @@ type (
 		DecodeBinaryFloat(input []byte) (float32, error)
 	}
 	OracleType interface {
-		SetValue(v interface{}, typeId uint16) error
+		SetValue(v any, typeId uint16) error
 		SetBytes(b []byte)
-		Value(typeId uint16) (interface{}, error)
+		Value(typeId uint16) (any, error)
 		Bytes() []byte
 
 		//Encode(typeId uint16) error

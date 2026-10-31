@@ -10,10 +10,10 @@ type Raw struct {
 	Basic
 }
 
-func (raw *Raw) Value() (interface{}, error) {
+func (raw *Raw) Value() (any, error) {
 	return raw.bValue, nil
 }
-func (raw *Raw) SetValue(input interface{}) error {
+func (raw *Raw) SetValue(input any) error {
 	if input == nil {
 		raw.bValue = nil
 		return nil
@@ -33,7 +33,7 @@ func (raw *Raw) SetValue(input interface{}) error {
 	return nil
 }
 
-func (raw *Raw) Scan(input interface{}) error {
+func (raw *Raw) Scan(input any) error {
 	return raw.SetValue(input)
 }
 

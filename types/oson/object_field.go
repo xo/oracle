@@ -11,16 +11,16 @@ import (
 )
 
 type objectField struct {
-	value map[string]interface{}
+	value map[string]any
 	structField
 }
 
-func (obj *objectField) Value() (interface{}, error) {
+func (obj *objectField) Value() (any, error) {
 	//TODO implement me
 	return obj.value, nil
 }
 
-func NewobjectField(objData map[string]interface{}, header *header) (*objectField, error) {
+func NewobjectField(objData map[string]any, header *header) (*objectField, error) {
 	ret := new(objectField)
 	ret.header = header
 	var err error
@@ -52,7 +52,7 @@ func NewobjectField(objData map[string]interface{}, header *header) (*objectFiel
 					return nil, err
 				}
 			case reflect.Map:
-				if temp, ok := value.(map[string]interface{}); ok {
+				if temp, ok := value.(map[string]any); ok {
 					field, err = NewobjectField(temp, header)
 					if err != nil {
 						return nil, err

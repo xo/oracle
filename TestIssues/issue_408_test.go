@@ -75,7 +75,7 @@ end;`)
 			anzChars)
 		return err
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

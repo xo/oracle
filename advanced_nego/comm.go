@@ -180,7 +180,7 @@ func (comm *AdvancedNegoComm) readUB2Array() ([]int, error) {
 		return nil, errors.New("advanced negotiation error: reading supervisor service")
 	}
 	output := make([]int, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		output[i], err = comm.session.GetInt(2, false, true)
 		if err != nil {
 			return nil, err
@@ -194,7 +194,7 @@ func (comm *AdvancedNegoComm) writeUB2Array(input []int) {
 	comm.session.PutInt(uint64(0xDEADBEEF), 4, true, false)
 	comm.session.PutInt(3, 2, true, false)
 	comm.session.PutInt(len(input), 4, true, false)
-	for i := 0; i < len(input); i++ {
+	for i := range input {
 		comm.session.PutInt(input[i], 2, true, false)
 	}
 }

@@ -67,7 +67,7 @@ func (obj *AuthObject) read() error {
 			if err != nil {
 				return err
 			}
-			for x := 0; x < dictLen; x++ {
+			for range dictLen {
 				key, val, num, err := session.GetKeyVal()
 				if err != nil {
 					return err
@@ -369,7 +369,7 @@ func generateSpeedyKey(buffer, key []byte, turns int) []byte {
 		mac.Reset()
 		mac.Write(tempHash)
 		tempHash = mac.Sum(nil)
-		for index2 := 0; index2 < 64; index2++ {
+		for index2 := range 64 {
 			firstHash[index2] = firstHash[index2] ^ tempHash[index2]
 		}
 	}
@@ -400,7 +400,7 @@ func getKeyFromUserNameAndPassword(username string, password string) ([]byte, er
 			return nil, err
 		}
 		for x := 0; x < len(input)/8; x++ {
-			for y := 0; y < 8; y++ {
+			for y := range 8 {
 				ret[y] = uint8(int(ret[y]) ^ int(input[x*8+y]))
 			}
 			output := make([]byte, 8)
@@ -530,7 +530,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 		switch obj.VerifierType {
 		case 2361:
 			buffer := make([]byte, 16)
-			for x := 0; x < 16; x++ {
+			for x := range 16 {
 				buffer[x] = key1[x+start] ^ key2[x+start]
 			}
 			_, err := hash.Write(buffer)
@@ -540,7 +540,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 			return hash.Sum(nil), nil
 		case 6949:
 			buffer := make([]byte, 24)
-			for x := 0; x < 24; x++ {
+			for x := range 24 {
 				buffer[x] = key1[x+start] ^ key2[x+start]
 			}
 			_, err := hash.Write(buffer[:16])

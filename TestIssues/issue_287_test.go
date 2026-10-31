@@ -52,7 +52,7 @@ func TestIssue287(t *testing.T) {
 		t.Log(string(b))
 		return nil
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

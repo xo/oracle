@@ -64,10 +64,7 @@ func (d *digest) Write(p []byte) (nn int, err error) {
 	nn = len(p)
 	d.len += uint64(nn)
 	if d.nx > 0 {
-		n := len(p)
-		if n > _Chunk-d.nx {
-			n = _Chunk - d.nx
-		}
+		n := min(len(p), _Chunk-d.nx)
 		for i := 0; i < n; i++ {
 			d.x[d.nx+i] = p[i]
 		}
@@ -103,7 +100,7 @@ func (d0 *digest) Sum(in []byte) []byte {
 
 	// Length in bits.
 	len <<= 3
-	for i := uint(0); i < 8; i++ {
+	for i := range uint(8) {
 		tmp[i] = byte(len >> (8 * i))
 	}
 	d.Write(tmp[0:8])

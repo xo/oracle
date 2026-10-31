@@ -12,7 +12,7 @@ type dateField struct {
 	basicField
 }
 
-func (field *dateField) Value() (interface{}, error) {
+func (field *dateField) Value() (any, error) {
 	return field.value.Value()
 }
 

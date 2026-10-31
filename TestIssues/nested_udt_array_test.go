@@ -43,18 +43,18 @@ func TestNestedUDTArray(t *testing.T) {
 		var parent typeParent
 		parent.Id = index + 1
 		parent.Value = fmt.Sprintf("parent_%d", index+1)
-		for x := 0; x < 3; x++ {
+		for x := range 3 {
 			temp := typeChild{}
 			temp.Id = x + 1
 			temp.Name = fmt.Sprintf("child_%d", x+1)
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				temp.Data = append(temp.Data, typeChild2{Id: i + 1, Name: fmt.Sprintf("child2_%d", i+1), Date: date})
 			}
 			temp.Child = typeChild2{6, "child2_6", date}
 			parent.Data = append(parent.Data, temp)
 		}
 		parent.Child = typeChild{Id: 4, Name: "child_4"}
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			parent.Child.Data = append(parent.Child.Data, typeChild2{Id: i + 1, Name: fmt.Sprintf("child2_%d", i+1), Date: date})
 		}
 		parent.Child.Child = typeChild2{6, "child2_6", date}
@@ -347,7 +347,7 @@ end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name)
 		}
 		return nil
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

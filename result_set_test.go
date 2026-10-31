@@ -41,8 +41,8 @@ func TestColumnTypeScanTypeInlineLOB(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			col := ParameterInfo{}
-			col.DataType = c.dataType
+			col := ParameterInfo{
+				DataType: c.dataType}
 			cols := &[]ParameterInfo{col}
 			rs := ResultSet{cols: cols}
 			got := rs.ColumnTypeScanType(0)

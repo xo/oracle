@@ -18,10 +18,10 @@ type JsonCoder interface {
 }
 
 type JsonDecoder interface {
-	DecodeJson(data []byte) (interface{}, error)
+	DecodeJson(data []byte) (any, error)
 }
 type JsonEncoder interface {
-	EncodeJson(input interface{}) ([]byte, error)
+	EncodeJson(input any) ([]byte, error)
 }
 type Json struct {
 	Basic
@@ -42,7 +42,7 @@ func (js *Json) Upload() error {
 	return js.uploadData(js.bValue, 0, 0)
 }
 
-func (js *Json) SetValue(input interface{}) error {
+func (js *Json) SetValue(input any) error {
 	if input == nil {
 		js.bValue = nil
 		return nil
@@ -68,7 +68,7 @@ func (js *Json) SetValue(input interface{}) error {
 			return nil
 		}
 		if strings.HasPrefix(value, "[") {
-			var temp []interface{}
+			var temp []any
 			err = json.Unmarshal([]byte(value), &temp)
 			if err != nil {
 				return err
@@ -76,7 +76,7 @@ func (js *Json) SetValue(input interface{}) error {
 			return js.SetValue(temp)
 		}
 
-		var temp = make(map[string]interface{})
+		var temp = make(map[string]any)
 		err = json.Unmarshal([]byte(value), &temp)
 		if err != nil {
 			return err
@@ -100,11 +100,11 @@ func (js *Json) SetValue(input interface{}) error {
 	return err
 }
 
-func (js *Json) Value() (interface{}, error) {
+func (js *Json) Value() (any, error) {
 	return js.Coder.DecodeJson(js.bValue)
 }
 
-func (js *Json) Scan(input interface{}) error {
+func (js *Json) Scan(input any) error {
 	return js.SetValue(input)
 }
 
@@ -126,18 +126,18 @@ func (js *Json) CopyTo(dest driver.Value) error {
 			}
 			*dst = string(temp)
 		}
-	case *map[string]interface{}:
+	case *map[string]any:
 		if value == nil {
 			*dst = nil
 		} else {
-			*dst = value.(map[string]interface{})
+			*dst = value.(map[string]any)
 		}
 
-	case *[]interface{}:
+	case *[]any:
 		if value == nil {
 			*dst = nil
 		} else {
-			*dst = value.([]interface{})
+			*dst = value.([]any)
 		}
 	default:
 		return fmt.Errorf("cannot copy Json to variable of type %T", dest)

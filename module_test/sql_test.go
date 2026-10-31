@@ -31,11 +31,11 @@ func newDbConnection() (*sql.DB, error) {
 	return sql.Open(driver, dsn)
 }
 
-func fetchOneRow(rows *sql.Rows, colsAndTypes []*sql.ColumnType) (map[string]interface{}, error) {
+func fetchOneRow(rows *sql.Rows, colsAndTypes []*sql.ColumnType) (map[string]any, error) {
 	numCols := len(colsAndTypes)
-	vals := make([]interface{}, numCols)
-	scanVals := make([]interface{}, numCols)
-	for i := 0; i < numCols; i++ {
+	vals := make([]any, numCols)
+	scanVals := make([]any, numCols)
+	for i := range numCols {
 		scanVals[i] = &vals[i]
 	}
 	if err := rows.Scan(scanVals...); err != nil {
@@ -45,14 +45,14 @@ func fetchOneRow(rows *sql.Rows, colsAndTypes []*sql.ColumnType) (map[string]int
 		return nil, err
 	}
 
-	result := map[string]interface{}{}
+	result := map[string]any{}
 	for i, col := range colsAndTypes {
 		result[strings.ToLower(col.Name())] = vals[i]
 	}
 	return result, nil
 }
 
-func fetchAllRowsColumnLowerCased(dbrows *sql.Rows) ([]map[string]interface{}, error) {
+func fetchAllRowsColumnLowerCased(dbrows *sql.Rows) ([]map[string]any, error) {
 	defer func() { _ = dbrows.Close() }()
 
 	colTypes, err := dbrows.ColumnTypes()
@@ -60,7 +60,7 @@ func fetchAllRowsColumnLowerCased(dbrows *sql.Rows) ([]map[string]interface{}, e
 		return nil, err
 	}
 
-	result := make([]map[string]interface{}, 0)
+	result := make([]map[string]any, 0)
 	for dbrows.Next() {
 		rowData, err := fetchOneRow(dbrows, colTypes)
 		if err != nil {
@@ -71,7 +71,7 @@ func fetchAllRowsColumnLowerCased(dbrows *sql.Rows) ([]map[string]interface{}, e
 	return result, dbrows.Err()
 }
 
-func toIntIfInteger(v interface{}) (int64, error) {
+func toIntIfInteger(v any) (int64, error) {
 	if v == nil {
 		return 0, errors.New("input is nil")
 	}
@@ -87,7 +87,7 @@ func toIntIfInteger(v interface{}) (int64, error) {
 	}
 }
 
-func toFloatIfReal(v interface{}) (float64, error) {
+func toFloatIfReal(v any) (float64, error) {
 	if v == nil {
 		return 0, errors.New("input is nil")
 	}
@@ -101,7 +101,7 @@ func toFloatIfReal(v interface{}) (float64, error) {
 	}
 }
 
-func toFloatIfNumber(v interface{}) (float64, error) {
+func toFloatIfNumber(v any) (float64, error) {
 	if v == nil {
 		return 0, errors.New("input is nil")
 	}

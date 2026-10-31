@@ -12,7 +12,7 @@ func TestOson(t *testing.T) {
 	"name": "this is a test",
 	"time": "2026-05-21T10:59:59"
     }`
-	var obj map[string]interface{}
+	var obj map[string]any
 	err = json.Unmarshal([]byte(input), &obj)
 	if err != nil {
 		t.Error(err)

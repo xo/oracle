@@ -48,7 +48,7 @@ END GOORA_TEMP_PKG;`,
 	defer func() {
 		delete(urlOptions, "charset")
 	}()
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

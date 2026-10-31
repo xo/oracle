@@ -19,7 +19,7 @@ package TestIssues
 //		return execCmd(db, `DROP TABLE TTB_544 PURGE`)
 //	}
 //
-//	db, err := getDB()
+//	db, err := getDB(t)
 //	if err != nil {
 //		t.Error(err)
 //		return

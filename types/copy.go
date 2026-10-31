@@ -2,9 +2,9 @@ package types
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -66,8 +66,31 @@ func defaultCopy(dest reflect.Value, src any) error {
 		dest.Set(reflect.ValueOf(src))
 		return nil
 	}
-	if dest.CanConvert(reflect.TypeOf(src)) {
-		dest.Set(reflect.ValueOf(src))
+	v := reflect.ValueOf(src)
+	if dest.Kind() == reflect.String {
+		// reflect converts an integer to a string as a rune, so format
+		// numbers and bools as database/sql does in convertAssign.
+		switch v.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			dest.SetString(strconv.FormatInt(v.Int(), 10))
+			return nil
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			dest.SetString(strconv.FormatUint(v.Uint(), 10))
+			return nil
+		case reflect.Float32, reflect.Float64:
+			dest.SetString(strconv.FormatFloat(v.Float(), 'g', -1, v.Type().Bits()))
+			return nil
+		case reflect.Bool:
+			dest.SetString(strconv.FormatBool(v.Bool()))
+			return nil
+		}
+	}
+	if v.Type().AssignableTo(dest.Type()) {
+		dest.Set(v)
+		return nil
+	}
+	if v.CanConvert(dest.Type()) {
+		dest.Set(v.Convert(dest.Type()))
 		return nil
 	}
 
@@ -76,7 +99,7 @@ func defaultCopy(dest reflect.Value, src any) error {
 }
 
 func RCopy(dest reflect.Value, src any) (err error) {
-	if dest.Kind() == reflect.Ptr {
+	if dest.Kind() == reflect.Pointer {
 		if dest.IsNil() {
 			dest.Set(reflect.New(dest.Type().Elem()))
 		}
@@ -97,7 +120,7 @@ func RCopy(dest reflect.Value, src any) (err error) {
 		err = copyTime(dest, src)
 	case []byte:
 		err = copyBytes(dest, src)
-	case []interface{}:
+	case []any:
 		err = copyArray(dest, src)
 	default:
 		err = defaultCopy(dest, src)
@@ -211,30 +234,6 @@ func Copy(dest, src any) error {
 	//	//}
 	//}
 	//return err
-}
-
-func createNewType(dstValue reflect.Value, dstType reflect.Type) error {
-	// special types
-	if dstType == reflect.TypeOf((*Blob)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&Blob{}))
-		return nil
-	}
-	if dstType == reflect.TypeOf((*Clob)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&Clob{}))
-		return nil
-	}
-	if dstType == reflect.TypeOf((*Vector)(nil)).Elem() {
-		dstValue.Set(reflect.ValueOf(&Vector{}))
-		return nil
-	}
-	if dstType.Kind() != reflect.Ptr {
-		return errors.New("dst must be a pointer")
-	}
-	// bfile also here
-
-	// return default null type
-	dstValue.Set(reflect.New(dstType.Elem()))
-	return nil
 }
 
 //func addSomeData(dst any) {

@@ -14,7 +14,7 @@ type numberField struct {
 	basicField
 }
 
-func (field *numberField) Value() (interface{}, error) {
+func (field *numberField) Value() (any, error) {
 	strNum, err := field.value.String()
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ type binaryDoubleField struct {
 	basicField
 }
 
-func (field *binaryDoubleField) Value() (interface{}, error) {
+func (field *binaryDoubleField) Value() (any, error) {
 	field.value.SetDataType(types.IBDOUBLE)
 	return field.value.Value()
 }
@@ -127,7 +127,7 @@ type binaryFloatField struct {
 	basicField
 }
 
-func (field *binaryFloatField) Value() (interface{}, error) {
+func (field *binaryFloatField) Value() (any, error) {
 	field.value.SetDataType(types.IBFLOAT)
 	return field.value.Value()
 }

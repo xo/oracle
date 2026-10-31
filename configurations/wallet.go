@@ -126,7 +126,7 @@ func (w *Wallet) readFromBytes(fileData []byte) error {
 			mac := hmac.New(sha1.New, key)
 			mac.Write(w.password)
 			tempPassword := mac.Sum(nil)
-			for x := 0; x < len(tempPassword); x++ {
+			for x := range tempPassword {
 				tempPassword[x] = (tempPassword[x]+128)%128%127 + 1
 			}
 			w.password = tempPassword[:16]
@@ -477,14 +477,12 @@ func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 			return
 		}
 		algo = &pbkdf2{
-			defaultAlgorithm: defaultAlgorithm{
-				password:  w.password,
-				salt:      kdfParams.Salt.Bytes,
-				iv:        params.EncryptionScheme.Parameters.Bytes,
-				iteration: kdfParams.Iterations,
-			},
-			hash:   h,
-			keyLen: keyLen,
+			password:  w.password,
+			salt:      kdfParams.Salt.Bytes,
+			iv:        params.EncryptionScheme.Parameters.Bytes,
+			iteration: kdfParams.Iterations,
+			hash:      h,
+			keyLen:    keyLen,
 		}
 	default:
 		err = fmt.Errorf("algorithm %s is not supported", algorithm)

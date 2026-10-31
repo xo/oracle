@@ -20,7 +20,7 @@ func (param *BoolParameter) Init() {
 	param.DataType = types.BOOLEAN
 }
 
-func (param *BoolParameter) Encode(input interface{}, _ IConnection) error {
+func (param *BoolParameter) Encode(input any, _ IConnection) error {
 	param.Init()
 	encoder := &types.Bool{}
 	encoder.SetDataType(param.DataType)
@@ -38,7 +38,7 @@ func (param *BoolParameter) Encode(input interface{}, _ IConnection) error {
 	return nil
 }
 
-func (param *BoolParameter) Decode(_ IConnection) (interface{}, error) {
+func (param *BoolParameter) Decode(_ IConnection) (any, error) {
 	decoder := &types.Bool{}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)

@@ -15,13 +15,11 @@ type authService struct {
 
 func newAuthService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (*authService, error) {
 	output := &authService{
-		defaultService: defaultService{
-			ano:         ano,
-			serviceType: 1,
-			level:       -1,
-			version:     version,
-		},
-		status: 0xFCFF,
+		ano:         ano,
+		serviceType: 1,
+		level:       -1,
+		version:     version,
+		status:      0xFCFF,
 	}
 	// var avaAuth []string
 	output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}

@@ -38,27 +38,25 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 
 	return &RefusePacket{
-		Packet: Packet{
-			dataOffset: 12,
-			length:     uint32(binary.BigEndian.Uint16(packetData)),
-			packetType: PacketType(packetData[4]),
-			flag:       0,
-		},
+		dataOffset:   12,
+		length:       uint32(binary.BigEndian.Uint16(packetData)),
+		packetType:   PacketType(packetData[4]),
+		flag:         0,
 		SystemReason: packetData[9],
 		UserReason:   packetData[8],
 		message:      message,
 	}
 }
 
-var errExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+var errExtractRegexp = go_ora.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
 })
 
-var errorExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+var errorExtractRegexp = go_ora.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
 })
 
-var codeExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+var codeExtractRegexp = go_ora.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`CODE\s*=\s*([0-9]+)`)
 })
 
@@ -69,7 +67,7 @@ func (pck *RefusePacket) extractErrCode() {
 		return
 	}
 
-	var errExtractRegexpAny interface{}
+	var errExtractRegexpAny any
 	errExtractRegexpAny, err = errExtractRegexp.GetValue()
 	if err != nil {
 		return
@@ -88,7 +86,7 @@ func (pck *RefusePacket) extractErrCode() {
 		return
 	}
 
-	var errorExtractRegexpAny interface{}
+	var errorExtractRegexpAny any
 	errorExtractRegexpAny, err = errorExtractRegexp.GetValue()
 	if err != nil {
 		return
@@ -100,7 +98,7 @@ func (pck *RefusePacket) extractErrCode() {
 	}
 	codeStr := matches[1]
 
-	var codeExtractRegexpAny interface{}
+	var codeExtractRegexpAny any
 	codeExtractRegexpAny, err = codeExtractRegexp.GetValue()
 	if err != nil {
 		return

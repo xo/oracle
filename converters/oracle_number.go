@@ -215,11 +215,7 @@ func toInt64(data []byte) (int64, error) {
 	} else {
 		b2 = len(data) - 2
 	}
-	if b2 > b1+1 {
-		b3 = b1 + 1
-	} else {
-		b3 = b2
-	}
+	b3 = min(b2, b1+1)
 	var l int64
 	if positive {
 		for i := 0; i < b3; i++ {
@@ -255,11 +251,7 @@ func toUInt64(data []byte) (uint64, error) {
 	} else {
 		b2 = len(data) - 2
 	}
-	if b2 > b1+1 {
-		b3 = b1 + 1
-	} else {
-		b3 = b2
-	}
+	b3 = min(b2, b1+1)
 	var l uint64
 	for i := 0; i < b3; i++ {
 		l = l*100 + (uint64(data[i+1]) - 1)

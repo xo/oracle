@@ -53,17 +53,17 @@ func createNTSNegoPacket(domain, machine string) ([]byte, error) {
 	ret = append(ret, negoData...)
 	temp := make([]byte, 2)
 	binary.BigEndian.PutUint16(temp, uint16(len(ret)))
-	for x := 0; x < 2; x++ {
+	for x := range 2 {
 		ret[x+4] = temp[x]
 	}
 	temp2 := make([]byte, 4)
 	ntsDataLen := len(ret) - sspiOffset
 	binary.LittleEndian.PutUint32(temp2, uint32(ntsDataLen))
 	binary.BigEndian.PutUint16(temp, uint16(ntsDataLen))
-	for x := 0; x < 4; x++ {
+	for x := range 4 {
 		ret[sspiOffset-8+x] = temp2[x]
 	}
-	for x := 0; x < 2; x++ {
+	for x := range 2 {
 		ret[sspiOffset-4+x] = temp[x]
 	}
 	return ret, nil
@@ -87,17 +87,17 @@ func createNTSAuthPacket(chaMsgData []byte, user, password string) ([]byte, erro
 	ret = append(ret, authData...)
 	temp := make([]byte, 2)
 	binary.BigEndian.PutUint16(temp, uint16(len(ret)))
-	for x := 0; x < 2; x++ {
+	for x := range 2 {
 		ret[x+4] = temp[x]
 	}
 	temp2 := make([]byte, 4)
 	ntsDataLen := len(ret) - sspiOffset
 	binary.LittleEndian.PutUint32(temp2, uint32(ntsDataLen))
 	binary.BigEndian.PutUint16(temp, uint16(ntsDataLen))
-	for x := 0; x < 4; x++ {
+	for x := range 4 {
 		ret[sspiOffset-8+x] = temp2[x]
 	}
-	for x := 0; x < 2; x++ {
+	for x := range 2 {
 		ret[sspiOffset-4+x] = temp[x]
 	}
 	return ret, nil

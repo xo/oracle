@@ -4,23 +4,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"net/url"
 	"os"
 	"reflect"
-	"strconv"
+	"testing"
 	"time"
 )
 
-// var db *sql.DB
-var server = os.Getenv("SERVER")
-var port int
-var service = os.Getenv("SERVICE")
-var username = os.Getenv("USER")
-var password = os.Getenv("PASSWORD")
-var urlOptions = map[string]string{
-	"TRACE FILE": "trace.log",
-	"lob fetch":  "pre",
-}
+// urlOptions holds the keys that a test adds to the query of ORACLE_DSN.
+var urlOptions = map[string]string{}
 
 type Execuer interface {
 	Exec(query string, args ...any) (sql.Result, error)
@@ -43,28 +35,25 @@ func dropMainTable(db *sql.DB) error {
 	return execCmd(db, "drop table TTB_MAIN purge")
 }
 
-func getDB() (*sql.DB, error) {
-	url := go_ora.BuildUrl(server, port, service, username, password, urlOptions)
-	return sql.Open("oracle", url)
-}
-
-func init() {
-	temp := os.Getenv("PORT")
-	tempInt, err := strconv.ParseInt(temp, 10, 32)
+// getDB opens the database that ORACLE_DSN names, with the keys of
+// urlOptions added to its query. It skips the test when ORACLE_DSN is empty.
+// dbrun prints the DSN of each release. See docs/DESIGN.md, under Testing.
+func getDB(t testing.TB) (*sql.DB, error) {
+	t.Helper()
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn == "" {
+		t.Skip("ORACLE_DSN is empty")
+	}
+	u, err := url.Parse(dsn)
 	if err != nil {
-		port = 1521
-	} else {
-		port = int(tempInt)
+		return nil, fmt.Errorf("parsing ORACLE_DSN: %w", err)
 	}
-	ssl_value := os.Getenv("SSL")
-	wallet := os.Getenv("WALLET")
-	if ssl_value == "TRUE" {
-		urlOptions["SSL"] = "true"
-		urlOptions["SSL VERIFY"] = "false"
-		urlOptions["wallet"] = wallet
+	q := u.Query()
+	for k, v := range urlOptions {
+		q.Set(k, v)
 	}
-	urlOptions["DATA INTEGRITY"] = "required"
-	urlOptions["ENCRYPTION"] = "required"
+	u.RawQuery = q.Encode()
+	return sql.Open("oracle", u.String())
 }
 
 func execCmd(db *sql.DB, stmts ...string) error {
@@ -95,7 +84,7 @@ func isEqualTime(t1, t2 time.Time, compareNano bool) bool {
 
 func queryStruct(row *sql.Row, s any) error {
 	sValue := reflect.ValueOf(s)
-	if sValue.Kind() != reflect.Ptr {
+	if sValue.Kind() != reflect.Pointer {
 		return errors.New("you should pass pointer")
 	}
 	if sValue.IsNil() {
@@ -107,7 +96,7 @@ func queryStruct(row *sql.Row, s any) error {
 	sValue = sValue.Elem()
 	fieldCount := sValue.NumField()
 	scanValue := make([]any, fieldCount)
-	for x := 0; x < fieldCount; x++ {
+	for x := range fieldCount {
 		fieldValue := sValue.Field(x)
 		scanValue[x] = fieldValue.Addr().Interface()
 	}

@@ -40,7 +40,7 @@ func CreateBFile(db *sql.DB, dirName, fileName string) (*BFile, error) {
 func (file *BFile) GetMaxLen() int64 {
 	return MaxLenBFile
 }
-func (file *BFile) SetValue(input interface{}) error {
+func (file *BFile) SetValue(input any) error {
 	if input == nil {
 		file.bValue = nil
 		return nil
@@ -135,11 +135,11 @@ func (file *BFile) SetStreamer(input LobStreamer) {
 		_ = file.SetValue(filePath)
 	}
 }
-func (file *BFile) Value() (interface{}, error) {
+func (file *BFile) Value() (any, error) {
 	return file.bValue, nil
 }
 
-func (file *BFile) Scan(input interface{}) error {
+func (file *BFile) Scan(input any) error {
 	return file.SetValue(input)
 }
 

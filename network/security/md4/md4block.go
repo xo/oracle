@@ -30,7 +30,7 @@ func _Block(dig *digest, p []byte) int {
 		aa, bb, cc, dd := a, b, c, d
 
 		j := 0
-		for i := 0; i < 16; i++ {
+		for i := range 16 {
 			X[i] = uint32(p[j]) | uint32(p[j+1])<<8 | uint32(p[j+2])<<16 | uint32(p[j+3])<<24
 			j += 4
 		}
@@ -47,7 +47,7 @@ func _Block(dig *digest, p []byte) int {
 		// of two can be optimized easily by a compiler.
 
 		// Round 1.
-		for i := uint(0); i < 16; i++ {
+		for i := range uint(16) {
 			x := i
 			s := shift1[i%4]
 			f := ((c ^ d) & b) ^ d
@@ -57,7 +57,7 @@ func _Block(dig *digest, p []byte) int {
 		}
 
 		// Round 2.
-		for i := uint(0); i < 16; i++ {
+		for i := range uint(16) {
 			x := xIndex2[i]
 			s := shift2[i%4]
 			g := (b & c) | (b & d) | (c & d)
@@ -67,7 +67,7 @@ func _Block(dig *digest, p []byte) int {
 		}
 
 		// Round 3.
-		for i := uint(0); i < 16; i++ {
+		for i := range uint(16) {
 			x := xIndex3[i]
 			s := shift3[i%4]
 			h := b ^ c ^ d

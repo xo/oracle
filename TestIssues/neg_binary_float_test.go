@@ -55,7 +55,7 @@ func TestNegBinaryFloat(t *testing.T) {
 		}
 		return rows.Err()
 	}
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

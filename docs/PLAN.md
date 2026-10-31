@@ -21,7 +21,7 @@ conclusion.
 | [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Proposed |
 | [D11](#d11-the-dsn-is-an-oracle-url-with-lower-case-keys) | Decided |
 | [D12](#d12-the-protocol-code-moves-to-internal) | Proposed |
-| [D13](#d13-the-module-requires-go-1271) | Proposed |
+| [D13](#d13-the-module-requires-go-1271) | Decided |
 | [D14](#d14-the-driver-logs-only-to-a-logger-that-the-caller-passes) | Decided |
 | [D15](#d15-unit-tests-play-back-recorded-tns-exchanges) | Proposed |
 | [D16](#d16-a-decimal-is-an-apddecimal) | Decided. Amends hard rule 2 of AGENTS.md |
@@ -172,11 +172,12 @@ and the value types that a caller passes or scans stay public.
 
 ## D13. The module requires Go 1.27.1
 
-Status: Proposed. Amends the `go 1.24` line of `go.mod`.
+Status: Decided. Amends the `go 1.24` line of `go.mod`.
 
 `go.mod` says `go 1.27.1`, as in dbimp D2, and the code uses the idioms that
 `DESIGN.md` lists. The earlier size analysis asked for Go 1.26. Go 1.27.1 is
-newer, and every other `xo` driver requires it.
+newer, and every other `xo` driver requires it. Ken asked for the idioms of Go
+1.27, and step 1 of `DESIGN.md` made the change on 2026-10-31.
 
 ## D14. The driver logs only to a logger that the caller passes
 

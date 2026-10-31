@@ -42,7 +42,7 @@ END GOORA_TEMP;`,
 	var callProc = func(db *sql.DB, strings_in []string) error {
 		var string_out string
 		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC(:1, :2); END;`, strings_in,
-			go_ora.Out{&string_out, 256, false})
+			go_ora.Out{Dest: &string_out, Size: 256})
 		if err != nil {
 			return err
 		}
@@ -56,7 +56,7 @@ END GOORA_TEMP;`,
 	defer func() {
 		delete(urlOptions, "charset")
 	}()
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

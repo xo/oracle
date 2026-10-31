@@ -87,7 +87,7 @@ func TestDataType_Int(t *testing.T) {
 			dataInt8:      vInt - 2,
 		}
 		rowArr = append(rowArr, row)
-		params := []interface{}{
+		params := []any{
 			row.id,
 			row.dataInt, row.dataInteger, row.dataDecimal, row.dataNumber, row.dataNumeric,
 			row.dataTinyInt, row.dataSmallInt, row.dataMediumInt, row.dataBigInt,

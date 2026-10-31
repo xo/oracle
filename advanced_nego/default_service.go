@@ -158,7 +158,7 @@ func (serv *defaultService) buildServiceList(userList []string, useLevel, useDef
 		}
 	}
 	userListLength := len(userList)
-	for i := 0; i < userListLength; i++ {
+	for i := range userListLength {
 		userList[i] = strings.TrimSpace(userList[i])
 	}
 	if userListLength > 0 && userList[userListLength-1] == "" {

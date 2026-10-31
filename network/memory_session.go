@@ -11,9 +11,7 @@ type MemorySession struct {
 
 func NewMemorySession(inputBuffer, outputBuffer []byte, sessionProp SessionProperties) *MemorySession {
 	ret := &MemorySession{
-		basicSession: basicSession{
-			SessionProperties: sessionProp,
-		},
+		SessionProperties: sessionProp,
 	}
 	ret.terminal = ret
 	ret.inBuffer = bytes.NewBuffer(inputBuffer)

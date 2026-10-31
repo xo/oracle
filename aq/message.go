@@ -69,7 +69,7 @@ type Message struct {
 	EnqTime        time.Time
 
 	propModified bool
-	Payload      interface{}
+	Payload      any
 	bValue       []byte
 	shareNum     int
 

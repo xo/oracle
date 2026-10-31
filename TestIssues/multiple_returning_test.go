@@ -42,7 +42,7 @@ VALUES(:ID, :NAME, :TEAM, :LDATE) RETURNING NAME, TEAM_NAME INTO :RET1, :RET2`, 
 		return nil
 	}
 
-	db, err := getDB()
+	db, err := getDB(t)
 	if err != nil {
 		t.Error(err)
 		return

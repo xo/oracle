@@ -317,7 +317,7 @@ func NewBinaryFloat(number float32) *Number {
 	_ = ret.encodeFloat32(number)
 	return ret
 }
-func NewNumber(n interface{}) (*Number, error) {
+func NewNumber(n any) (*Number, error) {
 	var err error
 	ret := new(Number)
 	ret.SetDataType(NUMBER)
@@ -459,7 +459,7 @@ func (number *Number) decodeFloat() (float32, error) {
 	return math.Float32frombits(binary.BigEndian.Uint32(number.bValue)), nil
 }
 
-func (number *Number) Value() (interface{}, error) {
+func (number *Number) Value() (any, error) {
 	if len(number.bValue) == 0 {
 		return nil, nil
 	}
@@ -579,7 +579,7 @@ func (number *Number) encodeString(input string) error {
 	number.bValue, err = number.encode(mantissa, exp, negative)
 	return err
 }
-func (number *Number) SetValue(input interface{}) error {
+func (number *Number) SetValue(input any) error {
 	var err error
 	defer func(input *Number) {
 		if input.dataType == 0 {
@@ -603,7 +603,7 @@ func (number *Number) SetValue(input interface{}) error {
 		}
 		return nil
 	}
-	var tempValue interface{}
+	var tempValue any
 	//if utils.IsSigned(rType) {
 	//
 	//	//return number.encodeInt()
@@ -802,7 +802,7 @@ func (number *Number) SetValue(input interface{}) error {
 	//return nil
 }
 
-func (number *Number) Scan(value interface{}) error {
+func (number *Number) Scan(value any) error {
 	number.SetDataType(NUMBER)
 	return number.SetValue(value)
 	//temp, err := NewNumber(value)
@@ -817,9 +817,9 @@ func (number *Number) Scan(value interface{}) error {
 	//return nil
 }
 
-func (number *Number) CopyTo(dest interface{}) error {
+func (number *Number) CopyTo(dest any) error {
 	destValue := reflect.ValueOf(dest)
-	if destValue.Kind() != reflect.Ptr {
+	if destValue.Kind() != reflect.Pointer {
 		return errors.New("dest must be a pointer")
 	}
 
