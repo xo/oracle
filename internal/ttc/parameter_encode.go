@@ -6,7 +6,7 @@ import (
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 func (par *ParameterInfo) init() {
@@ -29,7 +29,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		return err
 	}
 
-	if value, ok := tempValue.(oraTypes.Object); ok {
+	if value, ok := tempValue.(types.Object); ok {
 		par.encoder, err = connection.ParameterCoder(value.Name)
 		if err != nil {
 			return err
@@ -69,7 +69,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 					}
 					tempCoder.Init()
 					// if item is of type xml so search for slice of item in the registered parameter coders
-					if tempCoder.ParameterInfo().DataType == oraTypes.XMLType {
+					if tempCoder.ParameterInfo().DataType == types.XMLType {
 						par.encoder, err = connection.ParameterCoder(reflect.SliceOf(itemType))
 					} else {
 						// if max length > 1 (mean it is set with size) so transfer size to array size
@@ -95,7 +95,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	if par.MaxLen < size {
 		par.MaxLen = size
 	}
-	if par.Direction != Input && par.DataType == oraTypes.NCHAR {
+	if par.Direction != Input && par.DataType == types.NCHAR {
 		// the size of an OUT string is in characters, and the server sizes
 		// its buffer from the length in bytes divided by the bytes of a
 		// character, so the length must be that many bytes for each
@@ -118,13 +118,13 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		par.MaxLen = par.MaxCharLen * perChar
 	}
 
-	if par.DataType == oraTypes.OCIFileLocator {
+	if par.DataType == types.OCIFileLocator {
 		par.MaxLen = int64(size)
 		if par.MaxLen == 0 {
-			par.MaxLen = oraTypes.MaxLenBFile
+			par.MaxLen = types.MaxLenBFile
 		}
 	}
-	if par.Direction == Output && !(par.DataType == oraTypes.XMLType) {
+	if par.Direction == Output && !(par.DataType == types.XMLType) {
 		par.BValue = nil
 	}
 	return nil

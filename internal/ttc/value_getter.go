@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // ======== get primitive data from original data types ========//
@@ -18,7 +18,7 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 	if origVal == nil {
 		return nil, nil
 	}
-	if v, ok := oraTypes.OwnNull(origVal); ok {
+	if v, ok := types.OwnNull(origVal); ok {
 		return v, nil
 	}
 	rOriginal := reflect.ValueOf(origVal)
@@ -43,13 +43,13 @@ func getType(value driver.Value) reflect.Type {
 
 func getString(col any) string {
 	switch val := col.(type) {
-	case oraTypes.Clob:
+	case types.Clob:
 		temp, _ := val.Value()
 		if temp == nil {
 			return ""
 		}
 		return temp.(string)
-	case *oraTypes.Clob:
+	case *types.Clob:
 		temp, _ := val.Value()
 		if temp == nil {
 			return ""
@@ -116,7 +116,7 @@ func getDate(col any) (time.Time, error) {
 	switch val := col.(type) {
 	case time.Time:
 		return val, nil
-	case oraTypes.TimestampTZ:
+	case types.TimestampTZ:
 		return time.Time(val), nil
 	case string:
 		return time.Parse(time.RFC3339, val)
@@ -129,7 +129,7 @@ func getDate(col any) (time.Time, error) {
 func getBytes(col any) ([]byte, error) {
 	var err error
 	switch val := col.(type) {
-	case oraTypes.Blob:
+	case types.Blob:
 		var temp any
 		temp, err = val.Value()
 		if err != nil {
@@ -139,7 +139,7 @@ func getBytes(col any) ([]byte, error) {
 			return nil, nil
 		}
 		return temp.([]byte), nil
-	case *oraTypes.Blob:
+	case *types.Blob:
 		var temp any
 		temp, err = val.Value()
 		if err != nil {
@@ -162,7 +162,7 @@ func getBytes(col any) ([]byte, error) {
 		return val, nil
 	case string:
 		return []byte(val), nil
-	case oraTypes.Blob:
+	case types.Blob:
 		var temp any
 		temp, err = val.Value()
 		if err != nil {
@@ -202,9 +202,9 @@ func namedBasic(v any) bool {
 // database/sql must not convert first.
 func ownValue(v any) bool {
 	switch v.(type) {
-	case oraTypes.TimestampTZ, *oraTypes.TimestampTZ:
+	case types.TimestampTZ, *types.TimestampTZ:
 		return true
 	}
-	_, ok := oraTypes.OwnNull(v)
+	_, ok := types.OwnNull(v)
 	return ok
 }

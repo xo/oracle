@@ -1,7 +1,7 @@
 # Driver design
 
-This document is the target design for the rewritten driver. It is a proposal
-until Ken accepts it, and D8 to D16 in [PLAN.md](PLAN.md) record it. The design
+This document is the design of the rewritten driver. Ken accepted it on
+2026-10-31, and D8 to D16 in [PLAN.md](PLAN.md) record it. The design
 follows the drivers of [`xo/dbimp`](https://github.com/xo/dbimp) and
 [`xo/cassandra`](https://github.com/xo/cassandra), so that an `xo` driver looks
 the same whatever database it reaches. Where this document cites a decision of
@@ -331,7 +331,7 @@ its type for an object. `go-ora` gave none. `TestColumnType` holds it.
 | `INTERVAL YEAR TO MONTH` | `IntervalYM` | `string` |
 | `INTERVAL DAY TO SECOND` | `time.Duration` | `string` |
 | `RAW`, `LONG RAW`, `BLOB` | `[]byte` | `Blob` |
-| `BOOLEAN` | `bool` | |
+| `BOOLEAN` | `bool` | `sql.Null[bool]` |
 | `JSON` | `JSON`, which holds the document | `string`, any type that `encoding/json/v2` decodes |
 | `VECTOR` | `Vector` | the slices of each element type |
 | `ROWID`, `UROWID` | `string` | `RowID` |
@@ -349,6 +349,17 @@ which a `TIMESTAMP` bind would convert, and a `TIMESTAMP` that goes into a
 `DATE` column loses its fraction, as Oracle truncates it. The zone of a
 `time.Time` is dropped, and the server reads its wall clock in the zone of
 the session. `TimestampTZ` binds with its zone.
+
+A `bool` binds as a `BOOLEAN` on 23ai and later, and as the `NUMBER` 1 or 0
+before, whose SQL has no `BOOLEAN`. `go-ora` bound no `bool`.
+
+A string longer than the longest `VARCHAR2` binds as a `LONG`. 11g converts
+one to the UTF-16 of a `CLOB` one packet at a time, and stored U+FFFD for a
+character that the end of a packet split. So on 11g a string that long with a
+character outside ASCII binds as a temporary `CLOB`, which a `CLOB` column
+stores whole and a `LONG` column refuses with ORA-22835. A bind in the
+national charset fixed the `CLOB` too, and garbled a `LONG` on 11g.
+`TestStrings` and `TestLongColumn` hold it.
 
 The type of a column decides the Go type, and the value never does, so every
 row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,
@@ -513,6 +524,13 @@ sets it from `dbrun dsn --json` for every release (D7). `upstream_test.go` in
 the root package holds a test for each upstream fault that step 9 fixed,
 named for its fault, and its doc comment names the issue. `integration`, which
 was `TestIssues`, holds the integration tests of `go-ora`.
+
+In step 9 the root package and `integration` passed on 11g, 18c, 21c, 23ai,
+26ai, and the two Autonomous Database releases, `oracle-adb-19c` and
+`oracle-adb-26ai`. 19c is left out (D17), because its first start takes
+longer than the work can wait. `dbrun dsn` prints the URL of an Autonomous
+Database with the TLS options of `go-ora`, `ssl=true&ssl+verify=false`, which
+this parser refuses. A test gives it `sslmode=require` in their place.
 
 ## Idiomatic names and structure
 

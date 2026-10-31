@@ -12,7 +12,7 @@ import (
 	"github.com/cockroachdb/apd/v3"
 
 	"github.com/xo/oracle/internal/tns"
-	types "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 type Row []driver.Value

@@ -13,7 +13,7 @@ import (
 
 	"github.com/cockroachdb/apd/v3"
 
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // numberValue returns the Go value of a NUMBER column, from the text that the
@@ -50,9 +50,9 @@ func numberValue(precision, scale uint8, v any) (any, error) {
 // decoder returns.
 func columnValue(col *ParameterInfo, v any) (any, error) {
 	switch col.DataType {
-	case oraTypes.NUMBER:
+	case types.NUMBER:
 		return numberValue(col.Precision, col.Scale, v)
-	case oraTypes.IBFLOAT:
+	case types.IBFLOAT:
 		if f, ok := v.(float32); ok {
 			// through the shortest text, so that 1.5 stays 1.5 and does not
 			// become 1.5000000xxx
@@ -127,7 +127,7 @@ func assignJSON(dest any, v jsontext.Value) error {
 		*d = string(v)
 	case *[]byte:
 		*d = bytes.Clone(v)
-	case *oraTypes.JSON:
+	case *types.JSON:
 		return d.SetValue(v)
 	case sql.Scanner:
 		return d.Scan(string(v))

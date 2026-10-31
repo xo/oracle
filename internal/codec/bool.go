@@ -20,8 +20,11 @@ func (param *BoolParameter) Init() {
 	param.DataType = types.BOOLEAN
 }
 
-func (param *BoolParameter) Encode(input any, _ Conn) error {
+func (param *BoolParameter) Encode(input any, conn Conn) error {
 	param.Init()
+	if conn != nil && conn.ServerRelease() < 23 {
+		return param.encodeNumber(input, conn)
+	}
 	encoder := &types.Bool{}
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
@@ -35,6 +38,32 @@ func (param *BoolParameter) Encode(input any, _ Conn) error {
 		param.MaxLen = encoder.MaxLen()
 	}
 	param.BValue = encoder.Bytes()
+	return nil
+}
+
+// encodeNumber encodes input as the NUMBER 1 or 0, for a server before 23ai,
+// whose SQL has no BOOLEAN.
+func (param *BoolParameter) encodeNumber(input any, conn Conn) error {
+	var b types.Bool
+	if err := b.SetValue(input); err != nil {
+		return err
+	}
+	v, err := b.Value()
+	if err != nil {
+		return err
+	}
+	var n any
+	switch v {
+	case true:
+		n = int64(1)
+	case false:
+		n = int64(0)
+	}
+	num := &NumberParameter{}
+	if err := num.Encode(n, conn); err != nil {
+		return err
+	}
+	param.BasicParameter = num.BasicParameter
 	return nil
 }
 

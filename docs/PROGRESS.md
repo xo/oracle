@@ -75,10 +75,17 @@ failed and hung on 11g, #695, #624 and #692, whose cookies are now per
 The third part of step 9 is done (`cda6693`). It fixes #769, sends the trace
 to `Config.Logger` (D14), and sweeps the dead code and the documents.
 
-The fourth part of step 9 is staged. `ColumnTypeDatabaseTypeName` gives the
-names of the data dictionary, a `time.Time` with a fraction of a second binds
-as a `TIMESTAMP`, and `Config.NTS` replaces `SetNTSAuth`, the last state of
-the process. Three integration tests that need 12c skip on 11g. The root
-package and `integration` pass on 11g and 26ai, with no failure. Left in
-`UPSTREAM.md`: #771, which needs an Autonomous Database, and #729, which is a
-feature. The pull requests wait for Ken.
+The fourth part of step 9 is done (`9d4ea66`). `ColumnTypeDatabaseTypeName`
+gives the names of the data dictionary, a `time.Time` with a fraction of a
+second binds as a `TIMESTAMP`, and `Config.NTS` replaces `SetNTSAuth`.
+
+The fifth part of step 9 is staged. The driver reads XMLType, which `v3`
+never did, and tests the bits of its flag word, which fixes #771 on
+Autonomous Database (D18). On 11g a long string with characters outside
+ASCII binds as a temporary CLOB, which a CLOB column stores whole, and a
+`bool` binds. `values_test.go` holds the tests of `go-ora` that step 1
+deleted, for strings, LOBs, BOOLEAN and VECTOR. Ken accepted D8 to D15 and
+decided D17 to D21. `dbrun` added `oracle-adb-19c` and `oracle-adb-26ai`, and
+the root package and `integration` pass on 11g, 18c, 21c, 23ai, 26ai and
+both of them. 19c is left out (D17). Left in `UPSTREAM.md`: #729, which Ken
+asked to reproduce, and the work of D18 to D21 in `BACKLOG.md`.

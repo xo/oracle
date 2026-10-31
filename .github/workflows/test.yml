@@ -92,11 +92,13 @@ jobs:
           mkdir -p "${{ runner.temp }}/bin"
           go build -o "${{ runner.temp }}/bin/dbrun" ./cmd/dbrun
 
-      # Every tier, because every release that dbmeta names is tested here.
+      # Every release that dbmeta names, except 19c, whose image is not
+      # public (D17), and the Autonomous Database releases, which dbmeta
+      # verifies on a machine and never in CI.
       - name: Read the list
         id: list
         run: |
-          servers=$("${{ runner.temp }}/bin/dbrun" list --json --names all | jq -c 'map(select(startswith("oracle-")))')
+          servers=$("${{ runner.temp }}/bin/dbrun" list --json --names all | jq -c 'map(select(startswith("oracle-") and . != "oracle-19c" and (contains("-adb-") | not)))')
           echo "servers=$servers" >> "$GITHUB_OUTPUT"
 
       - name: Upload dbrun

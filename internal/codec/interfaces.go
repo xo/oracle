@@ -17,6 +17,9 @@ type Conn interface {
 	DBTimeZone() *time.Location
 	DBServerTimeZone() *time.Location
 	MaxRawLength() int64
+	// ServerRelease returns the major release of the server, such as 11 or
+	// 23.
+	ServerRelease() int
 }
 
 type (

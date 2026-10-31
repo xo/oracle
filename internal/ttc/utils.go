@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/tns"
 )
@@ -230,7 +230,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 	case "varchar":
 		tempPar.Value = getString(fieldValue.Interface())
 	case "nvarchar":
-		temp := &oraTypes.String{}
+		temp := &types.String{}
 		temp.UseNCharset = true
 		err = temp.SetValue(getString(fieldValue.Interface()))
 		if err != nil {
@@ -244,25 +244,25 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 			return
 		}
 	case "timestamp":
-		var fieldVal = &oraTypes.Date{}
+		var fieldVal = &types.Date{}
 		var temp time.Time
 		temp, err = getDate(fieldValue.Interface())
 		if err != nil {
 			err = typeErr
 			return
 		}
-		fieldVal.SetDataType(oraTypes.TIMESTAMP)
+		fieldVal.SetDataType(types.TIMESTAMP)
 		err = fieldVal.SetValue(temp)
 		tempPar.Value = fieldVal
 	case "timestamptz":
-		var fieldVal = &oraTypes.Date{}
+		var fieldVal = &types.Date{}
 		var temp time.Time
 		temp, err = getDate(fieldValue.Interface())
 		if err != nil {
 			err = typeErr
 			return
 		}
-		fieldVal.SetDataType(oraTypes.TIMESTAMPTZ)
+		fieldVal.SetDataType(types.TIMESTAMPTZ)
 		err = fieldVal.SetValue(temp)
 		tempPar.Value = fieldVal
 	case "raw":
@@ -273,7 +273,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		}
 	case "clob":
 		fieldVal := getString(fieldValue.Interface())
-		clob := &oraTypes.Clob{}
+		clob := &types.Clob{}
 		if len(fieldVal) == 0 {
 			err = clob.SetValue(nil)
 		} else {
@@ -285,7 +285,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 		tempPar.Value = clob
 	case "nclob":
 		fieldVal := getString(fieldValue.Interface())
-		clob := &oraTypes.Clob{}
+		clob := &types.Clob{}
 		clob.UseNCharset = true
 		if len(fieldVal) == 0 {
 			err = clob.SetValue(nil)
@@ -303,7 +303,7 @@ func parseInputField(structValue reflect.Value, name, _type string, fieldIndex i
 			err = typeErr
 			return
 		}
-		blob := &oraTypes.Blob{}
+		blob := &types.Blob{}
 		err = blob.SetValue(fieldVal)
 		if err != nil {
 			return nil, err

@@ -227,3 +227,41 @@ func TestClobOutsideBMP(t *testing.T) {
 		t.Errorf("got %d bytes with %d U+FFFD, want %d bytes", len(got), strings.Count(got, "�"), len(want))
 	}
 }
+
+// TestXMLType is sijms/go-ora#771: an XMLType came back NULL on Autonomous
+// Database, whose flag word is 0x8014, and one of about 254 bytes or more
+// hung. go-ora read no XMLType at all in v3.
+func TestXMLType(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_xml", "id NUMBER, x XMLTYPE")
+	tests := []struct {
+		insert string
+		want   string
+	}{
+		{"XMLTYPE('<a>1</a>')", "<a>1</a>"},
+		{"XMLTYPE('<a>' || RPAD('x', 3000, 'x') || '</a>')", "<a>" + strings.Repeat("x", 3000) + "</a>"},
+		{"XMLTYPE(TO_CLOB('<a>') || RPAD(TO_CLOB('y'), 32000, 'y') || TO_CLOB('</a>'))", "<a>" + strings.Repeat("y", 32000) + "</a>"},
+		{"NULL", ""},
+	}
+	for i, test := range tests {
+		if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_xml VALUES (:1, "+test.insert+")", i); err != nil {
+			t.Fatalf("%s: %v", test.insert, err)
+		}
+	}
+	for i, test := range tests {
+		qctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		var got sql.NullString
+		err := db.QueryRowContext(qctx, "SELECT x FROM xo_oracle_xml WHERE id = :1", i).Scan(&got)
+		cancel()
+		if err != nil {
+			t.Errorf("%s: %v", test.insert, err)
+			continue
+		}
+		// the server can indent or end the text with a newline
+		if g := strings.TrimSpace(got.String); g != test.want {
+			t.Errorf("%s: got %d bytes %.40q, want %d bytes", test.insert, len(g), g, len(test.want))
+		}
+	}
+	usable(t, db)
+}

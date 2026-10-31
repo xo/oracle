@@ -7,7 +7,7 @@ import (
 
 	"github.com/cockroachdb/apd/v3"
 
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // unconstrained is the precision and the scale that the driver keeps for a
@@ -55,7 +55,7 @@ func TestNumberValue(t *testing.T) {
 
 func TestColumnValueBinaryFloat(t *testing.T) {
 	col := &ParameterInfo{}
-	col.DataType = oraTypes.IBFLOAT
+	col.DataType = types.IBFLOAT
 	got, err := columnValue(col, float32(1.5))
 	if err != nil || got != 1.5 {
 		t.Errorf("got %T(%v), %v, want float64(1.5)", got, got, err)

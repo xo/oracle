@@ -7,16 +7,20 @@ import (
 
 type StringParameter struct {
 	BasicParameter
+	// clob binds the string when it goes as a temporary CLOB
+	clob *ClobParameter
 }
 
 func (param *StringParameter) Copy() OracleParameterCoder {
 	ret := new(StringParameter)
 	*ret = *param
+	ret.clob = nil
 	return ret
 }
 
 func (param *StringParameter) Init() {
 	param.SetDefault()
+	param.clob = nil
 	param.DataType = types.NCHAR
 	param.ContFlag = 0x10
 	if param.CharsetForm == 0 {
@@ -62,6 +66,14 @@ func (param *StringParameter) Encode(input any, conn Conn) error {
 	length = conn.MaxStringLength()
 	if param.MaxLen > length {
 		param.DataType = types.LongVarChar
+		// 11g converts a long string to the UTF-16 of a CLOB one packet at
+		// a time, and stores U+FFFD for a character that the end of a
+		// packet splits. A string with no such character binds as a LONG,
+		// and one with them as a temporary CLOB, which a CLOB column stores
+		// whole and a LONG column refuses with an error.
+		if conn.ServerRelease() < 12 && !isASCII(param.BValue) {
+			return param.encodeClob(input, conn)
+		}
 	} else {
 		param.DataType = types.NCHAR
 	}
@@ -69,6 +81,36 @@ func (param *StringParameter) Encode(input any, conn Conn) error {
 		param.MaxLen = encoder.MaxLen()
 	}
 	return nil
+}
+
+// encodeClob encodes input as a temporary CLOB.
+func (param *StringParameter) encodeClob(input any, conn Conn) error {
+	clob := &ClobParameter{}
+	clob.CharsetForm = param.CharsetForm
+	if err := clob.Encode(input, conn); err != nil {
+		return err
+	}
+	param.clob = clob
+	param.BasicParameter = clob.BasicParameter
+	return nil
+}
+
+// Write writes the locator of the temporary CLOB, when the string went as
+// one, and the string otherwise.
+func (param *StringParameter) Write(session tns.SessionWriter) error {
+	if param.clob != nil {
+		return param.clob.Write(session)
+	}
+	return param.BasicParameter.Write(session)
+}
+
+func isASCII(b []byte) bool {
+	for _, c := range b {
+		if c >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 func (param *StringParameter) Decode(conn Conn) (any, error) {

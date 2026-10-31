@@ -101,6 +101,7 @@ func (driver *Registry) init() {
 	tempClob := &codec.ClobParameter{}
 	tempClob.CharsetForm = 2
 	driver.nameTypeCoder["NCLOB"] = tempClob
+	driver.nameTypeCoder["XMLTYPE"] = &xmlParameter{}
 
 	// initialize all
 	for _, coder := range driver.goTypeCoder {

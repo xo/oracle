@@ -7,7 +7,7 @@ import (
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/config"
-	ora_types "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 //type NClob Clob
@@ -16,8 +16,8 @@ var errEmptyLocator = errors.New("call lob operation on an empty locator")
 
 type LobStream struct {
 	conn          *Connection
-	sourceLocator ora_types.Locator
-	destLocator   ora_types.Locator
+	sourceLocator types.Locator
+	destLocator   types.Locator
 	scn           []byte
 	sourceOffset  int64
 	destOffset    int64
@@ -38,10 +38,10 @@ func (lob *LobStream) initialize() {
 	lob.destOffset = 0
 }
 
-func (lob *LobStream) Locator() ora_types.Locator {
+func (lob *LobStream) Locator() types.Locator {
 	return lob.sourceLocator
 }
-func (lob *LobStream) SetLocator(locator ora_types.Locator) {
+func (lob *LobStream) SetLocator(locator types.Locator) {
 	lob.sourceLocator = locator
 	if !locator.IsInline() && locator.IsTemporary() {
 		lob.conn.appendTemporaryLoc(locator)
@@ -182,7 +182,7 @@ func (lob *LobStream) FreeTemporaryLocator() error {
 	lob.sourceLocator = nil
 	return nil
 }
-func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (ora_types.Locator, error) {
+func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (types.Locator, error) {
 	lob.initialize()
 	lob.conn.logger.Debug("create temporary LOB")
 	lob.sourceLocator = make([]byte, 0x28)

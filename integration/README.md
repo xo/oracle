@@ -10,3 +10,7 @@ go test -count=1 ./integration
 ```
 
 Many files are named for the upstream issue of `sijms/go-ora` that they hold.
+
+For an Autonomous Database release, such as `oracle-adb-26ai`, replace the
+query of the URL that `dbrun` prints, which names the TLS options of
+`go-ora`, with `sslmode=require`.

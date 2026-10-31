@@ -8,7 +8,7 @@ import (
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 type (
@@ -48,7 +48,7 @@ type ParameterInfo struct {
 	oPrimValue        driver.Value
 	getDataFromServer bool
 	oaccollid         int
-	cusType           *oraTypes.Object
+	cusType           *types.Object
 	parent            *ParameterInfo
 	Annotations       map[string]string
 	// databaseType is the name of the type of a column, which the define of
@@ -73,30 +73,30 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	par.Precision, err = session.ReadByte()
 	float := false
 	switch par.DataType {
-	case oraTypes.NUMBER:
+	case types.NUMBER:
 		fallthrough
-	case oraTypes.TimestampDTY:
+	case types.TimestampDTY:
 		fallthrough
-	case oraTypes.TimestampTZDTY:
+	case types.TimestampTZDTY:
 		fallthrough
-	case oraTypes.IntervalDSDTY:
+	case types.IntervalDSDTY:
 		fallthrough
-	case oraTypes.TIMESTAMP:
+	case types.TIMESTAMP:
 		fallthrough
-	case oraTypes.TIMESTAMPTZ:
+	case types.TIMESTAMPTZ:
 		fallthrough
-	case oraTypes.INTERVALDS:
+	case types.INTERVALDS:
 		fallthrough
-	case oraTypes.TimestampLTZDTY:
+	case types.TimestampLTZDTY:
 		fallthrough
-	case oraTypes.TimestampLTZ:
+	case types.TimestampLTZ:
 		scale, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 
 		if scale == -127 {
-			float = par.DataType == oraTypes.NUMBER && par.Precision > 0
+			float = par.DataType == types.NUMBER && par.Precision > 0
 			par.Precision = uint8(math.Ceil(float64(par.Precision) * 0.30103))
 			par.Scale = 0xFF
 		} else {
@@ -105,7 +105,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	default:
 		par.Scale, err = session.ReadByte()
 	}
-	if par.DataType == oraTypes.NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
+	if par.DataType == types.NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
 		par.Precision = 38
 		par.Scale = 0xFF
 	}
@@ -115,24 +115,24 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	switch par.DataType {
-	case oraTypes.ROWID:
+	case types.ROWID:
 		par.MaxLen = 128
-	case oraTypes.DATE:
+	case types.DATE:
 		// a DATE column takes the buffer of a TIMESTAMP, 11 bytes
-		par.MaxLen = oraTypes.MaxLenTimestamp
-	case oraTypes.IBFLOAT:
+		par.MaxLen = types.MaxLenTimestamp
+	case types.IBFLOAT:
 		par.MaxLen = 4
-	case oraTypes.IBDOUBLE:
+	case types.IBDOUBLE:
 		par.MaxLen = 8
-	case oraTypes.TimestampTZDTY:
-		par.MaxLen = oraTypes.MaxLenTimestampTZ
-	case oraTypes.IntervalYMDTY:
+	case types.TimestampTZDTY:
+		par.MaxLen = types.MaxLenTimestampTZ
+	case types.IntervalYMDTY:
 		fallthrough
-	case oraTypes.IntervalDSDTY:
+	case types.IntervalDSDTY:
 		fallthrough
-	case oraTypes.INTERVALYM:
+	case types.INTERVALYM:
 		fallthrough
-	case oraTypes.INTERVALDS:
+	case types.INTERVALDS:
 		par.MaxLen = 11
 	}
 	par.ArraySize, err = session.ReadInt(4, true, true)
@@ -191,16 +191,16 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.TypeName = strings.ToUpper(session.StrConv.Decode(bName))
-	if par.DataType == oraTypes.XMLType && par.TypeName != "XMLTYPE" {
+	if par.DataType == types.XMLType && par.TypeName != "XMLTYPE" {
 		for typName, cusTyp := range conn.cusTyp {
 			if typName == par.TypeName {
-				par.cusType = new(oraTypes.Object)
+				par.cusType = new(types.Object)
 				*par.cusType = cusTyp
 			}
 		}
 	}
 	if par.TypeName == "XMLTYPE" {
-		par.DataType = oraTypes.XMLType
+		par.DataType = types.XMLType
 		par.IsXmlType = true
 	}
 	par.databaseType = databaseTypeName(par.DataType, par.CharsetForm, float, par.TypeName)
@@ -265,7 +265,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if session.TTCVersion < 24 {
 		return nil
 	}
-	if par.DataType == oraTypes.VECTOR {
+	if par.DataType == types.VECTOR {
 		par.VectorDim, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
@@ -276,9 +276,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 		par.VectorFlag, err = session.ReadByte()
 
-		par.VectorType = oraTypes.VectorDense
+		par.VectorType = types.VectorDense
 		if par.VectorFlag&2 == 2 {
-			par.VectorType = oraTypes.VectorSparse
+			par.VectorType = types.VectorSparse
 		}
 	} else {
 		_, err = session.ReadInt(4, true, true)
@@ -326,18 +326,18 @@ func (par *ParameterInfo) write(session *tns.Session) error {
 }
 
 func (par *ParameterInfo) isLongType() bool {
-	return par.DataType == oraTypes.LONG ||
-		par.DataType == oraTypes.LongRaw ||
-		par.DataType == oraTypes.LongVarChar ||
-		par.DataType == oraTypes.LongVarRaw
+	return par.DataType == types.LONG ||
+		par.DataType == types.LongRaw ||
+		par.DataType == types.LongVarChar ||
+		par.DataType == types.LongVarRaw
 }
 
 func (par *ParameterInfo) isLobType() bool {
-	return par.DataType == oraTypes.OCIBlobLocator ||
-		par.DataType == oraTypes.OCIClobLocator ||
-		par.DataType == oraTypes.OCIFileLocator ||
-		par.DataType == oraTypes.VECTOR ||
-		par.DataType == oraTypes.JSONType
+	return par.DataType == types.OCIBlobLocator ||
+		par.DataType == types.OCIClobLocator ||
+		par.DataType == types.OCIFileLocator ||
+		par.DataType == types.VECTOR ||
+		par.DataType == types.JSONType
 }
 
 func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
@@ -359,7 +359,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		par.IsNull = true
 		return nil
 	} else {
-		if par.DataType == oraTypes.XMLType {
+		if par.DataType == types.XMLType {
 			decoder, err = conn.ParameterCoder(par.TypeName)
 		} else {
 			decoder, err = conn.ParameterCoder(par.DataType)
@@ -419,65 +419,65 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) er
 func databaseTypeName(dataType uint16, form int, float bool, typeName string) string {
 	national := form == 2
 	switch dataType {
-	case oraTypes.NCHAR:
+	case types.NCHAR:
 		if national {
 			return "NVARCHAR2"
 		}
 		return "VARCHAR2"
-	case oraTypes.CHAR:
+	case types.CHAR:
 		if national {
 			return "NCHAR"
 		}
 		return "CHAR"
-	case oraTypes.NUMBER:
+	case types.NUMBER:
 		if float {
 			return "FLOAT"
 		}
 		return "NUMBER"
-	case oraTypes.LONG:
+	case types.LONG:
 		return "LONG"
-	case oraTypes.ROWID:
+	case types.ROWID:
 		return "ROWID"
-	case oraTypes.UROWID:
+	case types.UROWID:
 		return "UROWID"
-	case oraTypes.DATE:
+	case types.DATE:
 		return "DATE"
-	case oraTypes.RAW:
+	case types.RAW:
 		return "RAW"
-	case oraTypes.LongRaw:
+	case types.LongRaw:
 		return "LONG RAW"
-	case oraTypes.IBFLOAT, oraTypes.BFLOAT:
+	case types.IBFLOAT, types.BFLOAT:
 		return "BINARY_FLOAT"
-	case oraTypes.IBDOUBLE, oraTypes.BDOUBLE:
+	case types.IBDOUBLE, types.BDOUBLE:
 		return "BINARY_DOUBLE"
-	case oraTypes.REFCURSOR:
+	case types.REFCURSOR:
 		return "REF CURSOR"
-	case oraTypes.OCIClobLocator:
+	case types.OCIClobLocator:
 		if national {
 			return "NCLOB"
 		}
 		return "CLOB"
-	case oraTypes.OCIBlobLocator:
+	case types.OCIBlobLocator:
 		return "BLOB"
-	case oraTypes.OCIFileLocator:
+	case types.OCIFileLocator:
 		return "BFILE"
-	case oraTypes.JSONType:
+	case types.JSONType:
 		return "JSON"
-	case oraTypes.VECTOR:
+	case types.VECTOR:
 		return "VECTOR"
-	case oraTypes.BOOLEAN:
+	case types.BOOLEAN:
 		return "BOOLEAN"
-	case oraTypes.TimestampDTY, oraTypes.TIMESTAMP:
+	case types.TimestampDTY, types.TIMESTAMP:
 		return "TIMESTAMP"
-	case oraTypes.TimestampTZDTY, oraTypes.TIMESTAMPTZ:
+	case types.TimestampTZDTY, types.TIMESTAMPTZ:
 		return "TIMESTAMP WITH TIME ZONE"
-	case oraTypes.TimestampLTZDTY, oraTypes.TimestampLTZ:
+	case types.TimestampLTZDTY, types.TimestampLTZ:
 		return "TIMESTAMP WITH LOCAL TIME ZONE"
-	case oraTypes.IntervalYMDTY, oraTypes.INTERVALYM:
+	case types.IntervalYMDTY, types.INTERVALYM:
 		return "INTERVAL YEAR TO MONTH"
-	case oraTypes.IntervalDSDTY, oraTypes.INTERVALDS:
+	case types.IntervalDSDTY, types.INTERVALDS:
 		return "INTERVAL DAY TO SECOND"
-	case oraTypes.XMLType, oraTypes.OCIXMLType:
+	case types.XMLType, types.OCIXMLType:
 		if typeName != "" {
 			return typeName
 		}

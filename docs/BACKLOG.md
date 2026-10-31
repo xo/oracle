@@ -26,13 +26,6 @@ sets them out: `WithOptions`, `WithTimeout`, `WithReadonly`, `WithPrefetch`
 and `WithLobFetch`. None is built. The DSN keys `prefetch` and `lob_fetch` set
 the same for every statement of a connector.
 
-### Find the statement that answers ORA-01403 at logon
-
-Every release answers a statement at logon with `ORA-01403: no data found`,
-which nothing checks. The recorded exchanges show it. Find which statement it
-is, and return the error or stop running the statement (D14).
-sijms/go-ora#611 asks for an option to skip the NLS query.
-
 ### Report SELECT CAST(:1 AS JSON) on 21c
 
 On 21c, `SELECT CAST(:1 AS JSON) FROM dual` with a JSON bind fails inside the
@@ -47,18 +40,18 @@ Step 1 deleted the files of `TestIssues` that did not build against the `v3`
 code. They used the API of `v2`, such as `go_ora.Clob`, `go_ora.Object` and
 `go_ora.NVarChar`, or a package that the module does not carry: `gorm`, `xorm`
 and the `dbms` package of `v2`. Each one is in commit `d9fa927` and earlier.
-Write a test for each again, on the new API:
+Write a test for each again, on the new API. Step 9 wrote `TestStrings`,
+`TestBlob`, `TestBoolean` and `TestVector` in `values_test.go`, for
+`bool_type_test.go`, `emoji_test.go`, `long_input_test.go`, `lob_test.go` and
+`vector_test.go`. These are left:
 
-- `bool_type_test.go`, `emoji_test.go`, `long_input_test.go`,
-  `regular_type_array_test.go`, `udt_string_test.go`, `varray_test.go` and
-  `vector_test.go`.
-- `bulkinsert_bfile_test.go`, `bulkinsert_blob_test.go`, `inout_lob_test.go`
-  and `lob_test.go`.
+- `regular_type_array_test.go`, `udt_string_test.go` and `varray_test.go`.
+- `bulkinsert_bfile_test.go`, `bulkinsert_blob_test.go` and
+  `inout_lob_test.go`.
 - `issue_173_test.go`, `issue_264_test.go`, `issue_320_test.go` and
   `issue_363_test.go`.
 - `dbms_aq_test.go` and `dbms_output_test.go`. The `aq` package replaces the
-  first. Nothing in `v3` replaces `DBMS_OUTPUT`, which `v2` read through
-  `dbms.NewOutput`. Ask Ken whether the driver reads it.
+  first, and the reader of D19 the second.
 - `gorm_test.go`, which tests `gorm` and not this driver. It does not come back.
 
 Step 1 also deleted the unit tests of functions that `v3` removed:
@@ -67,23 +60,41 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 that it tested. The vectors of `converters/other_types_test.go` moved to
 `internal/types/vectors_test.go`.
 
-### Make the integration tests pass on every release
+### Read DBMS_OUTPUT
 
-`integration`, which was `TestIssues`, reads `ORACLE_DSN` and skips without
-it, and CI sets it from `dbrun dsn --json`. In step 9 it passes on 11g, with
-3 tests that need 12c skipped through `requireRelease`, and on 26ai. Run it on
-18c, 19c, 21c and 23ai, and fix or record each failure.
+Ken decided that the driver reads `DBMS_OUTPUT` (D19). Write a helper that
+enables it on a connection and reads its lines with `DBMS_OUTPUT.GET_LINES`,
+and a live test.
 
-### Make 19c start in CI
+### Read tnsnames.ora
 
-`dbmeta` marks 18c and 19c as verified, and not tested in its CI (D7). On this
-machine on 2026-10-31, 18c started in less than a minute from its public image.
-19c needs the image that `dbrun build` makes from an Oracle installer that is
-not public, and its first start creates the database, which took more than the
-5 minutes that `dbrun start` waits. `dbrun start --timeout 25m oracle-19c`
-started it. The oracle job in the workflow lists 19c and fails on a runner
-until `dbmeta` can start it there. Decide with Ken whether to publish the image
-or to leave 19c out of CI.
+Write a parser of `tnsnames.ora` and a key that names an alias, found
+through `TNS_ADMIN` (D20). Test it with files in `testdata`, and live with a
+descriptor of a `dbrun` release.
+
+### Take four upstream features
+
+Build the four requests of D21, each with a test: a key that skips the NLS
+query at connect (sijms/go-ora#611), a logon with an OCI IAM token (#530),
+streaming of LOBs and rows (#681, #559 and #664), and failover to the next
+address of a descriptor (#707 and #619).
+
+### Reproduce the refusal of required network encryption
+
+A server with `SQLNET.ENCRYPTION_SERVER=REQUIRED` or
+`SQLNET.CRYPTO_CHECKSUM_SERVER=REQUIRED` refuses the driver with ORA-12269
+(sijms/go-ora#729). Reproduce it on a `dbrun` release, and fix the
+negotiation (D21).
+
+### Write four upstream pull requests again
+
+Ken decided to take sijms/go-ora#734, #721, #770 and #773 (D18). Step 9 wrote
+#770, which reads XMLType. Write the other three for this code, with a test. `UPSTREAM.md` says what each does. On 2026-10-31
+`dbrun` added the Autonomous Database Free image as `oracle-adb-26ai` and
+`oracle-adb-19c`, which CI leaves out. The driver connects to both with
+`sslmode=require` in place of the query that `dbrun dsn` prints, which names
+the options of `go-ora`. The `v3` code reads no XMLType column, so #770 starts
+with a reader of XMLType, tested on those releases and on the others.
 
 ### Tell dburl when the first tag exists
 

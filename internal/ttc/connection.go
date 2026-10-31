@@ -246,6 +246,15 @@ func (conn *Connection) MaxStringLength() int64 {
 	}
 	return conn.maxLen.varchar
 }
+
+// ServerRelease returns the major release of the server, such as 11 or 23.
+func (conn *Connection) ServerRelease() int {
+	if conn.dBVersion == nil {
+		return 0
+	}
+	return conn.dBVersion.MajorVersion
+}
+
 func (conn *Connection) MaxRawLength() int64 {
 	if conn.maxLen.raw == 0 {
 		return 0x7FFF

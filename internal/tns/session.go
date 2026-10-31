@@ -710,7 +710,9 @@ func (session *Session) writePacket(pck packet) error {
 	return err
 }
 
-// HasError Check if the session has error or not
+// HasError reports whether the last summary holds an error. ORA-01403, no
+// data found, is not one: the server sends it with the last rows of a fetch,
+// to say that the cursor has no more.
 func (session *Session) HasError() bool {
 	return session.Summary != nil && (session.Summary.RetCode != 0 && session.Summary.RetCode != 1403)
 }

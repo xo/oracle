@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 )
 
 // copyValue stores src in dest, which is a pointer, for an OUT argument, a
@@ -22,8 +22,8 @@ import (
 // in go-ora, because a field of a user defined type is often a plain string.
 // sql.ConvertAssign would refuse it.
 func copyValue(dest, src any) error {
-	if o, ok := src.(oraTypes.OracleType); ok {
-		if _, own := dest.(oraTypes.OracleType); !own {
+	if o, ok := src.(types.OracleType); ok {
+		if _, own := dest.(types.OracleType); !own {
 			v, err := o.Value()
 			if err != nil {
 				return err

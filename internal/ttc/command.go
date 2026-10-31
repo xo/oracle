@@ -14,7 +14,7 @@ import (
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
@@ -241,16 +241,16 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.isLobType() {
 			num = 0
 			// temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == config.INLINE && !col.IsJSON && col.DataType != oraTypes.OCIFileLocator {
+			if stmt.connection.connOption.Lob == config.INLINE && !col.IsJSON && col.DataType != types.OCIFileLocator {
 				num = 0x3FFFFFFF
-				if col.DataType == oraTypes.OCIBlobLocator || col.DataType == oraTypes.VECTOR || col.DataType == oraTypes.JSONType {
-					col.DataType = oraTypes.LongRaw
+				if col.DataType == types.OCIBlobLocator || col.DataType == types.VECTOR || col.DataType == types.JSONType {
+					col.DataType = types.LongRaw
 					// change data type in the original array
-					stmt.columns[index].DataType = oraTypes.LongRaw
+					stmt.columns[index].DataType = types.LongRaw
 				} else {
-					col.DataType = oraTypes.LongVarChar
+					col.DataType = types.LongVarChar
 					// change data type in the original array
-					stmt.columns[index].DataType = oraTypes.LongVarChar
+					stmt.columns[index].DataType = types.LongVarChar
 					// a CLOB of a database in AL32UTF8 is stored as UTF-16.
 					// Defined in the database charset, 11g to 19c convert it
 					// piece by piece and send U+FFFD for a pair that a piece
@@ -365,7 +365,7 @@ func (stmt *Stmt) writePars() error {
 				continue
 			}
 			if (par.Direction == Input || par.Direction == InOut) && par.isLobType() {
-				if par.DataType == oraTypes.VECTOR {
+				if par.DataType == types.VECTOR {
 				} else {
 					if len(par.BValue) > 0 {
 						ms.PutUint(len(par.BValue), 4, true, true)
@@ -684,7 +684,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			} else {
 				if stmt.containOutputPars {
 					for x := 0; x < len(stmt.Pars); x++ {
-						if stmt.Pars[x].DataType == oraTypes.REFCURSOR {
+						if stmt.Pars[x].DataType == types.REFCURSOR {
 							typ := reflect.TypeOf(stmt.Pars[x].Value)
 							if typ.Kind() == reflect.Pointer {
 								if cursor, ok := stmt.Pars[x].Value.(*RefCursor); ok {
@@ -927,7 +927,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 
 func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) error {
 	session := stmt.connection.session
-	if col.DataType == oraTypes.REFCURSOR {
+	if col.DataType == types.REFCURSOR {
 		cursor := new(RefCursor)
 		cursor.connection = stmt.connection
 		cursor.parent = stmt
@@ -958,10 +958,10 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if err != nil {
 		return err
 	}
-	if param.DataType == oraTypes.XMLType && param.IsNull {
+	if param.DataType == types.XMLType && param.IsNull {
 		return nil
 	}
-	if param.DataType != oraTypes.XMLType && param.ArraySize > 0 {
+	if param.DataType != types.XMLType && param.ArraySize > 0 {
 		return nil
 	}
 	_, err = stmt.connection.session.ReadInt(2, true, true)
@@ -1076,11 +1076,11 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		typeErr := fmt.Errorf("error passing filed %s as type %s", tempType.Field(fieldIndex).Name, _type)
 		switch _type {
 		case "number":
-			var fieldVal *oraTypes.Number
+			var fieldVal *types.Number
 			if hasNullValue {
-				fieldVal = &oraTypes.Number{}
+				fieldVal = &types.Number{}
 			} else {
-				fieldVal, err = oraTypes.NewNumber(fieldValue)
+				fieldVal, err = types.NewNumber(fieldValue)
 				if err != nil {
 					err = typeErr
 					return
@@ -1094,7 +1094,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nvarchar":
-			fieldVal := &oraTypes.String{}
+			fieldVal := &types.String{}
 			fieldVal.UseNCharset = true
 			err = fieldVal.SetValue(fieldValue)
 			if err != nil {
@@ -1113,7 +1113,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "timestamptz":
-			fieldVal := &sql.Null[oraTypes.TimestampTZ]{}
+			fieldVal := &sql.Null[types.TimestampTZ]{}
 			if !hasNullValue {
 				var tempDate time.Time
 				tempDate, err = getDate(fieldValue)
@@ -1121,7 +1121,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					err = typeErr
 					return
 				}
-				fieldVal.V = oraTypes.TimestampTZ(tempDate)
+				fieldVal.V = types.TimestampTZ(tempDate)
 				fieldVal.Valid = true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
@@ -1136,14 +1136,14 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, &fieldVal, size, dir)
 		case "clob":
-			fieldVal := &oraTypes.Clob{}
+			fieldVal := &types.Clob{}
 			err = fieldVal.SetValue(fieldValue)
 			if err != nil {
 				return
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nclob":
-			fieldVal := &oraTypes.Clob{}
+			fieldVal := &types.Clob{}
 			fieldVal.UseNCharset = true
 			err = fieldVal.SetValue(fieldValue)
 			if err != nil {
@@ -1151,7 +1151,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "blob":
-			fieldVal := &oraTypes.Blob{}
+			fieldVal := &types.Blob{}
 			err = fieldVal.SetValue(fieldValue)
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "":
@@ -1353,7 +1353,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					}
 					// here I can take the binary value and store it into array
 					arrayValues[y] = par.BValue
-					if len(par.BValue) == 0 && par.DataType == oraTypes.NCHAR {
+					if len(par.BValue) == 0 && par.DataType == types.NCHAR {
 						continue
 					}
 					dataType = par.DataType
@@ -1363,7 +1363,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				par.MaxLen = maxLen
 				par.MaxCharLen = maxCharLen
 				if int(dataType) == 0 {
-					dataType = oraTypes.NCHAR
+					dataType = types.NCHAR
 				}
 				par.DataType = dataType
 			} else {
@@ -1406,7 +1406,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	}
 	// before release results decode parameters
 	for _, par := range stmt.Pars {
-		if par.Direction != Input && par.DataType != oraTypes.REFCURSOR {
+		if par.Direction != Input && par.DataType != types.REFCURSOR {
 			fieldValue := reflect.ValueOf(par.Value)
 			if fieldValue.Kind() != reflect.Pointer {
 				return nil, errors.New("output parameter should be pointer type")
@@ -1416,7 +1416,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			} else {
 				// check if LobReadMode is auto so auto read all lobs
 				if stmt.connection.connOption.LobReadMode == config.LobReadModeAuto {
-					if lob, ok := par.oPrimValue.(oraTypes.Lob); ok {
+					if lob, ok := par.oPrimValue.(types.Lob); ok {
 						err = lob.Load()
 						if err != nil {
 							return nil, err
@@ -1580,22 +1580,22 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 		}
 		// resend parameter definition when string/[]byte length change from long to short and vice versa
 		switch par.DataType {
-		case oraTypes.NCHAR:
-			if originalPar.DataType == oraTypes.LONG || originalPar.DataType == oraTypes.LongVarChar {
+		case types.NCHAR:
+			if originalPar.DataType == types.LONG || originalPar.DataType == types.LongVarChar {
 				stmt.reSendParDef = true
 			}
-		case oraTypes.RAW:
-			if originalPar.DataType == oraTypes.LongRaw {
+		case types.RAW:
+			if originalPar.DataType == types.LongRaw {
 				stmt.reSendParDef = true
 			}
-		case oraTypes.LONG:
+		case types.LONG:
 			fallthrough
-		case oraTypes.LongVarChar:
-			if originalPar.DataType == oraTypes.NCHAR {
+		case types.LongVarChar:
+			if originalPar.DataType == types.NCHAR {
 				stmt.reSendParDef = true
 			}
-		case oraTypes.LongVarRaw:
-			if originalPar.DataType == oraTypes.RAW {
+		case types.LongVarRaw:
+			if originalPar.DataType == types.RAW {
 				stmt.reSendParDef = true
 			}
 		}
@@ -1754,7 +1754,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 				if err != nil {
 					return err
 				}
-			case *oraTypes.Vector:
+			case *types.Vector:
 				if stmt.connection.connOption.Lob == config.INLINE {
 					resultSet.rows[rowIndex][colIndex], err = val.Value()
 					if err != nil {
@@ -1772,7 +1772,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 						}
 					}
 				}
-			case *oraTypes.JSON:
+			case *types.JSON:
 				// a JSON row is its JSON text. Inline, the row holds the OSON,
 				// and streamed, it holds a locator that a load reads
 				if stmt.connection.connOption.Lob != config.INLINE {
@@ -1790,7 +1790,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 				if err != nil {
 					return err
 				}
-			case *oraTypes.Clob:
+			case *types.Clob:
 				if val.ReadMode() == config.LobReadModeAuto {
 					err = val.Load()
 					if err != nil {
@@ -1801,7 +1801,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 						return err
 					}
 				}
-			case *oraTypes.Blob:
+			case *types.Blob:
 				if val.ReadMode() == config.LobReadModeAuto {
 					err = val.Load()
 					if err != nil {

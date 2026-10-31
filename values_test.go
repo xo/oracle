@@ -1,6 +1,7 @@
 package oracle_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json/jsontext"
@@ -207,13 +208,14 @@ func TestNullOutArguments(t *testing.T) {
 // OSON and encoding/json/v2.
 func TestJSON(t *testing.T) {
 	db := openLive(t)
+	if serverRelease(t, db) < 21 {
+		// 18c reads JSON('...') as a function that returns NULL
+		t.Skip("the JSON type needs 21c")
+	}
 	ctx := t.Context()
 	const doc = `{"a":1,"b":[1,2.5,"x"],"big":12345678901234567890.12,"n":null}`
 	var v any
 	if err := db.QueryRowContext(ctx, "SELECT JSON('"+doc+"') FROM dual").Scan(&v); err != nil {
-		if strings.Contains(err.Error(), "ORA-00904") || strings.Contains(err.Error(), "ORA-00902") {
-			t.Skip("the release has no JSON type")
-		}
 		t.Fatal(err)
 	}
 	if got := fmt.Sprintf("%T %s", v, v); got != "jsontext.Value "+doc {
@@ -301,5 +303,186 @@ func TestTimeFraction(t *testing.T) {
 	var n int
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM "+table+" WHERE d = :1", v.Truncate(time.Second)).Scan(&n); err != nil || n != 1 {
 		t.Errorf("a DATE bind finds %d rows, %v", n, err)
+	}
+}
+
+// serverRelease returns the major release of the server, such as 11 or 23.
+func serverRelease(t *testing.T, db *sql.DB) int {
+	t.Helper()
+	var version int
+	err := db.QueryRowContext(t.Context(), `SELECT TO_NUMBER(REGEXP_SUBSTR(version, '^[0-9]+'))
+		FROM product_component_version WHERE product LIKE 'Oracle%' AND ROWNUM = 1`).Scan(&version)
+	if err != nil {
+		t.Fatalf("reading the release: %v", err)
+	}
+	return version
+}
+
+// createTable drops the table name and creates it with the columns cols, in
+// the tablespace USERS, and drops it when the test ends. The test user is
+// SYSTEM, and its tablespace holds no SecureFile LOB on 21c and no VECTOR.
+func createTable(t *testing.T, db *sql.DB, name, cols string) {
+	t.Helper()
+	ctx := t.Context()
+	if _, err := db.ExecContext(ctx, "BEGIN EXECUTE IMMEDIATE 'DROP TABLE "+name+" PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "CREATE TABLE "+name+" ("+cols+") TABLESPACE USERS"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE " + name + " PURGE") })
+}
+
+// TestStrings binds text with characters outside ASCII and outside the BMP,
+// and text longer than a VARCHAR2, and reads it back. go-ora held these in
+// emoji_test.go and long_input_test.go.
+func TestStrings(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_strings", "id NUMBER, v VARCHAR2(400 CHAR), nv NVARCHAR2(400), c CLOB, nc NCLOB")
+	long := strings.Repeat("한😀a", 40_000)
+	tests := []string{"", "ascii", "é ñ ü", "漢字 かな 한글", "😀 🎉 𝄞", strings.Repeat("😀", 100)}
+	for i, s := range tests {
+		if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_strings VALUES (:1, :2, :3, :4, :5)", i, s, s, s+long, s+long); err != nil {
+			t.Fatalf("%q: %v", s, err)
+		}
+	}
+	for i, s := range tests {
+		var v, nv, c, nc sql.NullString
+		err := db.QueryRowContext(ctx, "SELECT v, nv, c, nc FROM xo_oracle_strings WHERE id = :1", i).Scan(&v, &nv, &c, &nc)
+		if err != nil {
+			t.Fatalf("%q: %v", s, err)
+		}
+		// Oracle stores an empty string as NULL
+		if v.String != s || nv.String != s {
+			t.Errorf("%q: got %q and %q", s, v.String, nv.String)
+		}
+		if c.String != s+long || nc.String != s+long {
+			t.Errorf("%q: the CLOB has %d bytes and the NCLOB %d, want %d", s, len(c.String), len(nc.String), len(s+long))
+		}
+	}
+}
+
+// TestBlob binds a BLOB of a megabyte as a []byte and reads it back. go-ora
+// held this in lob_test.go.
+func TestBlob(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_blob", "id NUMBER, b BLOB")
+	want := make([]byte, 1<<20)
+	for i := range want {
+		want[i] = byte(i * 7)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_blob VALUES (1, :1)", want); err != nil {
+		t.Fatal(err)
+	}
+	var got []byte
+	if err := db.QueryRowContext(ctx, "SELECT b FROM xo_oracle_blob").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("got %d bytes, want %d", len(got), len(want))
+	}
+}
+
+// TestBoolean binds a bool into a BOOLEAN of 23ai and reads it back, and
+// into a NUMBER before 23ai, as 1 or 0. go-ora held this in
+// bool_type_test.go, and bound no bool.
+func TestBoolean(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	if serverRelease(t, db) < 23 {
+		var n, m int
+		if err := db.QueryRowContext(ctx, "SELECT :1, :2 FROM dual", true, false).Scan(&n, &m); err != nil || n != 1 || m != 0 {
+			t.Errorf("true and false as NUMBER: got %d and %d, %v", n, m, err)
+		}
+		return
+	}
+	createTable(t, db, "xo_oracle_boolean", "id NUMBER, b BOOLEAN")
+	for i, v := range []any{true, false, nil} {
+		if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_boolean VALUES (:1, :2)", i, v); err != nil {
+			t.Fatalf("%v: %v", v, err)
+		}
+	}
+	for i, want := range []sql.Null[bool]{{V: true, Valid: true}, {V: false, Valid: true}, {}} {
+		var got sql.Null[bool]
+		if err := db.QueryRowContext(ctx, "SELECT b FROM xo_oracle_boolean WHERE id = :1", i).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("row %d: got %v, want %v", i, got, want)
+		}
+	}
+	var b any
+	if err := db.QueryRowContext(ctx, "SELECT b FROM xo_oracle_boolean WHERE id = 0").Scan(&b); err != nil || b != true {
+		t.Errorf("into *any: got %#v, %v", b, err)
+	}
+}
+
+// TestVector binds a VECTOR of 23ai and reads it back. go-ora held this in
+// vector_test.go.
+func TestVector(t *testing.T) {
+	db := openLive(t)
+	if serverRelease(t, db) < 23 {
+		t.Skip("VECTOR needs 23ai")
+	}
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_vector", "id NUMBER, f32 VECTOR(3, FLOAT32), f64 VECTOR(3, FLOAT64), i8 VECTOR(3, INT8)")
+	f32, f64, i8 := []float32{1.5, -2.25, 3}, []float64{1.5, -2.25, 3}, []uint8{1, 2, 3}
+	args := []any{}
+	for _, v := range []any{f32, f64, i8} {
+		vec, err := oracle.CreateVector(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		args = append(args, vec)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_vector VALUES (1, :1, :2, :3)", args...); err != nil {
+		t.Fatal(err)
+	}
+	var a, b, c oracle.Vector
+	if err := db.QueryRowContext(ctx, "SELECT f32, f64, i8 FROM xo_oracle_vector").Scan(&a, &b, &c); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		vec  *oracle.Vector
+		want any
+	}{{&a, f32}, {&b, f64}, {&c, i8}} {
+		got, err := test.vec.Value()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fmt.Sprint(got) != fmt.Sprint(test.want) {
+			t.Errorf("got %v, want %v", got, test.want)
+		}
+	}
+}
+
+// TestLongColumn binds text longer than a VARCHAR2 into a LONG. Before 12c
+// a string with characters outside ASCII binds as a temporary CLOB, so that
+// a CLOB column stores it whole, and a LONG column refuses it.
+func TestLongColumn(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_long", "id NUMBER, l LONG")
+	old := serverRelease(t, db) < 12
+	for i, s := range []string{strings.Repeat("a", 0x5000), strings.Repeat("é", 0x3000)} {
+		_, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_long VALUES (:1, :2)", i, s)
+		if old && i == 1 {
+			if err == nil {
+				t.Error("11g stores text outside ASCII in a LONG, which it garbled")
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%d: %v", i, err)
+		}
+		var got string
+		if err := db.QueryRowContext(ctx, "SELECT l FROM xo_oracle_long WHERE id = :1", i).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != s {
+			t.Errorf("%d: got %d bytes, want %d", i, len(got), len(s))
+		}
 	}
 }

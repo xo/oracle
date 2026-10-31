@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 
 	"github.com/xo/oracle/internal/tns"
-	oraTypes "github.com/xo/oracle/internal/types"
+	"github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/config"
 )
@@ -50,9 +50,9 @@ func (cursor *RefCursor) load() error {
 			if err != nil {
 				return err
 			}
-			if cursor.columns[x].DataType == oraTypes.OCIClobLocator ||
-				cursor.columns[x].DataType == oraTypes.OCIBlobLocator ||
-				cursor.columns[x].DataType == oraTypes.OCIFileLocator {
+			if cursor.columns[x].DataType == types.OCIClobLocator ||
+				cursor.columns[x].DataType == types.OCIBlobLocator ||
+				cursor.columns[x].DataType == types.OCIFileLocator {
 				cursor._hasBLOB = true
 			}
 			if cursor.columns[x].isLongType() {
@@ -165,6 +165,6 @@ func (cursor *RefCursor) write() error {
 }
 
 func (cursor RefCursor) SetDataType(conn *Connection, par *ParameterInfo) error {
-	par.DataType = oraTypes.REFCURSOR
+	par.DataType = types.REFCURSOR
 	return nil
 }

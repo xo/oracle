@@ -15,16 +15,21 @@ conclusion.
 | [D4](#d4-the-module-path-is-githubcomxooracle) | Decided, the package name settled by D8 |
 | [D5](#d5-no-upstream-pull-request-is-merged-without-asking-ken) | Decided |
 | [D6](#d6-oracle-is-tested-against-databases-started-by-dbrun) | Decided |
-| [D7](#d7-ci-tests-three-operating-systems-and-every-oracle-release-dbmeta-knows) | Decided |
-| [D8](#d8-the-driver-follows-the-design-of-the-dbimp-drivers) | Proposed, the package name decided and built |
-| [D9](#d9-a-connector-holds-everything-that-belongs-to-one-database) | Proposed |
-| [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Proposed, built in step 5 |
+| [D7](#d7-ci-tests-three-operating-systems-and-every-oracle-release-dbmeta-knows) | Decided, amended by D17 |
+| [D8](#d8-the-driver-follows-the-design-of-the-dbimp-drivers) | Decided |
+| [D9](#d9-a-connector-holds-everything-that-belongs-to-one-database) | Decided |
+| [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Decided |
 | [D11](#d11-the-dsn-is-an-oracle-url-with-lower-case-keys) | Decided |
-| [D12](#d12-the-protocol-code-moves-to-internal) | Proposed |
+| [D12](#d12-the-protocol-code-moves-to-internal) | Decided |
 | [D13](#d13-the-module-requires-go-1271) | Decided |
 | [D14](#d14-the-driver-logs-only-to-a-logger-that-the-caller-passes) | Decided |
-| [D15](#d15-unit-tests-play-back-recorded-tns-exchanges) | Proposed |
+| [D15](#d15-unit-tests-play-back-recorded-tns-exchanges) | Decided |
 | [D16](#d16-a-decimal-is-an-apddecimal) | Decided. Amends hard rule 2 of AGENTS.md |
+| [D17](#d17-ci-leaves-out-19c) | Decided. Amends D7 |
+| [D18](#d18-four-upstream-pull-requests-are-written-again-here) | Decided |
+| [D19](#d19-the-driver-reads-dbms_output) | Decided |
+| [D20](#d20-the-driver-reads-tnsnamesora-with-a-parser-of-its-own) | Decided |
+| [D21](#d21-four-upstream-features-are-taken) | Decided |
 
 ## Purpose
 
@@ -104,24 +109,25 @@ one, so macOS and Windows run the unit job and not the oracle job. The 18c and
 19c releases are verified in `dbmeta` and not in its CI, because 19c is built
 from an installer that Oracle does not publish as a free image (see
 `container/oracle.go` in `dbmeta`). Those two jobs can fail until `dbmeta` makes
-them startable on a runner. See the backlog.
+them startable on a runner. D17 amends this: CI leaves out 19c.
 
 ## D8. The driver follows the design of the dbimp drivers
 
-Status: Proposed.
+Status: Decided. Ken accepted it on 2026-10-31, as built.
 
 Ken asked on 2026-10-31 that the driver be redesigned in the way of the
 `xo/dbimp` drivers, with the context flow and the idioms of Go 1.27.
 [DESIGN.md](DESIGN.md) holds the design. It keeps the contract of dbimp D8,
 the conventions of dbimp D6 and dbimp D25, and the file layout of `cassandra`.
-D9 to D16 hold its parts. Each part is proposed until Ken accepts the design.
+D9 to D16 hold its parts. Ken accepted the design and its parts on
+2026-10-31, as built.
 
 Ken decided on 2026-10-31 that the package is `oracle`, the name that it
 registers with `database/sql` and the scheme of its DSN.
 
 ## D9. A Connector holds everything that belongs to one database
 
-Status: Proposed.
+Status: Decided. Ken accepted it on 2026-10-31, as built.
 
 The package variable `oracleDriver` and every function that takes a `*sql.DB`
 go. The session parameters, the registered types, the TLS configuration and
@@ -141,7 +147,7 @@ decision still holds. `DESIGN.md`, under Connector, says more.
 
 ## D10. A context ends a round trip through deadlines and context.AfterFunc
 
-Status: Proposed.
+Status: Decided. Ken accepted it on 2026-10-31, as built.
 
 `StartContext` and its goroutine for each call go. The deadline of the context
 becomes the deadline of the connection, and `context.AfterFunc` sends the break.
@@ -182,7 +188,7 @@ Step 4 built `ParseDSN`, `Config` and `Config.DSN` on 2026-10-31.
 
 ## D12. The protocol code moves to internal
 
-Status: Proposed.
+Status: Decided. Ken accepted it on 2026-10-31, as built.
 
 TNS, TTC, authentication, charsets and the type codecs move under `internal/`,
 so that they can change with no new major version. The root package, `aq/`,
@@ -214,7 +220,7 @@ reaches the logger.
 
 ## D15. Unit tests play back recorded TNS exchanges
 
-Status: Proposed.
+Status: Decided. Ken accepted it on 2026-10-31, as built.
 
 A unit test needs no server. A fake server on a `net.Pipe` plays back packets
 recorded from the releases that `dbrun` starts. An integration test reads
@@ -232,7 +238,53 @@ and a `float64` loses them.
 Step 6 built it on 2026-10-31. A `NUMBER` with a scale of 0 and a precision
 from 1 to 18 is an `int64`, and any other is an `*apd.Decimal`.
 
+## D17. CI leaves out 19c
+
+Status: Decided. Amends D7.
+
+Ken decided on 2026-10-31 that the oracle job of CI leaves out 19c. Its image
+is built by `dbrun build` from an installer that Oracle does not publish, and
+its first start takes about 15 minutes. A change that touches the protocol is
+tested on 19c through `dbrun` on a machine that has the image. The workflow
+names no other release, and reads the rest from `dbrun list`.
+
+## D18. Four upstream pull requests are written again here
+
+Status: Decided.
+
+Ken decided on 2026-10-31 to take sijms/go-ora#734, #721, #770 and #773, as
+D5 asks. Each is written again for this code, with a test, and none is merged
+as it is. sijms/go-ora#770 serves #771, which needs an Autonomous Database to
+test, so its test is a unit test of the flag bits.
+
+## D19. The driver reads DBMS_OUTPUT
+
+Status: Decided.
+
+Ken decided on 2026-10-31 that the driver reads the output of `DBMS_OUTPUT`,
+as `go-ora` v2 did through `dbms.NewOutput`, with a helper and a live test.
+
+## D20. The driver reads tnsnames.ora with a parser of its own
+
+Status: Decided.
+
+Ken decided on 2026-10-31 that a DSN can name an alias of `tnsnames.ora`,
+which the driver finds through `TNS_ADMIN`, as sijms/go-ora#616 asks. The
+parser is written here, small, and does not take the 1,470 lines of that pull
+request.
+
+## D21. Four upstream features are taken
+
+Status: Decided.
+
+Ken decided on 2026-10-31 to take these requests of `sijms/go-ora`: an option
+to skip the NLS query at connect (#611), a logon with an OCI IAM token
+(#530), streaming of LOBs and rows (#681, #559 and #664), and failover to
+another address (#707 and #619). He also asked that the refusal of a server
+that requires native network encryption (#729) be reproduced and fixed. The
+other features stay open.
+
 ## Open questions for Ken
 
-1. Does the work go in the order that `DESIGN.md` gives, with nothing tagged
-   until step 6 is done?
+1. When is the first tag? Ken will say. Step 6 is done, and `dburl` waits on
+   it.
