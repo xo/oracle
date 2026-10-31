@@ -326,15 +326,52 @@ The `go fix` of Go 1.27 does most of the mechanical part. The rest is review.
 
 ## Testing
 
-A unit test needs no server. A fake server in the test speaks TNS on a
-`net.Pipe`, and plays back the packets of a recorded exchange. The recordings
-come from the releases that `dbrun` starts, and live under `testdata/`. This is
-the same idea as the recorded exchanges of `dbimptest`, for a protocol that is
-not HTTP.
+A unit test needs no server. `internal/tnstest` holds the two halves:
+
+- `Recorder` is a dialer that dials a real server and keeps every byte that
+  passes. It splits the bytes into TNS packets, with the length of two bytes
+  before the accept packet and of four after an accept of version 315 or
+  later.
+- `Player` is a dialer that returns one end of a `net.Pipe`, and plays a
+  recorded exchange on the other end. It writes each packet that the server
+  sent, and reads each packet that the client sends and compares its type.
+  It compares no more, because the client sends random keys and the time.
+
+An exchange is a text file under `testdata/exchanges/<release>/`, named for its
+scenario. Each line is a note, which starts with `# `, or a packet, which is
+`C` or `S` and the bytes in hex. The notes hold the release, the scenario, the
+user, the password and the service, and one `result` line for each fact that
+the scenario returns, quoted as a Go string. The password is the fixed test
+password of `dbrun`. The O5LOGON exchange encrypts the session key of the server
+with it, so a replay needs it.
+
+`Player` reads the packets of the client in a goroutine of its own. A pipe
+holds no buffer, and on 11g the server sends a marker packet that the client
+answers while the server still writes, so both writes wait for each other
+without the goroutine. Each exchange has a deadline of one minute, so that a
+driver that waits for a packet that the exchange lacks fails the test.
+
+`exchange_test.go` in the root package holds the scenarios: `ping`, `query`,
+`error`, `dml` and `clob`. `TestExchanges` plays every file back and compares
+the results. `TestRecordExchanges` records them again with `-record`, against
+the release that `ORACLE_DSN` and `ORACLE_RELEASE` name. The comment at the
+top of `exchange_test.go` gives the command. Every recorded
+connection names the address `oracle.test:1521` and a fixed client identity,
+in the `CID` key, so the packets do not depend on the machine.
+
+The driver keeps a cache of fast login cookies for the whole process, and a
+cookie changes the logon. So each scenario clears it first, through
+`ResetCookies` in `export_test.go`. D9 moves the cache to the `Connector`, and
+the hook goes with it.
+
+A replay passes only while the driver sends the same packet types in the same
+order. A change that sends another packet, such as a new round trip at logon,
+needs the exchanges recorded again. That is the point: it shows each change to
+what the driver sends.
 
 An integration test reads `ORACLE_DSN` and skips when it is empty. CI sets it
-from `dbrun dsn` for every release (D7). `TestIssues` becomes these tests, one
-for each upstream issue that this design fixes, named for the issue.
+from `dbrun dsn --json` for every release (D7). `TestIssues` becomes these
+tests, one for each upstream issue that this design fixes, named for the issue.
 
 ## The order of the work
 

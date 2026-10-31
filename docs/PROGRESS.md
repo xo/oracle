@@ -12,14 +12,16 @@ on the `main` branch, with the module path `github.com/xo/oracle` (`cb68b12`).
 [`DESIGN.md`](DESIGN.md) holds the design of the rewrite, and D8 to D16 in
 [`PLAN.md`](PLAN.md) record it (`d9fa927`).
 
-Step 1 of the design is done and staged. `go.mod` requires Go 1.27.1, `go fix`
-ran over both modules, and `go vet ./...` and `go test -race -count=2 ./...`
-pass with no server, on Linux, and vet passes for Windows and macOS. The
-tests that did not build are deleted or moved, and `BACKLOG.md` lists them.
-Two faults came out of it and are fixed: `types.defaultCopy` panicked or
-failed when a value needed a conversion, and `result_set_test.go` lacked two
-braces. One fault is recorded and not fixed: the decoding of intervals.
-Nothing ran against a server yet.
+Step 1 of the design is done (`7bc994c`). `go.mod` requires Go 1.27.1, `go
+fix` ran over both modules, and every package vets and passes its unit tests
+with no server.
 
-The next step is step 2: record the exchanges of each release for the fake
-server.
+Step 2 is done and staged. `internal/tnstest` records the TNS packets of a
+connection and plays them back over a `net.Pipe`. `exchange_test.go` holds
+five scenarios, `ping`, `query`, `error`, `dml` and `clob`, and
+`testdata/exchanges/` holds them recorded against every release that `dbrun`
+starts: 11g, 18c, 19c, 21c, 23ai and 26ai. `TestExchanges` plays them all back
+with no server.
+
+The next step is step 3: move the protocol code to `internal/`, with no change
+of behavior. The exchanges prove that nothing changed.

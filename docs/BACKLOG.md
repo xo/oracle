@@ -32,6 +32,17 @@ OUT parameter. Step 1 deleted it as dead code, which changed nothing. An OUT
 string with no size breaking the connection, sijms/go-ora#703, can be the
 fault that this block was written for. Look at it with that issue.
 
+### Read the NLS settings on 11g
+
+The recorded exchanges show that `GetNLS`, which runs at every logon, fails on
+11g with `ORA-06502: PL/SQL: numeric or value error: character string buffer
+too small`. `OpenWithContext` traces the error and goes on, so a connection to
+11g has no NLS settings, and the server sends two marker packets that the
+driver answers. Every release also answers a statement at logon with
+`ORA-01403: no data found`, which nothing checks. Find which statement it is.
+A design that logs nothing (D14) has to return such an error or not run the
+statement. sijms/go-ora#611 asks for an option to skip the NLS query.
+
 ### Write the integration tests again
 
 Step 1 deleted the files of `TestIssues` that did not build against the `v3`
@@ -64,12 +75,16 @@ that it tested. The vectors of `converters/other_types_test.go` moved to
 `dbrun dsn --json`. Nothing ran it against a server yet. Run it on every
 release, and fix or record each failure.
 
-### Make 18c and 19c start in CI
+### Make 19c start in CI
 
-`dbmeta` marks 18c and 19c as verified because their images are built by hand
-from an Oracle installer (D7). The oracle job in the workflow lists them, and
-they fail on a runner until `dbmeta` can start them there. Decide with Ken
-whether to publish the images or to let those two jobs wait.
+`dbmeta` marks 18c and 19c as verified, and not tested in its CI (D7). On this
+machine on 2026-10-31, 18c started in less than a minute from its public image.
+19c needs the image that `dbrun build` makes from an Oracle installer that is
+not public, and its first start creates the database, which took more than the
+5 minutes that `dbrun start` waits. `dbrun start --timeout 25m oracle-19c`
+started it. The oracle job in the workflow lists 19c and fails on a runner
+until `dbmeta` can start it there. Decide with Ken whether to publish the image
+or to leave 19c out of CI.
 
 ### Shrink the charset tables
 
