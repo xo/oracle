@@ -301,10 +301,16 @@ func (resultSet *ResultSet) Next(dest []driver.Value) error {
 	}
 
 	if noOfRowsToFetch > 0 && resultSet.index%noOfRowsToFetch < len(resultSet.rows) {
-		length := min(len(dest), len(resultSet.rows[resultSet.index%noOfRowsToFetch]))
-		for x := 0; x < length; x++ {
-			dest[x] = resultSet.rows[resultSet.index%noOfRowsToFetch][x]
+		row := resultSet.rows[resultSet.index%noOfRowsToFetch]
+		if err := resultSet.parent.decodeRow(row); err != nil {
+			return err
 		}
+		length := min(len(dest), len(row))
+		for x := 0; x < length; x++ {
+			dest[x] = row[x]
+		}
+		// the row is not read again, and a loaded LOB is freed with it
+		resultSet.rows[resultSet.index%noOfRowsToFetch] = nil
 		resultSet.index++
 		return nil
 	}

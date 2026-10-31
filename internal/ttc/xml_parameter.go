@@ -153,7 +153,7 @@ func parseXMLImage(image []byte) (payload []byte, lob bool, err error) {
 // xmlClob returns the CLOB of an XMLType whose locator is locator, which 11g
 // sends for an XMLType that a table stores as a CLOB. It reads nothing: a
 // round trip in the middle of a fetch loses the rest of the fetch, so
-// decodePrim loads it after the fetch, as it loads a CLOB column.
+// decodeRow loads it after the fetch, as it loads a CLOB column.
 func xmlClob(locator []byte, conn codec.Conn) (any, error) {
 	streamer := conn.NewLobStreamer()
 	streamer.SetLocator(locator)

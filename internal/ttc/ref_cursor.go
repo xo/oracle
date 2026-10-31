@@ -120,10 +120,6 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = cursor.decodePrim(dataSet.currentResultSet())
-	if err != nil {
-		return nil, err
-	}
 	return dataSet, nil
 }
 
@@ -135,6 +131,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 	logger := cursor.connection.logger
 	logger.Debug("query a REF CURSOR", "cursor", cursor.cursorID)
 	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
+	cursor.autoFetch = cursor._noOfRowsToFetch == config.DefaultPrefetch
 	cursor._hasMoreRows = true
 	if len(cursor.parent.scnForSnapshot) > 0 {
 		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)

@@ -95,10 +95,12 @@ The eighth part of step 9 is done (`c8a1f39`, pushed). A NULL object of a
 batch is NULL (#721), and a failed handshake tries the next address (#619,
 #707).
 
-The ninth part of step 9 is staged. The options of one statement of dbimp
-D109 are built: `WithOptions`, `WithTimeout`, `WithPrefetch`,
-`WithLobFetch`, and `WithReadonly`, `WithParameter` and `WithDatabase`,
-which fail with `ErrNotSupported`. The root package and `integration` pass
-on 11g, 11g with `lob_fetch=stream`, 26ai and both Autonomous Database
-releases. The dbmeta session was asked for a release that requires network
-encryption, for #729. Left: streaming (D21), which needs a design.
+The ninth part of step 9 is done (`3ef13ad`, pushed). It builds the options
+of one statement of dbimp D109.
+
+The tenth part of step 9 is staged. A fetch of rows with LOB values holds
+the values of about 4 MiB, and `Next` loads a LOB one row at a time (#664).
+AES takes a zero IV on a server before 12c, where the driver panicked with
+encryption required (#729). dbmeta added `oracle-nne-26ai`, a server that
+requires encryption and checksums, and CI leaves it out. Left: a reader of
+one LOB in pieces (#681 and #559), which waits for Ken to agree to a design.

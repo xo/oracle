@@ -33,6 +33,7 @@ type parentStmt interface {
 	hasMoreRows() bool
 	noOfRowsToFetch() int
 	fetch(resultSet *ResultSet) error
+	decodeRow(row Row) error
 	hasBLOB() bool
 	hasLONG() bool
 	read(resultSet *ResultSet) error
@@ -63,6 +64,12 @@ type defaultStmt struct {
 	prefetch int
 	lob      config.LobFetch
 	lobSet   bool
+	// autoFetch is true when sizeFetch sizes each fetch. lobRowBytes is the
+	// size of the LOB values of a row in the last fetch that loaded them,
+	// and lobMeasured is true once one did.
+	autoFetch   bool
+	lobRowBytes int
+	lobMeasured bool
 }
 
 func (stmt *defaultStmt) CanAutoClose() bool {
@@ -555,26 +562,13 @@ func (stmt *defaultStmt) fetch(resultSet *ResultSet) error {
 		// last fetch of this one, with another mode
 		stmt.connection.connOption.Lob = stmt.lob
 	}
-	if stmt._noOfRowsToFetch == 25 {
-		// m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
-		maxRowSize := int64(0)
-		for _, col := range stmt.columns {
-			if col.isLobType() {
-				maxRowSize += 86
-			} else if col.isLongType() {
-				maxRowSize += 2
-			} else {
-				maxRowSize += col.MaxLen
-			}
-		}
-		if maxRowSize > 0 {
-			stmt._noOfRowsToFetch = (0x20000 / int(maxRowSize)) + 1
-		}
-		stmt.connection.logger.Debug("fetch size", "rows", stmt._noOfRowsToFetch)
-	}
-
+	stmt.sizeFetch()
 	logger := stmt.connection.logger
+	start := len(resultSet.rows)
 	err := stmt._fetch(resultSet)
+	if err == nil {
+		stmt.measureLobs(resultSet.rows[start:])
+	}
 	if errors.Is(err, tns.ErrConnReset) {
 		err = stmt.connection.read()
 		session := stmt.connection.session
@@ -603,31 +597,89 @@ func (stmt *defaultStmt) _fetch(resultSet *ResultSet) error {
 	if err != nil {
 		return err
 	}
-	err = stmt.read(resultSet)
-	if err != nil {
-		return err
+	return stmt.read(resultSet)
+}
+
+// fetchBudget is the bytes of the rows of one fetch, about, when sizeFetch
+// sizes it. It counts a LOB as its locator, and a LONG as 2 bytes.
+const fetchBudget = 0x20000
+
+// lobFetchBudget is the bytes of the LOB and LONG values of one fetch,
+// about, when sizeFetch sizes a fetch that brings them.
+const lobFetchBudget = 4 << 20
+
+// minLobRowBytes is the least size that sizeFetch takes for the LOB and LONG
+// values of a row, whatever the last fetch measured.
+const minLobRowBytes = 4 << 10
+
+// sizeFetch sets the rows that the next fetch asks for. It uses a prefetch
+// that the caller set as it is. For the default prefetch, it asks for the
+// rows that fill fetchBudget. When the fetch brings the values of LOB or
+// LONG columns inside it, it asks for one row first, and then for the rows
+// that fill lobFetchBudget with values the size of the last ones. A LOB
+// fetched inline is a LONG. go-ora counted it as 2 bytes, and so asked for
+// up to 65,537 rows and held every value at once, sijms/go-ora#664. A LOB
+// fetched as a locator is 86 bytes, because decodeRow loads its value one
+// row at a time.
+func (stmt *defaultStmt) sizeFetch() {
+	if !stmt.autoFetch {
+		return
 	}
-	return stmt.decodePrim(resultSet)
+	inline := stmt.connection.connOption.Lob == config.INLINE
+	rowSize, large := 0, false
+	for _, col := range stmt.columns {
+		switch {
+		case col.isLobType():
+			rowSize += 86
+			large = large || inline
+		case col.isLongType():
+			rowSize += 2
+			large = true
+		default:
+			rowSize += int(col.MaxLen)
+		}
+	}
+	rows := config.DefaultPrefetch
+	if rowSize > 0 {
+		rows = fetchBudget/rowSize + 1
+	}
+	switch {
+	case large && !stmt.lobMeasured:
+		rows = 1
+	case large:
+		// a fetch of NULLs and short values does not let the next one ask
+		// for every row
+		rows = max(1, min(rows, lobFetchBudget/max(stmt.lobRowBytes, minLobRowBytes)))
+	}
+	stmt._noOfRowsToFetch = rows
+	stmt.connection.logger.Debug("fetch size", "rows", rows)
+}
+
+// measureLobs records the size of the LOB and LONG values of a row of rows,
+// which a fetch brought.
+func (stmt *defaultStmt) measureLobs(rows []Row) {
+	if len(rows) == 0 {
+		return
+	}
+	n := 0
+	for _, row := range rows {
+		for i, col := range stmt.columns {
+			if !(col.isLobType() || col.isLongType()) || i >= len(row) {
+				continue
+			}
+			switch v := row[i].(type) {
+			case string:
+				n += len(v)
+			case []byte:
+				n += len(v)
+			}
+		}
+	}
+	stmt.lobRowBytes, stmt.lobMeasured = n/len(rows), true
 }
 
 func (stmt *defaultStmt) queryLobPrefetch(exeOp int, resultSet *ResultSet) error {
-	if stmt._noOfRowsToFetch == 25 {
-		// m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
-		maxRowSize := 0
-		for _, col := range stmt.columns {
-			if col.isLobType() {
-				maxRowSize += 86
-			} else if col.isLongType() {
-				maxRowSize += 2
-			} else {
-				maxRowSize += int(col.MaxLen)
-			}
-		}
-		if maxRowSize > 0 {
-			stmt._noOfRowsToFetch = (0x20000 / maxRowSize) + 1
-		}
-		stmt.connection.logger.Debug("fetch size", "rows", stmt._noOfRowsToFetch)
-	}
+	stmt.sizeFetch()
 	stmt.connection.session.ResetBuffer()
 	err := stmt.basicWrite(exeOp, false, true)
 	if err != nil {
@@ -1640,6 +1692,8 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 	}
 	logger := stmt.connection.logger
 	stmt._noOfRowsToFetch = stmt.prefetch
+	stmt.autoFetch = stmt.prefetch == config.DefaultPrefetch
+	stmt.lobMeasured = false
 	stmt._hasMoreRows = true
 	useNamedPars := len(namedArgs) > 0
 	for x := range namedArgs {
@@ -1762,87 +1816,81 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 			return nil, err
 		}
 	}
-	err = stmt.decodePrim(dataSet.currentResultSet())
-	if err != nil {
-		return nil, err
-	}
+	stmt.measureLobs(dataSet.currentResultSet().rows)
 	stmt.parse = false
 	stmt.define = false
 	stmt.reSendParDef = false
 	return dataSet, err
 }
 
-func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
+// decodeRow converts the values of row that the driver holds into the
+// values that it returns, such as a LOB locator into its value. Next calls
+// it on each row as it returns the row, and not on each fetch, so that the
+// driver holds the loaded LOB values of one row and not of a whole fetch,
+// sijms/go-ora#664.
+func (stmt *defaultStmt) decodeRow(row Row) error {
 	var err error
-	// convert from go-ora primitives to sql primitives
-	for rowIndex, row := range resultSet.rows {
-		for colIndex, _ := range stmt.columns {
-			if row == nil {
-				continue
+	for colIndex := range stmt.columns {
+		if colIndex >= len(row) {
+			break
+		}
+		switch val := row[colIndex].(type) {
+		case *RefCursor:
+			row[colIndex], err = val.Query()
+			if err != nil {
+				return err
 			}
-			switch val := row[colIndex].(type) {
-			case *RefCursor:
-				resultSet.rows[rowIndex][colIndex], err = val.Query()
+		case *types.Vector:
+			if stmt.connection.connOption.Lob == config.INLINE {
+				row[colIndex], err = val.Value()
 				if err != nil {
 					return err
 				}
-			case *types.Vector:
-				if stmt.connection.connOption.Lob == config.INLINE {
-					resultSet.rows[rowIndex][colIndex], err = val.Value()
-					if err != nil {
-						return err
-					}
-				} else {
-					if val.ReadMode() == config.LobReadModeAuto {
-						err = val.Load()
-						if err != nil {
-							return err
-						}
-						resultSet.rows[rowIndex][colIndex], err = val.Value()
-						if err != nil {
-							return err
-						}
-					}
-				}
-			case *types.JSON:
-				// a JSON row is its JSON text. Inline, the row holds the OSON,
-				// and streamed, it holds a locator that a load reads
-				if stmt.connection.connOption.Lob != config.INLINE {
-					if val.ReadMode() != config.LobReadModeAuto {
-						continue
-					}
-					if err = val.Load(); err != nil {
-						return err
-					}
-				}
-				if err = codec.DecodeOSON(val); err != nil {
+			} else if val.ReadMode() == config.LobReadModeAuto {
+				if err = val.Load(); err != nil {
 					return err
 				}
-				resultSet.rows[rowIndex][colIndex], err = val.Value()
+				row[colIndex], err = val.Value()
 				if err != nil {
 					return err
 				}
-			case *types.Clob:
-				if val.ReadMode() == config.LobReadModeAuto {
-					err = val.Load()
-					if err != nil {
-						return err
-					}
-					resultSet.rows[rowIndex][colIndex], err = val.Value()
-					if err != nil {
-						return err
-					}
+			}
+		case *types.JSON:
+			// a JSON row is its JSON text. Inline, the row holds the OSON,
+			// and streamed, it holds a locator that a load reads
+			if stmt.connection.connOption.Lob != config.INLINE {
+				if val.ReadMode() != config.LobReadModeAuto {
+					continue
 				}
-			case *types.Blob:
-				if val.ReadMode() == config.LobReadModeAuto {
-					err = val.Load()
-					if err != nil {
-						return err
-					}
-					resultSet.rows[rowIndex][colIndex], err = val.Value()
-					if err != nil {
-						return err
-					}
+				if err = val.Load(); err != nil {
+					return err
+				}
+			}
+			if err = codec.DecodeOSON(val); err != nil {
+				return err
+			}
+			row[colIndex], err = val.Value()
+			if err != nil {
+				return err
+			}
+		case *types.Clob:
+			if val.ReadMode() == config.LobReadModeAuto {
+				if err = val.Load(); err != nil {
+					return err
+				}
+				row[colIndex], err = val.Value()
+				if err != nil {
+					return err
+				}
+			}
+		case *types.Blob:
+			if val.ReadMode() == config.LobReadModeAuto {
+				if err = val.Load(); err != nil {
+					return err
+				}
+				row[colIndex], err = val.Value()
+				if err != nil {
+					return err
 				}
 			}
 		}

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -298,6 +299,125 @@ func TestClobCharset(t *testing.T) {
 	}
 	if c != long || v != short {
 		t.Errorf("got %d and %d bytes, want %d and %d", len(c), len(v), len(long), len(short))
+	}
+}
+
+// TestLobRows is sijms/go-ora#664: a fetch of rows with LOB values asked
+// for about 1,500 rows, or 65,537 when a LOB came inline as a LONG, and held
+// every value of them at once. Here the heap stays far below the size of the
+// rows, in each LOB fetch mode.
+func TestLobRows(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_lob_rows", "c CLOB")
+	const size, rows = 256 * 4000, 100
+	_, err := db.ExecContext(ctx, `DECLARE l CLOB;
+		BEGIN
+			INSERT INTO xo_oracle_lob_rows VALUES (EMPTY_CLOB()) RETURNING c INTO l;
+			FOR i IN 1..256 LOOP DBMS_LOB.WRITEAPPEND(l, 4000, RPAD('y', 4000, 'y')); END LOOP;
+		END;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	heap := func() uint64 {
+		runtime.GC()
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		return m.HeapAlloc
+	}
+	for _, mode := range []oracle.LobFetch{oracle.LobFetchInline, oracle.LobFetchStream} {
+		before := heap()
+		r, err := db.QueryContext(ctx, `SELECT c FROM xo_oracle_lob_rows,
+			(SELECT LEVEL FROM dual CONNECT BY LEVEL <= `+strconv.Itoa(rows)+`)`, oracle.WithLobFetch(mode))
+		if err != nil {
+			t.Fatalf("%s: %v", mode, err)
+		}
+		n, most := 0, uint64(0)
+		for r.Next() {
+			var c string
+			if err := r.Scan(&c); err != nil || len(c) != size {
+				t.Fatalf("%s: row %d has %d bytes, %v", mode, n, len(c), err)
+			}
+			if n++; n%10 == 0 {
+				most = max(most, heap())
+			}
+		}
+		if err := r.Err(); err != nil || n != rows {
+			t.Fatalf("%s: %d rows, %v", mode, n, err)
+		}
+		if grew := int64(most) - int64(before); grew > rows*size/4 {
+			t.Errorf("%s: the heap grew by %d bytes for %d rows of %d", mode, grew, rows, size)
+		}
+	}
+}
+
+// TestNetworkEncryption is sijms/go-ora#729: with native network encryption
+// required, the driver gave AES the IV of 20 bytes that a server before 12c
+// sends, and panicked on 11g. Here the client requires encryption and
+// checksums, and the session reports both.
+func TestNetworkEncryption(t *testing.T) {
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn == "" {
+		t.Skip("ORACLE_DSN is empty")
+	}
+	cfg, err := oracle.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TLS != nil || cfg.SSLMode != "" && cfg.SSLMode != oracle.SSLDisable {
+		t.Skip("the DSN uses TLS, which replaces native network encryption")
+	}
+	cfg.Encryption, cfg.Checksum = oracle.ServiceRequired, oracle.ServiceRequired
+	c, err := oracle.NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := sql.OpenDB(c)
+	defer db.Close()
+	ctx := t.Context()
+	rows, err := db.QueryContext(ctx, `SELECT network_service_banner FROM v$session_connect_info
+		WHERE sid = SYS_CONTEXT('USERENV', 'SID')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var banners []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		banners = append(banners, strings.ToLower(s))
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Join(banners, "\n")
+	for _, want := range []string{"encryption service adapter", "crypto-checksumming service adapter"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("the session has no %s: %q", want, banners)
+		}
+	}
+	// rows of many packets, each encrypted
+	var n, size int
+	err = db.QueryRowContext(ctx, `SELECT count(*), sum(length(v)) FROM
+		(SELECT RPAD(:1, 4000, 'x') v FROM dual CONNECT BY LEVEL <= 100)`, "abc").Scan(&n, &size)
+	if err != nil || n != 100 || size != 400_000 {
+		t.Errorf("read %d rows of %d characters, %v", n, size, err)
+	}
+	rows, err = db.QueryContext(ctx, "SELECT RPAD('x', 4000, 'x') FROM dual CONNECT BY LEVEL <= 100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n = 0
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil || len(v) != 4000 {
+			t.Fatalf("row %d: %d bytes, %v", n, len(v), err)
+		}
+		n++
+	}
+	if err := rows.Err(); err != nil || n != 100 {
+		t.Errorf("read %d rows, %v", n, err)
 	}
 }
 

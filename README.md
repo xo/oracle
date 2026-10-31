@@ -111,7 +111,7 @@ none of the key names of `go-ora`, such as `SSL VERIFY` or `SERVICE NAME`.
 | `sslservername` | The name to check the certificate against | the host |
 | `wallet`, `wallet_password` | A folder with `cwallet.sso` or `ewallet.p12`, and its password | none |
 | `timeout`, `connect_timeout` | Go durations, such as `30s` | none, and `60s` |
-| `prefetch` | The rows that one fetch asks for | `25` |
+| `prefetch` | The rows that one fetch asks for. With `25`, the driver sizes each fetch by the size of its rows and their LOB values | `25` |
 | `lob_fetch`, `lob_read` | `inline` or `stream`, and `auto` or `explicit` | `inline`, `auto` |
 | `auth` | `password`, `os`, `kerberos` or `token` | `password` |
 | `privilege` | `sysdba`, `sysoper`, `sysasm`, `sysbackup`, `sysdg`, `syskm` or `sysrac` | none |

@@ -120,12 +120,16 @@ func (config *ConnectionConfig) ConnectionData() string {
 	return "(DESCRIPTION=" + address + connectData + security + "))"
 }
 
+// DefaultPrefetch is the prefetch of a connection that sets none. A
+// statement with it sizes each fetch by the size of its rows.
+const DefaultPrefetch = 25
+
 // New returns the configuration of a connection with the defaults of the
-// protocol: 25 rows a fetch, fast login, a connect timeout of 60 seconds,
-// TCP, and the language AMERICAN in the territory AMERICA.
+// protocol: the default prefetch, fast login, a connect timeout of 60
+// seconds, TCP, and the language AMERICAN in the territory AMERICA.
 func New() *ConnectionConfig {
 	return &ConnectionConfig{
-		PrefetchRows: 25,
+		PrefetchRows: DefaultPrefetch,
 		FastLogin:    true,
 		SessionInfo: SessionInfo{
 			ConnectTimeout:        60 * time.Second,

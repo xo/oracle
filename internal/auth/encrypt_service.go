@@ -81,6 +81,14 @@ func (serv *encryptService) activateAlgorithm() error {
 		iv = serv.ano.iv[:16]
 	}
 
+	// AES takes an IV of 16 bytes. A server before the new version sends
+	// one of 20 bytes for the other algorithms, and uses an IV of zeros for
+	// AES, as go-ora v2 did. go-ora v3 gave AES the 20 bytes, which panicked
+	// on 11g, sijms/go-ora#729.
+	aesIV := iv
+	if len(aesIV) != 16 {
+		aesIV = nil
+	}
 	var algo security.OracleNetworkEncryption = nil
 	var err error
 	switch serv.algoID {
@@ -97,11 +105,11 @@ func (serv *encryptService) activateAlgorithm() error {
 	case 10:
 		algo, err = security.NewOracleNetworkRC4Cryptor(key, iv, 128)
 	case 15:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], iv)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:16], aesIV)
 	case 16:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], iv)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:24], aesIV)
 	case 17:
-		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], iv)
+		algo, err = security.NewOracleNetworkCBCEncrypter(key[:32], aesIV)
 	default:
 		err = errors.New(fmt.Sprintf("advanced negotiation error: encryption service algorithm: %d still not supported", serv.algoID))
 	}

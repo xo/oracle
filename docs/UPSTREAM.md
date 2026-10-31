@@ -46,7 +46,7 @@ blocks a connection, P2 is a fault with a workaround.
 | sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Fixed in step 9. `CheckNamedValue` returns `driver.ErrSkip` for a named type of a basic kind that the driver does not know, so `database/sql` converts it by its kind. `time.Duration` still binds as an interval. `TestNamedTypes` holds it, on 26ai, without sijms/go-ora#747 |
 | sijms/go-ora#671 | P2 | `RefCursor.Query` on a cursor the procedure never opened breaks the connection | Return an error before the round trip | Not reproduced. The execute returns ORA-01001, and the connection stays usable. `TestUnopenedRefCursor` holds it, on 26ai |
 | sijms/go-ora#698 | P2 | A `MERGE` that violates a key returns a timeout and not ORA-00001 | Needs a trace | Fixed in step 9. On 11g, which is before TTC 7, the driver read the errors of an array DML as three empty fields, so a batch that failed waited for bytes that never came. 26ai returned ORA-00001 already. `TestSummaryArrayDMLError` holds the 11g reply, and `TestBatchError` holds it on 11g and 26ai |
-| sijms/go-ora#729 | P2 | A server that requires native network encryption or checksums refuses the client with ORA-12269 | Implement the negotiation | Open. Ken asked that it be reproduced and fixed (D21) |
+| sijms/go-ora#729 | P2 | A server that requires native network encryption or checksums refuses the client with ORA-12269 | Implement the negotiation | Fixed in step 9 (D21). The refusal did not reproduce: on `oracle-nne-26ai`, whose server requires AES256 and SHA256, the driver negotiates both, with the client at any level. With `encryption=required` on 11g, the driver panicked: it gave AES the IV of 20 bytes that a server before the new version sends, which the 12.1 report in the issue also points at. AES takes an IV of zeros there, as in `v2`. `TestNetworkEncryption` requires both services from the client and finds both in `V$SESSION_CONNECT_INFO`, on 11g, 18c, 26ai and `oracle-nne-26ai` |
 
 ## Faults that need a reproduction first
 
@@ -74,7 +74,15 @@ connection needs (#619), which also serves the failover of a descriptor of
 many addresses (#707), and `TestFailover` holds both. #530 asked for the
 logon with an OCI IAM token, which the `v3` code had already as
 `auth=token` with `token` and `token_key`, and which no `dbrun` release can
-test. Ken decided to take #611, #530, #681, #559, #664,
+test. Rows were read one fetch at a time already, so a query of 400,000
+plain rows held under 1 MiB (#664). Rows with LOB values did not: a fetch
+counted a LOB as its locator, or as 2 bytes when it came inline as a LONG,
+and so asked for up to 65,537 rows and held every value at once. 300 rows
+of 1 MB CLOBs held 300 MB. A fetch with LOB values inside it is sized by
+the size of the values now, and a LOB fetched as a locator is loaded one
+row at a time, in `Next`. The same rows hold 5 MB inline and 7 MB
+streamed, and `TestLobRows` holds it. A reader of one LOB in pieces (#681
+and #559) waits for Ken. Ken decided to take #611, #530, #681, #559, #664,
 #707 and #619 (D21). The rest wait for Ken.
 
 sijms/go-ora#649 asks for smaller charset tables, which step 8 built. sijms/go-ora#653 (VECTOR) and sijms/go-ora#365 (Advanced Queuing) are in
