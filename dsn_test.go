@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"errors"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -167,6 +168,25 @@ func TestConnectionConfig(t *testing.T) {
 	clone.Servers[0].Addr = "other"
 	if conn.Servers[0].Addr != "h" {
 		t.Error("Clone shares the servers of the original")
+	}
+}
+
+func TestConnectionConfigDescriptor(t *testing.T) {
+	cfg, err := ParseDSN("oracle://u:p@?descriptor=" + url.QueryEscape(
+		"(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=x)(PORT=1))(ADDRESS=(PROTOCOL=tcp)(HOST=y)(PORT=2))"+
+			"(CONNECT_DATA=(SERVICE_NAME=svc)(INSTANCE_NAME=ins)))"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := cfg.connectionConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conn.Servers) != 2 || conn.Servers[0].Addr != "x" || conn.Servers[1].Port != 2 {
+		t.Errorf("servers: got %+v", conn.Servers)
+	}
+	if conn.ServiceName != "svc" || conn.InstanceName != "ins" {
+		t.Errorf("got the service %q and the instance %q", conn.ServiceName, conn.InstanceName)
 	}
 }
 

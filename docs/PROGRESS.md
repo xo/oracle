@@ -24,13 +24,15 @@ five scenarios, recorded under `testdata/exchanges/` against 11g, 18c, 19c,
 Step 3 is done (`eb5e173`). Every package that a caller does not use moved
 under `internal/`, and the 30 exchanges passed after the move.
 
-Step 4 is done and staged. The package is `oracle`. `ParseDSN`, `Config` and
-`Config.DSN` read and write the DSN of D11. `Driver` holds nothing, and each
-`Connector` holds the state of one database. The package variable and the
-functions that kept state through a `*sql.DB` are gone, except `RegisterType`,
-which now reaches its own database alone. `configurations` moved to
-`internal/configurations`. `Config` still hands its values to the parser of
-`go-ora`, so the 30 exchanges pass with no new recording.
+Step 4 is done (`c825f8d`). The package is `oracle`, with `ParseDSN`,
+`Config`, `Driver`, `Connector` and the sentinel errors, and no package
+variable.
 
-The next step is step 4b: move the TTC code to `internal/ttc`, unexport the
-types that `go-ora` exported, and write the configuration directly.
+Step 4b is done and staged. The TTC code moved to `internal/ttc`, and the root
+package exports 31 names. `Config.connectionConfig` writes the configuration
+directly, and the parser of `go-ora` is gone. `RegisterType` stays (see
+`DESIGN.md`). The 30 exchanges pass, and `TestIssues` on 26ai gives the same
+42 passes and 3 failures as before.
+
+The next step is step 5: replace `StartContext` with deadlines and
+`context.AfterFunc`.

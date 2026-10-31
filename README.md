@@ -219,23 +219,21 @@ after its logon.
 ```
 oracle/
 ├── aq/                # Advanced Queuing
-├── configurations/    # Connection string parsing
 ├── types/             # Oracle type implementations
 ├── internal/
 │   ├── auth/          # Encryption, checksums, Kerberos, NTS, NTLM
 │   ├── codec/         # Type encoding and decoding, and OSON
 │   ├── converters/    # Charsets, NUMBER, dates
+│   ├── configurations/ # The configuration of a connection, and wallets
 │   ├── tns/           # TNS packets and the session
+│   ├── ttc/           # Connections, statements, rows, LOBs, types
 │   └── tnstest/       # Recorded exchanges for the tests
-├── testdata/exchanges # Exchanges recorded against each release
-├── connection.go      # Connection implementation
-├── driver.go          # Driver registration
-├── command.go         # Statement execution
-├── parameter.go       # Parameter handling
-├── lob.go             # LOB streaming
-├── udt.go             # User-Defined Types
-├── transaction.go     # Transactions
-└── bulk_copy.go       # Bulk copy
+├── testdata/          # Exchanges recorded against each release
+├── connector.go       # Connector, and the configuration of each connection
+├── driver.go          # Driver registration, RegisterType
+├── dsn.go             # Config and ParseDSN
+├── errors.go          # Sentinel errors
+└── values.go          # Out, RefCursor and the other types a caller uses
 ```
 
 ### Design Principles

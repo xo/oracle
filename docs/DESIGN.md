@@ -71,6 +71,8 @@ sent the same packets.
 | --- | --- | --- |
 | `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package. Step 4 moves `configurations` and `types` here |
 | `aq/` | Advanced Queuing | `aq` |
+| `internal/ttc/` | The connection, statements, rows, transactions, LOBs, cursors, user defined types, the negotiation of data types, O5LOGON, and the registry of types | the root package, which step 4b moved |
+| `internal/configurations/` | The configuration of the protocol code, and wallets | `configurations` |
 | `internal/tns/` | Packets, the session, TLS, the redirect, out of band breaks | `network` |
 | `internal/auth/` | The advanced negotiation of Oracle Net: encryption, checksums, Kerberos and NTS | `advanced_nego` |
 | `internal/auth/security/` | DES and RC4, and the padding that O5LOGON uses | `network/security` |
@@ -82,9 +84,9 @@ sent the same packets.
 
 Later steps finish the layout:
 
-- Step 4 moves the TTC messages of the root package, such as cursors, LOB
-  calls and the negotiation of data types, to `internal/ttc/`, and O5LOGON and
-  the wallets to `internal/auth/`.
+- Step 4b moved the TTC code of the root package to `internal/ttc/`. O5LOGON
+  is in `internal/ttc/auth_object.go`, and the wallets in
+  `internal/configurations`. Both can move to `internal/auth/` later.
 - Step 8 splits `internal/converters` into `internal/charset`, the compacted
   charsets, and `internal/codec`, the number and date encoders.
 - `internal/trace` goes with D14, and the code of `internal/lazyinit` and
@@ -109,6 +111,12 @@ one job, so that a person or an agent finds a behavior by its file name.
 | `values.go` | The Oracle types that Go lacks, such as `IntervalYM`, `RowID`, `Vector` and `JSON` |
 | `lob.go` | `Clob`, `Blob` and `BFile` |
 | `object.go` | User defined types and collections |
+
+After step 4b the root package holds `driver.go`, `connector.go`, `dsn.go`,
+`errors.go` and `values.go`. `values.go` names the types of `internal/ttc`
+that a caller uses, such as `Out` and `RefCursor`, as aliases. `conn`, `stmt`,
+`rows` and `tx` are still `ttc.Connection`, `ttc.Stmt`, `ttc.DataSet` and
+`ttc.Transaction`, and steps 5 and 6 reshape them there.
 
 ## Connector
 
@@ -135,18 +143,26 @@ DSN with `ParseDSN` and changes the result, and calls
 | Today | Design |
 | --- | --- |
 | `AddSessionParam(db, k, v)` | `WithSessionParam(k, v)`, a `ConnectorOption`, run after each logon |
-| `RegisterType(db, name, array, v)` | `WithType(name, array, v)`, a `ConnectorOption`. Until step 4b, `RegisterType` keeps its `*sql.DB`, and reaches the registry of that database alone through `db.Driver()` |
+| `RegisterType(db, name, array, v)` | Kept, with its `*sql.DB`. It reaches the registry of that database alone through `db.Driver()`. See the note below |
 | `AddParameterCoder(db, t, id, c)` | Removed until a caller needs it. A user defined type covers the case that issues name |
 | `SetStringConverter(db, ...)` | Removed. The server names the charset at logon, and the connection keeps it |
 | `WithTLSConfig(cfg)` | `Config.TLS`, a `*tls.Config` that the connector clones for each dial, which fixes sijms/go-ora#757 |
 | `RegisterConnConfig(cfg)` | Removed |
 
-Step 4 built this, with one difference. `Config` hands its values to the
-parser of `go-ora`, through `Config.connectionConfig`, because that parser
-holds the defaults and the checks that the exchanges were recorded with. So
-the driver sends the same packets as before, and the 30 exchanges prove it.
-Step 4b writes the configuration of the protocol code directly and deletes
-that parser.
+Step 4 built this, and step 4b finished it. `Config.connectionConfig` writes
+the configuration of the protocol code directly. Before the parser of
+`go-ora` went, a test compared the two configurations, field by field, for 18
+DSNs, and they were equal. The one difference was a fault of the old path: it
+wrote the key `CONNSTR` and the parser read `connStr`, so a descriptor failed.
+
+`RegisterType` keeps its `*sql.DB`, and `WithType` does not exist. A
+`ConnectorOption` acts when the connector connects, and `RegisterType` reads
+the attributes of the type from the database, so the type has to exist
+before the first connection. A program, and many tests in `TestIssues`,
+create the type through the same `*sql.DB` and register it after. Under
+`WithType` the first connection fails, and the type can never be created. The
+registry belongs to one connector, so `RegisterType` changes no other
+database, which is what D9 asks.
 
 `Driver` is the value that `init` registers, and it holds nothing. Each
 `Connector` returns a `Driver` that points back at it, so a function that
@@ -410,11 +426,10 @@ Each step leaves a driver that builds and passes its tests.
 4. Write the root package as this document says, as the package `oracle`:
    `Driver`, `Connector`, `Config` with the DSN, and the errors. Delete the
    package variable and the functions that take a `*sql.DB` for state.
-4b. Move the TTC code of the root package to `internal/ttc`, and unexport
+4b. Move the TTC code of the root package to `internal/ttc`, so that
    `Connection`, `Stmt`, `DataSet`, `ParameterInfo` and the other types that
-   `go-ora` exported, as `conn`, `stmt`, `rows` and `tx`. Write the
-   configuration of the protocol code from `Config` directly, delete the
-   parser of `go-ora`, and replace `RegisterType` with `WithType`.
+   `go-ora` exported are hidden from callers. Write the configuration of the
+   protocol code from `Config` directly, and delete the parser of `go-ora`.
 5. Replace `StartContext` with deadlines and `context.AfterFunc`.
 6. Change the values to the table above, and add `RowsColumnScanner`.
 7. Move JSON and OSON to `encoding/json/v2`.

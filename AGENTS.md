@@ -63,8 +63,11 @@ yourself and do not write it as though it were settled.
 ## Layout
 
 - `/` is the driver, the package `oracle` (D8). `dsn.go` holds `Config` and
-  `ParseDSN`, `connector.go` the `Driver` and the `Connector`, and `errors.go`
-  the sentinel errors.
+  `ParseDSN`, `connector.go` the `Connector`, `driver.go` the `Driver` and
+  `RegisterType`, `errors.go` the sentinel errors, and `values.go` the types
+  of `internal/ttc` that a caller uses.
+- `internal/ttc` holds the connection, statements, rows and the rest of the
+  protocol above TNS (D12).
 - `types` and `aq` are public. Step 6 moves the values of `types` into the
   root package.
 - `internal/` holds everything that a caller does not use, and the table in

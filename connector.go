@@ -9,15 +9,13 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"os"
 	"os/user"
 	"strconv"
-	"strings"
 	"sync"
 
-	"github.com/xo/oracle/internal/auth"
 	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/ttc"
 )
 
 // Driver is the oracle driver. The value that init registers holds nothing.
@@ -47,12 +45,6 @@ func (Driver) OpenConnector(dsn string) (driver.Connector, error) {
 	return NewConnector(cfg)
 }
 
-// sessionParam is a parameter that the connector sets on each session with
-// ALTER SESSION.
-type sessionParam struct {
-	key, value string
-}
-
 // Connector opens connections to one Oracle database. It holds everything
 // that belongs to that database: the configuration, the session parameters,
 // the registered types and the type coders (D9). Pass it to sql.OpenDB.
@@ -60,8 +52,8 @@ type Connector struct {
 	cfg    Config
 	conn   *configurations.ConnectionConfig
 	wallet *configurations.Wallet
-	params []sessionParam
-	reg    *registry
+	params []ttc.SessionParam
+	reg    *ttc.Registry
 
 	mu     sync.Mutex
 	closed bool
@@ -76,7 +68,7 @@ type ConnectorOption func(*Connector) error
 // "'YYYY-MM-DD'").
 func WithSessionParam(key, value string) ConnectorOption {
 	return func(c *Connector) error {
-		c.params = append(c.params, sessionParam{key, value})
+		c.params = append(c.params, ttc.SessionParam{Key: key, Value: value})
 		return nil
 	}
 }
@@ -97,7 +89,7 @@ func WithWallet(r io.Reader) ConnectorOption {
 // NewConnector returns a Connector for cfg. It reads the files that cfg names,
 // such as a wallet or a certificate, and it does not connect.
 func NewConnector(cfg Config, opts ...ConnectorOption) (*Connector, error) {
-	c := &Connector{cfg: cfg, reg: newRegistry()}
+	c := &Connector{cfg: cfg, reg: ttc.NewRegistry()}
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
 			return nil, err
@@ -123,7 +115,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if err := conn.OpenWithContext(ctx); err != nil {
 		return nil, err
 	}
-	if err := c.reg.initFromConn(conn, c.params); err != nil {
+	if err := c.reg.InitFromConn(conn, c.params); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
@@ -139,7 +131,7 @@ func (c *Connector) open() (driver.Conn, error) {
 	if err := conn.Open(); err != nil {
 		return nil, err
 	}
-	if err := c.reg.initFromConn(conn, c.params); err != nil {
+	if err := c.reg.InitFromConn(conn, c.params); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
@@ -148,20 +140,14 @@ func (c *Connector) open() (driver.Conn, error) {
 
 // newConnection returns a connection that is not open yet, with its own copy
 // of the configuration, because a connection changes its copy as it connects.
-func (c *Connector) newConnection() (*Connection, error) {
+func (c *Connector) newConnection() (*ttc.Connection, error) {
 	c.mu.Lock()
 	closed := c.closed
 	c.mu.Unlock()
 	if closed {
 		return nil, ErrConnectorClosed
 	}
-	conn, err := NewConnection(c.conn.Clone())
-	if err != nil {
-		return nil, err
-	}
-	conn.buildParameterCoderMap(c.reg)
-	conn.cusTyp = c.reg.cusTyp
-	return conn, nil
+	return c.reg.NewConnection(c.conn.Clone())
 }
 
 // Driver returns a Driver that points at c.
@@ -179,87 +165,62 @@ func (c *Connector) Close() error {
 }
 
 // connectionConfig returns the configuration of the protocol code for cfg.
-//
-// For now it writes the DSN that the parser of go-ora reads, and parses that.
-// The parser holds the defaults and the checks that the recorded exchanges
-// were made with, so the driver sends the same packets as before. A later
-// step writes the configuration directly and deletes the parser.
 func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
 	if err := cfg.check(); err != nil {
 		return nil, fmt.Errorf("checking the configuration: %w", err)
 	}
-	port := cfg.Port
-	if port == 0 {
-		port = DefaultPort
+	conn := configurations.New()
+	conn.UserID, conn.Password = cfg.User, cfg.Password
+	if cfg.Host != "" {
+		port := cfg.Port
+		if port == 0 {
+			port = DefaultPort
+		}
+		conn.Servers = append(conn.Servers, configurations.ServerAddr{Addr: cfg.Host, Port: port})
 	}
-	u := &url.URL{
-		Scheme: "oracle",
-		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(port)),
-		Path:   "/" + cfg.Service,
-	}
-	if cfg.Descriptor != "" && cfg.Host == "" {
-		u.Host = ":0"
-	}
-	if cfg.User != "" || cfg.Password != "" {
-		u.User = url.UserPassword(cfg.User, cfg.Password)
-	}
-	q := url.Values{}
-	set := func(key, v string) {
-		if v != "" {
-			q.Set(key, v)
+	conn.ServiceName = cfg.Service
+	if cfg.Descriptor != "" {
+		// the descriptor names the addresses, and can name the service, the
+		// SID and the instance
+		if err := conn.UpdateDatabaseInfo(cfg.Descriptor); err != nil {
+			return nil, fmt.Errorf("reading the descriptor: %w", err)
 		}
 	}
-	set("SID", cfg.SID)
-	set("INSTANCE NAME", cfg.Instance)
-	set("CONNSTR", cfg.Descriptor)
-	for _, s := range cfg.Servers {
-		q.Add("SERVER", s)
+	if cfg.SID != "" {
+		conn.SID = cfg.SID
 	}
+	if cfg.Instance != "" {
+		conn.InstanceName = cfg.Instance
+	}
+	for _, s := range cfg.Servers {
+		host, p, err := net.SplitHostPort(s)
+		if err != nil {
+			return nil, fmt.Errorf("reading the server %q: %w", s, ErrInvalidValue)
+		}
+		port, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, fmt.Errorf("reading the port of the server %q: %w", s, ErrInvalidValue)
+		}
+		conn.Servers = append(conn.Servers, configurations.ServerAddr{Addr: host, Port: port})
+	}
+	if len(conn.Servers) == 0 {
+		return nil, fmt.Errorf("no address: %w", ErrInvalidValue)
+	}
+	switch cfg.Auth {
+	case AuthOS:
+		conn.AuthType = configurations.OS
+	case AuthKerberos:
+		conn.AuthType = configurations.Kerberos
+	}
+	conn.EncServiceLevel = cfg.Encryption.level()
+	conn.IntServiceLevel = cfg.Checksum.level()
 	switch cfg.SSLMode {
 	case "", SSLDisable:
 	case SSLRequire:
-		q.Set("SSL", "true")
-		q.Set("SSL VERIFY", "false")
+		conn.SSL, conn.SSLVerify = true, false
 	default:
-		q.Set("SSL", "true")
-		q.Set("SSL VERIFY", "true")
+		conn.SSL, conn.SSLVerify = true, true
 	}
-	set("WALLET", cfg.Wallet)
-	set("WALLET PASSWORD", cfg.WalletPassword)
-	if cfg.Prefetch != 0 {
-		q.Set("PREFETCH_ROWS", strconv.Itoa(cfg.Prefetch))
-	}
-	set("LOB FETCH", strings.ToUpper(string(cfg.LobFetch)))
-	set("LOB READ", strings.ToUpper(string(cfg.LobRead)))
-	switch cfg.Auth {
-	case AuthOS:
-		q.Set("AUTH TYPE", "OS")
-	case AuthKerberos:
-		q.Set("AUTH TYPE", "KERBEROS")
-	}
-	set("TOKEN FILE", cfg.Token)
-	set("TOKEN PRIVATE KEY FILE", cfg.TokenKey)
-	set("ENCRYPTION", strings.ToUpper(string(cfg.Encryption)))
-	set("DATA INTEGRITY", strings.ToUpper(string(cfg.Checksum)))
-	set("LANGUAGE", cfg.Language)
-	set("TERRITORY", cfg.Territory)
-	set("CHARSET", cfg.Charset)
-	set("PROGRAM", cfg.Program)
-	set("PROXY CLIENT NAME", cfg.ProxyUser)
-	set("UNIX SOCKET", cfg.UnixSocket)
-	if cid := cfg.Client.cid(); cid != "" {
-		q.Set("CID", cid)
-	}
-	u.RawQuery = q.Encode()
-
-	conn, err := configurations.ParseConfig(u.String())
-	if err != nil {
-		return nil, fmt.Errorf("reading the configuration: %w", err)
-	}
-	if len(conn.OSPassword) > 0 {
-		SetNTSAuth(&auth.NTSAuthHash{})
-	}
-	// the parser gives SYS the SYSDBA privilege by its name, and D11 does not
 	conn.DBAPrivilege = configurations.DBAPrivilegeFromString(string(cfg.Privilege))
 	if cfg.Timeout != 0 {
 		conn.Timeout = cfg.Timeout
@@ -267,17 +228,67 @@ func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
 	if cfg.ConnectTimeout != 0 {
 		conn.ConnectTimeout = cfg.ConnectTimeout
 	}
+	if cfg.Prefetch != 0 {
+		conn.PrefetchRows = cfg.Prefetch
+	}
+	if cfg.LobFetch == LobFetchStream {
+		conn.Lob = configurations.STREAM
+	}
+	if cfg.LobRead == LobReadExplicit {
+		conn.LobReadMode = configurations.LobReadMode_NONE
+	}
+	conn.UnixAddress = cfg.UnixSocket
+	conn.TokenFile, conn.TokenPrivateKeyFile = cfg.Token, cfg.TokenKey
+	conn.ProxyClientName = cfg.ProxyUser
+	if cfg.Language != "" {
+		conn.Language = cfg.Language
+	}
+	if cfg.Territory != "" {
+		conn.Territory = cfg.Territory
+	}
+	if cfg.Charset != "" {
+		id, err := configurations.CharsetID(cfg.Charset)
+		if err != nil {
+			return nil, fmt.Errorf("reading the charset: %w: %w", ErrInvalidValue, err)
+		}
+		conn.CharsetID = id
+	}
+	conn.ProgramName = cfg.Program
+	conn.Cid = cfg.Client.cid()
+	if cfg.Wallet != "" {
+		if err := conn.LoadWallet(cfg.Wallet, cfg.WalletPassword); err != nil {
+			return nil, fmt.Errorf("reading the wallet: %w", err)
+		}
+	}
+	if err := conn.Validate(); err != nil {
+		return nil, fmt.Errorf("checking the configuration: %w", err)
+	}
 	if cfg.Dialer != nil {
 		conn.Dialer = cfg.Dialer
 	}
 	if cfg.Kerberos != nil {
 		conn.Kerberos = cfg.Kerberos
 	}
+	var err error
 	conn.TLSConfig, err = cfg.tlsConfig()
 	if err != nil {
 		return nil, err
 	}
 	return conn, nil
+}
+
+// level returns the number that the protocol code uses for l. The zero value
+// is accepted, the default of Oracle Net.
+func (l ServiceLevel) level() int {
+	switch l {
+	case ServiceRejected:
+		return 1
+	case ServiceRequested:
+		return 2
+	case ServiceRequired:
+		return 3
+	}
+	return 0
 }
 
 // cid returns the client identity of the connect packet, or "" when no field

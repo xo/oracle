@@ -133,6 +133,12 @@ Step 4 deleted `oracleDriver`, `GetDefaultDriver`, `AddSessionParam`,
 `RegisterConnConfig` and the root `ParseConfig`. Four pieces of state for the
 whole process remain, and `BACKLOG.md` lists them.
 
+Step 4b kept `RegisterType` with its `*sql.DB`, and wrote no `WithType`. A
+type is registered after the program creates it, through the same database,
+and an option that acts at the first connection cannot wait for that.
+`RegisterType` changes the registry of its own connector alone, so this
+decision still holds. `DESIGN.md`, under Connector, says more.
+
 ## D10. A context ends a round trip through deadlines and context.AfterFunc
 
 Status: Proposed.
@@ -178,7 +184,9 @@ so that they can change with no new major version. The root package, `aq/`,
 and the value types that a caller passes or scans stay public.
 
 Step 3 of `DESIGN.md` moved the packages of `go-ora` on 2026-10-31, and
-changed nothing else. The recorded exchanges passed before and after.
+changed nothing else. The recorded exchanges passed before and after. Step 4b
+moved the TTC code of the root package to `internal/ttc` the same day, and the
+root package now exports 31 names, where `go-ora` exported 167.
 
 ## D13. The module requires Go 1.27.1
 

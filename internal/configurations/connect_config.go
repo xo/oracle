@@ -3,8 +3,6 @@ package configurations
 import (
 	"errors"
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -109,404 +107,74 @@ func (config *ConnectionConfig) ConnectionData() string {
 	return "(DESCRIPTION=" + address + connectData + security + "))"
 }
 
-func ParseConfig(dsn string) (*ConnectionConfig, error) {
-	walletPath := ""
-	walletPass := ""
-	u, err := url.Parse(dsn)
-	if err != nil {
-		return nil, err
+// New returns the configuration of a connection with the defaults of the
+// protocol: 25 rows a fetch, fast login, a connect timeout of 60 seconds,
+// TCP, and the language AMERICAN in the territory AMERICA.
+func New() *ConnectionConfig {
+	return &ConnectionConfig{
+		PrefetchRows: 25,
+		FastLogin:    true,
+		SessionInfo: SessionInfo{
+			ConnectTimeout:        60 * time.Second,
+			TransportDataUnitSize: 0x200000,
+			SessionDataUnitSize:   0x200000,
+			Protocol:              "tcp",
+			SSLVerify:             true,
+		},
+		DatabaseInfo: DatabaseInfo{
+			Servers: make([]ServerAddr, 0, 3),
+		},
+		ClientInfo: ClientInfo{Territory: "AMERICA", Language: "AMERICAN"},
 	}
-	q := u.Query()
-	config := &ConnectionConfig{
-		PrefetchRows:   25,
-		FastLogin:      true,
-		ConnectTimeout: time.Duration(60 * time.Second),
-		Timeout:        0,
-		// TransportDataUnitSize: 0xFFFF,
-		// SessionDataUnitSize:   0xFFFF,
-		TransportDataUnitSize: 0x200000,
-		SessionDataUnitSize:   0x200000,
-		Protocol:              "tcp",
-		SSL:                   false,
-		SSLVerify:             true,
-		Servers:               make([]ServerAddr, 0, 3),
-		Territory:             "AMERICA", Language: "AMERICAN",
-	}
-	// ret := &ConnectionString{
-	// Port:         defaultPort,
-	// DBAPrivilege: NONE,
-	// EnList:                TRUE,
-	// IncrPoolSize:          5,
-	// DecrPoolSize:          5,
-	// MaxPoolSize:           100,
-	// MinPoolSize:           1,
-	// PromotableTransaction: Promotable,
-	// StmtCacheSize:         20,
-	// MetadataBooling:       true,
-	// SelfTuning:            true,
-	// PoolRegulator:         100,
-	// ConnectionPoolTimeout: 15,
-	// }
-	config.UserID = u.User.Username()
-	config.DatabaseInfo.Password, _ = u.User.Password()
-	if strings.ToUpper(config.UserID) == "SYS" {
-		config.DBAPrivilege = SYSDBA
-	}
-
-	host, p, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return nil, err
-	}
-	if len(host) > 0 {
-		tempAddr := ServerAddr{Addr: host, Port: defaultPort}
-		tempAddr.Port, err = strconv.Atoi(p)
-		if err != nil {
-			tempAddr.Port = defaultPort
-		}
-		config.Servers = append(config.Servers, tempAddr)
-	}
-	config.ServiceName = strings.Trim(u.Path, "/")
-	for key, val := range q {
-		switch strings.ToUpper(key) {
-		case "CID":
-			config.Cid = val[0]
-		case "CONNSTR":
-			err = config.UpdateDatabaseInfo(q.Get("connStr"))
-			if err != nil {
-				return nil, err
-			}
-		case "SERVER":
-			for _, srv := range val {
-				srv = strings.TrimSpace(srv)
-				if srv != "" {
-					host, p, err := net.SplitHostPort(srv)
-					if err != nil {
-						return nil, err
-					}
-					tempAddr := ServerAddr{Addr: host, Port: defaultPort}
-					if p != "" {
-						tempAddr.Port, err = strconv.Atoi(p)
-						if err != nil {
-							tempAddr.Port = defaultPort
-						}
-					}
-					config.Servers = append(config.Servers, tempAddr)
-				}
-			}
-		case "SERVICE NAME":
-			config.ServiceName = val[0]
-		case "SID":
-			config.SID = val[0]
-		case "INSTANCE NAME":
-			config.InstanceName = val[0]
-		case "WALLET":
-			walletPath = val[0]
-		case "WALLET PASSWORD":
-			walletPass = val[0]
-		case "AUTH TYPE":
-			if strings.ToUpper(val[0]) == "OS" {
-				config.AuthType = OS
-			} else if strings.ToUpper(val[0]) == "KERBEROS" {
-				config.AuthType = Kerberos
-			} else if strings.ToUpper(val[0]) == "TCPS" {
-				config.AuthType = TCPS
-			} else {
-				config.AuthType = Normal
-			}
-		case "OS USER":
-			config.OSUserName = val[0]
-		case "OS PASS":
-			fallthrough
-		case "OS PASSWORD":
-			config.OSPassword = val[0]
-		case "OS HASH":
-			fallthrough
-		case "OS PASSHASH":
-			fallthrough
-		case "OS PASSWORD HASH":
-			config.ClientInfo.OSPassword = val[0]
-
-		case "DOMAIN":
-			config.DomainName = val[0]
-		case "AUTH SERV":
-			for _, tempVal := range val {
-				config.AuthService, _ = uniqueAppendString(config.AuthService, strings.ToUpper(strings.TrimSpace(tempVal)), false)
-			}
-		case "ENCRYPTION":
-			switch strings.ToUpper(val[0]) {
-			case "ACCEPTED":
-				config.EncServiceLevel = 0
-			case "REJECTED":
-				config.EncServiceLevel = 1
-			case "REQUESTED":
-				config.EncServiceLevel = 2
-			case "REQUIRED":
-				config.EncServiceLevel = 3
-			default:
-				return nil, fmt.Errorf("unknown encryption service level: %s use one of the following [ACCEPTED, REJECTED, REQUESTED, REQUIRED]", val[0])
-			}
-		case "DATA INTEGRITY":
-			switch strings.ToUpper(val[0]) {
-			case "ACCEPTED":
-				config.IntServiceLevel = 0
-			case "REJECTED":
-				config.IntServiceLevel = 1
-			case "REQUESTED":
-				config.IntServiceLevel = 2
-			case "REQUIRED":
-				config.IntServiceLevel = 3
-			default:
-				return nil, fmt.Errorf("unknown data integrity service level: %s use one of the following [ACCEPTED, REJECTED, REQUESTED, REQUIRED]", val[0])
-			}
-		case "SSL":
-			config.SSL = strings.ToUpper(val[0]) == "TRUE" ||
-				strings.ToUpper(val[0]) == "ENABLE" ||
-				strings.ToUpper(val[0]) == "ENABLED"
-		case "SSL VERIFY":
-			config.SSLVerify = strings.ToUpper(val[0]) == "TRUE" ||
-				strings.ToUpper(val[0]) == "ENABLE" ||
-				strings.ToUpper(val[0]) == "ENABLED"
-		case "DBA PRIVILEGE":
-			config.DBAPrivilege = DBAPrivilegeFromString(val[0])
-		case "TIMEOUT":
-			fallthrough
-		case "READ TIMEOUT":
-			fallthrough
-		case "SOCKET TIMEOUT":
-			to, err := strconv.Atoi(val[0])
-			if err != nil {
-				return nil, errors.New("TIMEOUT value must be an integer")
-			}
-			config.SessionInfo.Timeout = time.Second * time.Duration(to)
-		case "CONNECT TIMEOUT":
-			fallthrough
-		case "CONNECTION TIMEOUT":
-			to, err := strconv.Atoi(val[0])
-			if err != nil {
-				return nil, errors.New("TIMEOUT value must be an integer")
-			}
-			config.SessionInfo.ConnectTimeout = time.Second * time.Duration(to)
-		case "FAST LOGIN":
-			config.FastLogin = strings.ToUpper(val[0]) == "TRUE" || strings.ToUpper(val[0]) == "ENABLE"
-		case "TRACE FILE":
-			config.TraceFilePath = val[0]
-			// if len(val[0]) > 0 {
-			//	tf, err := os.Create(val[0])
-			//	if err != nil {
-			//		//noinspection GoErrorStringFormat
-			//		return nil, fmt.Errorf("Can't open trace file: %w", err)
-			//	}
-			//	config.Tracer = trace.NewTraceWriter(tf)
-			// } else {
-			//	config.Tracer = trace.NilTracer()
-			// }
-		case "TRACE DIR":
-			fallthrough
-		case "TRACE FOLDER":
-			fallthrough
-		case "TRACE DIRECTORY":
-			config.TraceDir = val[0]
-		case "USE_OOB":
-			fallthrough
-		case "ENABLE_OOB":
-			fallthrough
-		case "ENABLE URGENT DATA TRANSPORT":
-			config.EnableOOB = true
-		case "PREFETCH_ROWS":
-			config.PrefetchRows, err = strconv.Atoi(val[0])
-			if err != nil {
-				config.PrefetchRows = 25
-			}
-		case "UNIX SOCKET":
-			config.SessionInfo.UnixAddress = val[0]
-		case "TOKEN":
-			fallthrough
-		case "TOKEN FILE":
-			config.TokenFile = val[0]
-		case "TOKEN PRIVATE KEY":
-			fallthrough
-		case "TOKEN PRIVATE KEY FILE":
-			config.TokenPrivateKeyFile = val[0]
-		case "PROXY CLIENT NAME":
-			config.DatabaseInfo.ProxyClientName = val[0]
-		//case "FAILOVER":
-		//	return nil, errors.New("starting from v2.7.0 this feature (FAILOVER) is not supported and the driver use database/sql package fail over")
-		// config.Failover, err = strconv.Atoi(val[0])
-		// if err != nil {
-		//	config.Failover = 0
-		// }
-		//case "RETRYTIME":
-		//	fallthrough
-		//case "RE-TRY TIME":
-		//	fallthrough
-		//case "RETRY TIME":
-		//	return nil, errors.New("starting from v2.7.0 this feature (RETRY TIME) is not supported and the driver use database/sql package fail over")
-		// config.RetryTime, err = strconv.Atoi(val[0])
-		// if err != nil {
-		//	config.RetryTime = 0
-		// }
-		case "LOB FETCH":
-			tempVal := strings.ToUpper(val[0])
-			if tempVal == "PRE" || tempVal == "INLINE" {
-				config.Lob = INLINE
-			} else if tempVal == "POST" || tempVal == "STREAM" {
-				config.Lob = STREAM
-			} else {
-				return nil, errors.New("LOB FETCH value should be either INLINE/PRE (default) or STREAM/POST")
-			}
-		case "LOB READ":
-			tempVal := strings.ToUpper(val[0])
-			if tempVal == "AUTO" || tempVal == "AUTOMATIC" || tempVal == "IMPLICIT" {
-				config.LobReadMode = LobReadMode_AUTO
-			} else if tempVal == "NO" || tempVal == "NONE" || tempVal == "EXPLICIT" {
-				config.LobReadMode = LobReadMode_NONE
-			} else {
-				return nil, errors.New("LOB READ value should be either AUTO/IMPLICIT (default) or NO/EXPLICIT")
-			}
-		case "LANGUAGE":
-			config.Language = val[0]
-		case "TERRITORY":
-			config.Territory = val[0]
-		case "CHARSET":
-			fallthrough
-		case "CLIENT CHARSET":
-			config.CharsetID, err = getCharsetID(val[0])
-			if err != nil {
-				return nil, err
-			}
-		case "PROGRAM":
-			config.ClientInfo.ProgramName = val[0]
-		case "SERVER LOCATION":
-			config.DatabaseInfo.Location = val[0]
-		default:
-			return nil, fmt.Errorf("unknown URL option: %s", key)
-			// else if tempVal == "IMPLICIT" || tempVal == "AUTO" {
-			//	config.Lob = 1
-			// } else if tempVal == "EXPLICIT" || tempVal == "MANUAL" {
-			//	config.Lob = 2
-			// } else {
-			//	return nil, errors.New("LOB value should be: Prefetch, Implicit(AUTO) or Explicit(manual)")
-			// }
-			// case "ENLIST":
-			//	ret.EnList = EnListFromString(val[0])
-			// case "INC POOL SIZE":
-			//	ret.IncrPoolSize, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("INC POOL SIZE value must be an integer")
-			//	}
-			// case "DECR POOL SIZE":
-			//	ret.DecrPoolSize, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("DECR POOL SIZE value must be an integer")
-			//	}
-			// case "MAX POOL SIZE":
-			//	ret.MaxPoolSize, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("MAX POOL SIZE value must be an integer")
-			//	}
-			// case "MIN POOL SIZE":
-			//	ret.MinPoolSize, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("MIN POOL SIZE value must be an integer")
-			//	}
-			// case "POOL REGULATOR":
-			//	ret.PoolRegulator, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("POOL REGULATOR value must be an integer")
-			//	}
-			// case "STATEMENT CACHE SIZE":
-			//	ret.StmtCacheSize, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("STATEMENT CACHE SIZE value must be an integer")
-			//	}
-			// case "CONNECTION POOL TIMEOUT":
-			//	ret.ConnectionPoolTimeout, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("CONNECTION POOL TIMEOUT value must be an integer")
-			//	}
-			// case "CONNECTION LIFETIME":
-			//	ret.ConnectionLifeTime, err = strconv.Atoi(val[0])
-			//	if err != nil {
-			//		return nil, errors.New("CONNECTION LIFETIME value must be an integer")
-			//	}
-			// case "PERSIST SECURITY INFO":
-			//	ret.PasswordSecurityInfo = val[0] == "TRUE"
-			// case "POOLING":
-			//	ret.Pooling = val[0] == "TRUE"
-			// case "VALIDATE CONNECTION":
-			//	ret.ValidateConnection = val[0] == "TRUE"
-			// case "STATEMENT CACHE PURGE":
-			//	ret.StmtCachePurge = val[0] == "TRUE"
-			// case "HA EVENTS":
-			//	ret.HaEvent = val[0] == "TRUE"
-			// case "LOAD BALANCING":
-			//	ret.LoadBalance = val[0] == "TRUE"
-			// case "METADATA POOLING":
-			//	ret.MetadataBooling = val[0] == "TRUE"
-			// case "SELF TUNING":
-			//	ret.SelfTuning = val[0] == "TRUE"
-			// case "CONTEXT CONNECTION":
-			//	ret.ContextConnection = val[0] == "TRUE"
-			// case "PROMOTABLE TRANSACTION":
-			//	if val[0] == "PROMOTABLE" {
-			//		ret.PromotableTransaction = Promotable
-			//	} else {
-			//		ret.PromotableTransaction = Local
-			//	}
-			// case "APPLICATION EDITION":
-			//	ret.ApplicationEdition = val[0]
-			// case "PROXY USER ID":
-			//	ret.ProxyUserID = val[0]
-			// case "PROXY PASSWORD":
-			//	ret.ProxyPassword = val[0]
-		}
-	}
-	if len(config.Servers) == 0 {
-		return nil, errors.New("empty connection servers")
-	}
-	if len(walletPath) > 0 {
-		if len(config.ServiceName) == 0 {
-			return nil, errors.New("you should specify server/service if you will use wallet")
-		}
-		if _, err = os.Stat(path.Join(walletPath, "ewallet.p12")); err == nil && len(walletPass) > 0 {
-			fileData, err := os.ReadFile(path.Join(walletPath, "ewallet.p12"))
-			if err != nil {
-				return nil, err
-			}
-			config.Wallet = &Wallet{password: []byte(walletPass)}
-			err = config.Wallet.readPKCS12(fileData)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			config.Wallet, err = NewWallet(path.Join(walletPath, "cwallet.sso"))
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if len(config.UserID) > 0 {
-			if len(config.Password) == 0 {
-				serv := config.Servers[0]
-				cred, err := config.Wallet.getCredential(serv.Addr, serv.Port, config.ServiceName, config.UserID)
-				if err != nil {
-					return nil, err
-				}
-				if cred == nil {
-					return nil, errors.New(
-						fmt.Sprintf("cannot find credentials for server: %s:%d, service: %s,  username: %s",
-							serv.Addr, serv.Port, config.ServiceName, config.UserID))
-				}
-				config.UserID = cred.username
-				config.Password = cred.password
-			}
-		}
-	}
-	return config, config.validate()
 }
 
-// validate check is data in connection configuration is correct and fulfilled
-func (config *ConnectionConfig) validate() error {
+// LoadWallet reads the wallet in dir: ewallet.p12 when it exists and password
+// is set, and cwallet.sso when not. When the configuration has a user and no
+// password, it takes the password of that user from the wallet.
+func (config *ConnectionConfig) LoadWallet(dir, password string) error {
+	if len(config.ServiceName) == 0 {
+		return errors.New("you should specify server/service if you will use wallet")
+	}
+	var err error
+	if _, err = os.Stat(path.Join(dir, "ewallet.p12")); err == nil && len(password) > 0 {
+		fileData, err := os.ReadFile(path.Join(dir, "ewallet.p12"))
+		if err != nil {
+			return err
+		}
+		config.Wallet = &Wallet{password: []byte(password)}
+		if err := config.Wallet.readPKCS12(fileData); err != nil {
+			return err
+		}
+	} else {
+		config.Wallet, err = NewWallet(path.Join(dir, "cwallet.sso"))
+		if err != nil {
+			return err
+		}
+	}
+	if len(config.UserID) > 0 && len(config.Password) == 0 {
+		serv := config.Servers[0]
+		cred, err := config.Wallet.getCredential(serv.Addr, serv.Port, config.ServiceName, config.UserID)
+		if err != nil {
+			return err
+		}
+		if cred == nil {
+			return fmt.Errorf("cannot find credentials for server: %s:%d, service: %s,  username: %s",
+				serv.Addr, serv.Port, config.ServiceName, config.UserID)
+		}
+		config.UserID = cred.username
+		config.Password = cred.password
+	}
+	return nil
+}
+
+// CharsetID returns the Oracle ID of the charset with name.
+func CharsetID(name string) (int, error) {
+	return getCharsetID(name)
+}
+
+// Validate checks that config names a database, and fills in the client
+// fields from this process: the user, the host, the program and the PID.
+func (config *ConnectionConfig) Validate() error {
 	if len(config.SID) == 0 && len(config.ServiceName) == 0 {
 		return errors.New("empty SID and service name")
 	}

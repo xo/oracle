@@ -9,6 +9,16 @@ decided on the way (D3).
 
 ## Repository
 
+### Reshape the TTC code
+
+Step 4b moved the TTC code to `internal/ttc` as it was. Its names are the ones
+of `go-ora`: `Connection`, `Stmt`, `DataSet`, `ParameterInfo`, `Transaction`.
+`OracleConnector` and the struct of the old driver are gone, and the code
+still holds many lines that are commented out. Steps 5 and 6 reshape it.
+`Config` has no keys for the OS user and password of NTS, the domain, the
+list of authentication services, out of band breaks or the location of the
+server, which `go-ora` read. Add each when a caller needs it.
+
 ### Remove the state that the whole process shares
 
 Step 4 removed the package variable `oracleDriver` (D9). Four pieces of state
@@ -18,7 +28,8 @@ for the whole process remain:
   OS password sets for every connection after it.
 - `auth.kerberosAuth`, a Kerberos authenticator for every connection.
   `Config.Kerberos` sets one for each connector already.
-- `cookieStore` in `connection_cookie.go`, the fast login cookies. A cookie
+- `cookieStore` in `internal/ttc/connection_cookie.go`, the fast login
+  cookies. A cookie
   changes the logon, and `ResetCookies` in `export_test.go` clears it for the
   exchange tests.
 - `jsonEncoder` in `internal/codec/oson`, a map of encoders.
@@ -27,16 +38,9 @@ Move each to the `Connector` or to the connection.
 
 ### Stop printing on reconnect
 
-`connection.go` prints a line to standard output with `fmt.Printf` when it
+`internal/ttc/connection.go` prints a line to standard output with `fmt.Printf` when it
 reconnects after a bad connection. The driver logs nothing (D14). Send it to
 `Config.Logger`, or return the error.
-
-### Write the configuration directly
-
-`Config.connectionConfig` writes the DSN of `go-ora` and parses it with
-`configurations.ParseConfig`, so that step 4 changed no packet. Step 4b writes
-the `ConnectionConfig` from `Config` directly, and deletes the old parser and
-its tests.
 
 ### Fix the decoding of intervals
 
@@ -49,7 +53,7 @@ the type with `IntervalYM` and `time.Duration`. Remove the skips then.
 
 ### Size the OUT parameters again
 
-`ParameterInfo.encodeValue` in `parameter_encode.go` ended in a block after its
+`ParameterInfo.encodeValue` in `internal/ttc/parameter_encode.go` ended in a block after its
 `return nil`, so it never ran. The block set `MaxCharLen` and `MaxLen` of an
 `NCHAR` or `RAW` OUT parameter from its size, and cleared `BValue` of every
 OUT parameter. Step 1 deleted it as dead code, which changed nothing. An OUT
