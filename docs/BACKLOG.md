@@ -19,13 +19,6 @@ type IDs are constants of `uint16`, and want a named type. `Config` has no keys 
 list of authentication services, out of band breaks or the location of the
 server, which `go-ora` read. Add each when a caller needs it.
 
-### Build the statement options
-
-`DESIGN.md`, under Options, holds the options of a statement as dbimp D109
-sets them out: `WithOptions`, `WithTimeout`, `WithReadonly`, `WithPrefetch`
-and `WithLobFetch`. None is built. The DSN keys `prefetch` and `lob_fetch` set
-the same for every statement of a connector.
-
 ### Report SELECT CAST(:1 AS JSON) on 21c
 
 On 21c, `SELECT CAST(:1 AS JSON) FROM dual` with a JSON bind fails inside the

@@ -261,6 +261,24 @@ c, err := oracle.NewConnector(cfg,
 The connector sets each parameter with `ALTER SESSION` on each connection
 after its logon.
 
+## Options of one statement
+
+An option sets one statement, as an argument or through the context, and a
+later one wins over the DSN:
+
+```go
+rows, err := db.QueryContext(ctx, query, arg1, oracle.WithPrefetch(1000))
+
+ctx = oracle.WithOptions(ctx, oracle.WithTimeout(5*time.Second))
+_, err = db.ExecContext(ctx, "BEGIN slow_proc; END;")
+```
+
+`WithTimeout` ends the call after the time, and leaves the connection
+usable. `WithPrefetch` and `WithLobFetch` are the keys `prefetch` and
+`lob_fetch` for one statement. `WithReadonly(true)`, `WithParameter` and
+`WithDatabase` fail with `ErrNotSupported`, because Oracle has no such
+setting for one statement.
+
 ## DBMS_OUTPUT
 
 `DBMS_OUTPUT` belongs to one session, so the helpers take a `*sql.Conn` or a

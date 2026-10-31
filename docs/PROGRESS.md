@@ -91,9 +91,14 @@ The seventh part of step 9 is done (`42b556e`, pushed). It encodes
 collections in objects (#721), reads `tnsnames.ora` (D20), and adds
 `skip_nls` (#611).
 
-The eighth part of step 9 is staged. A NULL object in a batch was stored as
-the object of the row before, and is NULL now (#721). A handshake that fails
-after the dial tries the next address (#619 and #707). The root package and
-`integration` pass on 11g, 26ai and both Autonomous Database releases. Left:
-streaming of LOBs and rows (D21), which needs a design, and #729, which needs
-a server that requires network encryption.
+The eighth part of step 9 is done (`c8a1f39`, pushed). A NULL object of a
+batch is NULL (#721), and a failed handshake tries the next address (#619,
+#707).
+
+The ninth part of step 9 is staged. The options of one statement of dbimp
+D109 are built: `WithOptions`, `WithTimeout`, `WithPrefetch`,
+`WithLobFetch`, and `WithReadonly`, `WithParameter` and `WithDatabase`,
+which fail with `ErrNotSupported`. The root package and `integration` pass
+on 11g, 11g with `lob_fetch=stream`, 26ai and both Autonomous Database
+releases. The dbmeta session was asked for a release that requires network
+encryption, for #729. Left: streaming (D21), which needs a design.

@@ -15,7 +15,7 @@ const (
 	// ErrRepeatedKey is a key that a DSN holds twice.
 	ErrRepeatedKey Error = "repeated key"
 	// ErrInvalidValue is a value that the driver cannot use.
-	ErrInvalidValue Error = "invalid value"
+	ErrInvalidValue = tns.ErrInvalidValue
 	// ErrNotSupported is a feature that the driver or the server does not
 	// have.
 	ErrNotSupported = tns.ErrNotSupported

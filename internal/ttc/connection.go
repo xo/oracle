@@ -125,7 +125,10 @@ type Connection struct {
 	tokenPrivateKey          []byte
 	connectionCookie         *ConnectionCookie
 	cookies                  *cookieJar
-	newKey                   []byte
+	// lobFetch is the mode of LOBs of the DSN. connOption.Lob is the mode of
+	// the statement that runs, which an option can change (D109)
+	lobFetch config.LobFetch
+	newKey   []byte
 }
 
 type ConnectionProperties struct {
@@ -245,6 +248,11 @@ func (conn *Connection) MaxStringLength() int64 {
 		return 0x7FFF
 	}
 	return conn.maxLen.varchar
+}
+
+// restoreLobFetch puts back the mode of LOBs of the DSN after a statement.
+func (conn *Connection) restoreLobFetch() {
+	conn.connOption.Lob = conn.lobFetch
 }
 
 // ServerRelease returns the major release of the server, such as 11 or 23.
@@ -635,6 +643,7 @@ func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
 		connOption:      temp,
 		cStrConv:        charset.New(cfg.CharsetID),
 		logger:          logger,
+		lobFetch:        cfg.Lob,
 		autoCommit:      true,
 		oracleTypeCoder: nil,
 		cusTyp:          map[string]types.Object{},
@@ -1058,6 +1067,10 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 }
 
 func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
+	// an option goes to the statement as it is (D109)
+	if IsOption(nv.Value) {
+		return nil
+	}
 	// database/sql converts a driver.Valuer, such as sql.Null[T], to its
 	// value, except the few that the driver binds itself
 	if _, ok := nv.Value.(driver.Valuer); ok && !ownValue(nv.Value) {

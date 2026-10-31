@@ -23,6 +23,9 @@ const ErrAuthentication Error = "authentication refused"
 // ErrNotSupported is a feature that the driver or the server does not have.
 const ErrNotSupported Error = "not supported"
 
+// ErrInvalidValue is a value that the driver cannot use.
+const ErrInvalidValue Error = "invalid value"
+
 // authCodes are the codes of the errors that refuse a credential.
 var authCodes = []int{
 	1005,  // null password given

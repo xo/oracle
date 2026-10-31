@@ -58,6 +58,11 @@ type defaultStmt struct {
 	containOutputPars bool
 	autoClose         bool
 	multiSet          []RefCursor
+	// prefetch and lob are the options of the statement (D109). lobSet is
+	// true when lob holds them, which a REF CURSOR does not
+	prefetch int
+	lob      config.LobFetch
+	lobSet   bool
 }
 
 func (stmt *defaultStmt) CanAutoClose() bool {
@@ -316,6 +321,10 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	}
 	stmt.connection = conn
 	stmt.text = text
+	if conn != nil && conn.connOption != nil {
+		stmt.prefetch = conn.connOption.PrefetchRows
+		stmt.lob, stmt.lobSet = conn.lobFetch, true
+	}
 	stmt._hasBLOB = false
 	stmt._hasLONG = false
 	stmt.arrayBindCount = 0
@@ -541,6 +550,11 @@ func (stmt *Stmt) getExeOption() int {
 
 // fetch get more rows from network stream
 func (stmt *defaultStmt) fetch(resultSet *ResultSet) error {
+	if stmt.lobSet {
+		// another statement can have run on the connection since the
+		// last fetch of this one, with another mode
+		stmt.connection.connOption.Lob = stmt.lob
+	}
 	if stmt._noOfRowsToFetch == 25 {
 		// m_maxRowSize = m_maxRowSize + m_numOfLOBColumns * Math.Max(86, 86 + (int) lobSize) + m_numOfLONGColumns * Math.Max(2, longSize) + m_numOfBFileColumns * 86;
 		maxRowSize := int64(0)
@@ -1003,6 +1017,13 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 
 	logger.Debug("exec", "query", stmt.text)
 	stmt.arrayBindCount = 0
+	opts, args, err := resolve(ctx, stmt.connection, args)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := stmt.apply(ctx, opts)
+	defer cancel()
+	defer stmt.connection.restoreLobFetch()
 
 	done := stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext(done)
@@ -1544,6 +1565,10 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
+	// an option goes to the statement as it is (D109)
+	if IsOption(nv.Value) {
+		return nil
+	}
 	// database/sql converts a driver.Valuer, such as sql.Null[T], to its
 	// value, except the few that the driver binds itself
 	if _, ok := nv.Value.(driver.Valuer); ok && !ownValue(nv.Value) {
@@ -1614,7 +1639,7 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 		return nil, driver.ErrBadConn
 	}
 	logger := stmt.connection.logger
-	stmt._noOfRowsToFetch = stmt.connection.connOption.PrefetchRows
+	stmt._noOfRowsToFetch = stmt.prefetch
 	stmt._hasMoreRows = true
 	useNamedPars := len(namedArgs) > 0
 	for x := range namedArgs {
@@ -1683,6 +1708,13 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	}
 	logger := stmt.connection.logger
 	logger.Debug("query", "query", stmt.text)
+	opts, namedArgs, err := resolve(ctx, stmt.connection, namedArgs)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := stmt.apply(ctx, opts)
+	defer cancel()
+	defer stmt.connection.restoreLobFetch()
 
 	done := stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext(done)

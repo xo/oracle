@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json/jsontext"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -517,5 +518,69 @@ func TestOutput(t *testing.T) {
 	}
 	if err := oracle.DisableOutput(ctx, conn); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestOptions applies the options of one statement, from an argument and
+// from the context (D109).
+func TestOptions(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	// an option is no bind variable
+	var n int
+	if err := db.QueryRowContext(ctx, "SELECT :1 FROM dual", 7, oracle.WithPrefetch(1)).Scan(&n); err != nil || n != 7 {
+		t.Errorf("an option among the arguments: got %d, %v", n, err)
+	}
+	rows, err := db.QueryContext(ctx, "SELECT LEVEL FROM dual CONNECT BY LEVEL <= 10", oracle.WithPrefetch(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for rows.Next() {
+		count++
+	}
+	rows.Close()
+	if count != 10 {
+		t.Errorf("WithPrefetch(3) read %d rows, want 10", count)
+	}
+	// a LOB read in stream mode, for one statement
+	var c string
+	if err := db.QueryRowContext(ctx, "SELECT TO_CLOB(RPAD('x', 5000, 'x')) FROM dual", oracle.WithLobFetch(oracle.LobFetchStream)).Scan(&c); err != nil || len(c) != 4000 && len(c) != 5000 {
+		t.Errorf("WithLobFetch(stream): got %d bytes, %v", len(c), err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT TO_CLOB('y') FROM dual").Scan(&c); err != nil || c != "y" {
+		t.Errorf("the statement after: got %q, %v", c, err)
+	}
+	// a timeout breaks the call, from an argument and from the context
+	start := time.Now()
+	_, err = db.ExecContext(ctx, "DECLARE n NUMBER; BEGIN SELECT COUNT(*) INTO n FROM all_objects a, all_objects b; END;", oracle.WithTimeout(time.Second))
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > 15*time.Second {
+		t.Errorf("WithTimeout: got %v after %v", err, time.Since(start))
+	}
+	usable(t, db)
+	octx := oracle.WithOptions(ctx, oracle.WithTimeout(time.Second))
+	if err := db.QueryRowContext(octx, slowQuery).Scan(&n); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("WithOptions(WithTimeout): got %v", err)
+	}
+	usable(t, db)
+	// the options that Oracle has no setting for, and values that the DSN
+	// would refuse
+	for _, test := range []struct {
+		opt  oracle.Option
+		want error
+	}{
+		{oracle.WithReadonly(true), oracle.ErrNotSupported},
+		{oracle.WithParameter("a", 1), oracle.ErrNotSupported},
+		{oracle.WithDatabase("x"), oracle.ErrNotSupported},
+		{oracle.WithTimeout(-time.Second), oracle.ErrInvalidValue},
+		{oracle.WithPrefetch(0), oracle.ErrInvalidValue},
+		{oracle.WithLobFetch("sometimes"), oracle.ErrInvalidValue},
+	} {
+		if err := db.QueryRowContext(ctx, "SELECT 1 FROM dual", test.opt).Scan(&n); !errors.Is(err, test.want) {
+			t.Errorf("got %v, want %v", err, test.want)
+		}
+	}
+	if err := db.QueryRowContext(ctx, "SELECT 1 FROM dual", oracle.WithReadonly(false), oracle.WithTimeout(0)).Scan(&n); err != nil {
+		t.Errorf("options that ask for nothing: %v", err)
 	}
 }

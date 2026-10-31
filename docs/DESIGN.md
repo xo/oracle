@@ -111,12 +111,12 @@ one job, so that a person or an agent finds a behavior by its file name.
 | `object.go` | User defined types and collections |
 
 The table is the target. The root package holds `driver.go`, `connector.go`,
-`dsn.go`, `errors.go`, `values.go` and `output.go`, the reader of
-`DBMS_OUTPUT` (D19), today. `values.go` names the types of
+`dsn.go`, `errors.go`, `values.go`, `options.go`, and `output.go`, the reader
+of `DBMS_OUTPUT` (D19), today. `values.go` names the types of
 `internal/ttc` and `internal/types` that a caller uses, such as `Out`,
 `RefCursor` and `Clob`, as aliases. `conn`, `stmt`, `rows` and `tx` are still
 `ttc.Connection`, `ttc.Stmt`, `ttc.DataSet` and `ttc.Transaction`, which steps
-5 and 6 reshaped in place, and `options.go` waits for the options below.
+5 and 6 reshaped in place.
 
 ## Connector
 
@@ -310,7 +310,17 @@ the arguments. The common options are `WithTimeout`, the time that the server
 gives one statement, and `WithReadonly`. The options of this driver are
 `WithPrefetch` and `WithLobFetch`. dbimp holds the machinery in its root
 package. This module cannot import it (hard rule 2), so it holds a copy of the
-part it needs. None of this is built yet, and the backlog holds it.
+part it needs, in `internal/ttc/options.go`, and `options.go` names it.
+
+Step 9 built it. `WithTimeout` ends the call of a statement through the break
+of Oracle Net, which leaves the connection usable, and bounds the call and
+not the fetches of the rows after it. `WithPrefetch` and `WithLobFetch` are
+the keys `prefetch` and `lob_fetch` for one statement. A statement keeps its
+mode of LOBs and sets it on the connection before each of its round trips,
+so a statement after it gets the mode of the DSN. Oracle has no setting for
+one statement for `WithReadonly`, `WithParameter` or `WithDatabase`, so each
+fails with `ErrNotSupported`, and a value that the DSN would refuse fails
+with `ErrInvalidValue`, as dbimp D109 asks. `TestOptions` holds them.
 
 ## Values
 
