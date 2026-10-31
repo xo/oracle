@@ -1,7 +1,9 @@
 package oracle_test
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -119,6 +121,76 @@ func TestUnopenedRefCursor(t *testing.T) {
 	_, err := db.ExecContext(ctx, "BEGIN xo_oracle_cursor(:1); END;", sql.Out{Dest: &cur})
 	if err == nil {
 		t.Error("an unopened cursor gives no error")
+	}
+	usable(t, db)
+}
+
+// TestBatchLengths is sijms/go-ora#695: an empty array in a batch panicked,
+// and arrays of different lengths were cut to the shortest.
+func TestBatchLengths(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	const table = "xo_oracle_batch"
+	if _, err := db.ExecContext(ctx, "BEGIN EXECUTE IMMEDIATE 'DROP TABLE "+table+" PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "CREATE TABLE "+table+" (id NUMBER(10), name VARCHAR2(50))"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE " + table + " PURGE") })
+	insert := "INSERT INTO " + table + " (id, name) VALUES (:1, :2)"
+	if _, err := db.ExecContext(ctx, insert, []int64{}, []string{}); err == nil {
+		t.Error("an empty batch gives no error")
+	}
+	if _, err := db.ExecContext(ctx, insert, []int64{1, 2, 3}, []string{"a", "b"}); err == nil {
+		t.Error("arrays of 3 and 2 rows give no error")
+	}
+	if _, err := db.ExecContext(ctx, insert, []int64{1, 2}, []string{"a", "b", "c"}); err == nil {
+		t.Error("arrays of 2 and 3 rows give no error")
+	}
+	res, err := db.ExecContext(ctx, insert, []int64{1, 2}, []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 2 {
+		t.Errorf("a batch of 2 rows affects %d, %v", n, err)
+	}
+	usable(t, db)
+}
+
+// TestBatchError is sijms/go-ora#698: a batch whose row broke a key waited
+// until the network timed out on 11g, where it returns ORA-00001.
+func TestBatchError(t *testing.T) {
+	db := openLive(t)
+	const table = "xo_oracle_batch_error"
+	if _, err := db.ExecContext(t.Context(), "BEGIN EXECUTE IMMEDIATE 'DROP TABLE "+table+" PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), "CREATE TABLE "+table+" (id NUMBER(10) PRIMARY KEY, name VARCHAR2(20), val NUMBER(10))"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE " + table + " PURGE") })
+	merge := `MERGE INTO ` + table + ` t
+		USING (SELECT :id id, :name name, :val val FROM dual) s
+		ON (s.id = t.id AND s.name = t.name)
+		WHEN MATCHED THEN UPDATE SET t.val = s.val
+		WHEN NOT MATCHED THEN INSERT (id, name, val) VALUES (s.id, s.name, s.val)`
+	tests := []struct {
+		name  string
+		query string
+		args  []any
+	}{
+		{"insert", "INSERT INTO " + table + " (id, name, val) VALUES (:1, :2, :3)", []any{[]int64{1, 1}, []string{"a", "b"}, []int64{1, 2}}},
+		{"merge", merge, []any{sql.Named("id", []int64{2, 2}), sql.Named("name", []string{"a", "b"}), sql.Named("val", []int64{1, 2})}},
+	}
+	for _, test := range tests {
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		_, err := db.ExecContext(ctx, test.query, test.args...)
+		cancel()
+		var serr *oracle.ServerError
+		if !errors.As(err, &serr) || serr.ErrCode != 1 {
+			t.Errorf("%s: got %v, want ORA-00001", test.name, err)
+		}
 	}
 	usable(t, db)
 }

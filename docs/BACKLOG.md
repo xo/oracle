@@ -21,20 +21,24 @@ server, which `go-ora` read. Add each when a caller needs it.
 
 ### Remove the state that the whole process shares
 
-Step 4 removed the package variable `oracleDriver` (D9). Four pieces of state
-for the whole process remain:
+Step 4 removed the package variable `oracleDriver` (D9), and step 9 moved the
+fast login cookies to the `Connector`. Two pieces of state for the whole
+process remain:
 
 - `auth.NTSAuth`, which `SetNTSAuth` sets, and which a configuration with an
   OS password sets for every connection after it.
 - `auth.kerberosAuth`, a Kerberos authenticator for every connection.
   `Config.Kerberos` sets one for each connector already.
-- `cookieStore` in `internal/ttc/connection_cookie.go`, the fast login
-  cookies. A cookie
-  changes the logon, and `ResetCookies` in `export_test.go` clears it for the
-  exchange tests.
-- `jsonEncoder` in `internal/codec/oson`, a map of encoders.
 
 Move each to the `Connector` or to the connection.
+
+### Send the trace to Config.Logger
+
+`Config.Logger` is in the DSN code and reaches nothing. The connection still
+writes its trace through `internal/trace`, to the `TraceFilePath` or the
+`TraceDir` of the configuration, which no key of the DSN sets. So a caller
+cannot see the packets. Write each packet and event to the logger, as
+`DESIGN.md` says under Logging, and delete `internal/trace` (D14).
 
 ### Stop printing on reconnect
 
@@ -105,7 +109,10 @@ the free images do not have, so 43 pass and 2 fail.
 On 11g in step 9, 40 pass and 3 fail. `TestTime` fails as on 26ai.
 `TestIssue186` uses `FETCH NEXT`, and `TestIssue335` an identifier longer than
 30 characters, which 11g does not have. Those two tests need SQL that 11g
-accepts, or a skip on 11g.
+accepts, or a skip on 11g. A second run on the same 11g database also fails
+`TestArray`, because the package body `GOORA_TEMP_PKG` does not compile, and
+`TestColumnType`, as on 26ai. A test leaves an object behind that the next run
+meets. Each test must drop what it makes.
 
 Run it on the other four releases, and fix or record each failure.
 

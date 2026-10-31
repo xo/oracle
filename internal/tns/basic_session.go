@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -166,10 +167,17 @@ func (session *basicSession) ReadFixedCLR() ([]byte, error) {
 	return session.ReadBytes(size)
 }
 
-// ReadString read a string data from input buffer
+// ReadString reads a CLR and returns its first length bytes as a string. A
+// length longer than the CLR is an error, where it panicked.
 func (session *basicSession) ReadString(length int) (string, error) {
 	ret, err := session.ReadCLR()
-	return string(ret[:length]), err
+	if err != nil {
+		return "", err
+	}
+	if length < 0 || length > len(ret) {
+		return "", fmt.Errorf("reading a string of %d bytes from %d bytes", length, len(ret))
+	}
+	return string(ret[:length]), nil
 }
 
 // ReadNullTermString read a null terminated string from input buffer

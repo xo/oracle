@@ -799,7 +799,6 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 					}
 					if len(bty) >= 8 {
 						stmt.queryID = binary.LittleEndian.Uint64(bty[size-8:])
-						fmt.Println("query ID: ", stmt.queryID)
 					}
 				}
 			}
@@ -1349,13 +1348,16 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			tempType := reflect.TypeOf(args[x].Value)
 			tempVal := reflect.ValueOf(args[x].Value)
 			if args[x].Value != nil && tempType != reflect.TypeFor[[]byte]() && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
-				// setup array count
-				if stmt.arrayBindCount == 0 {
-					stmt.arrayBindCount = tempVal.Len()
-				} else {
-					if stmt.arrayBindCount > tempVal.Len() {
-						stmt.arrayBindCount = tempVal.Len()
-					}
+				// every array of a batch holds one value for each row. An
+				// empty array panicked, and a shorter one cut the others
+				// short, which was sijms/go-ora#695
+				switch n := tempVal.Len(); {
+				case n == 0:
+					return nil, fmt.Errorf("batch parameter %d is empty", x+1)
+				case stmt.arrayBindCount == 0:
+					stmt.arrayBindCount = n
+				case n != stmt.arrayBindCount:
+					return nil, fmt.Errorf("batch parameter %d has %d rows, where the first has %d", x+1, n, stmt.arrayBindCount)
 				}
 				// see if first item is struct
 				firstItem := tempVal.Index(0)

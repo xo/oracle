@@ -125,6 +125,7 @@ type Connection struct {
 	token                    []byte
 	tokenPrivateKey          []byte
 	connectionCookie         *ConnectionCookie
+	cookies                  *cookieJar
 	newKey                   []byte
 }
 

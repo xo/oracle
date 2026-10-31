@@ -63,9 +63,15 @@ MB. The integration tests on 26ai give the same 42 passes and 3 failures.
 
 Step 8 is done (`073dd07`).
 
-Step 9 is staged. It fixes sijms/go-ora#776, #703 for NCHAR, #699 for every
-basic kind and #762, finds #671 does not break the connection here, and
-`upstream_test.go` holds each against a live server. `TestIssue543` makes its
-own index, and `integration` on 26ai gives 43 passes and 2 failures. On 11g the root package passes, and `integration` gives 40 passes and 3 failures, which `BACKLOG.md` lists. Left in
-`UPSTREAM.md`: #769, #771, #692, #624, #695, #698 and #729, and the pull
-requests, which wait for Ken.
+Step 9 is in progress. Its first part is done (`bf54b03`). It fixes
+sijms/go-ora#776, #703 for NCHAR, #699 for every basic kind and #762, finds
+that #671 does not break the connection here, and `upstream_test.go` holds
+each against a live server. `TestIssue543` makes its own index.
+
+The second part of step 9 is staged. It fixes #698, a batch that failed and
+hung on 11g, #695, #624 and #692, whose cookies are now per `Connector`. The
+root package passes on 11g and 26ai. `integration` gives 43 passes and 2
+failures on 26ai, and 40 passes and 5 failures on 11g, which `BACKLOG.md`
+lists. Left in `UPSTREAM.md`: #769 and #771, which need sijms/go-ora#768 and
+sijms/go-ora#770 or a rewrite of them, and #729, which is a feature. The pull
+requests wait for Ken.

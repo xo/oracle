@@ -19,18 +19,14 @@ type ConnectionCookie struct {
 	cookieKey             string
 }
 
-var (
-	cookieStore = make(map[string]*ConnectionCookie)
-	cookieMu    sync.Mutex
-)
-
-// ResetCookies forgets the fast login cookie of every server. The store is
-// one for the whole process, so a test that compares the packets of a logon
-// must start from an empty store. D9 moves the store to the Connector.
-func ResetCookies() {
-	cookieMu.Lock()
-	clear(cookieStore)
-	cookieMu.Unlock()
+// cookieJar holds the fast login cookies of the connections of one Registry,
+// and so of one Connector (D9). A cookie names the charsets of the server.
+// go-ora kept one store for the whole process, keyed by the UUID of the
+// server and its service name, so a second database with the same name, such
+// as XE, took the charset of the first, which was sijms/go-ora#692.
+type cookieJar struct {
+	mu      sync.Mutex
+	cookies map[string]*ConnectionCookie
 }
 
 func getCookieKey(conn *Connection) string {
@@ -52,24 +48,27 @@ func getCookieKey(conn *Connection) string {
 
 func lookupCookie(conn *Connection) *ConnectionCookie {
 	key := getCookieKey(conn)
-	if key == "" {
+	if key == "" || conn.cookies == nil {
 		return nil
 	}
-	cookieMu.Lock()
-	defer cookieMu.Unlock()
-	return cookieStore[key]
+	conn.cookies.mu.Lock()
+	defer conn.cookies.mu.Unlock()
+	return conn.cookies.cookies[key]
 }
+
 func deleteCookie(conn *Connection) {
 	key := getCookieKey(conn)
-	if len(key) > 0 {
-		cookieMu.Lock()
-		defer cookieMu.Unlock()
-		delete(cookieStore, key)
+	if key == "" || conn.cookies == nil {
+		return
 	}
+	conn.cookies.mu.Lock()
+	defer conn.cookies.mu.Unlock()
+	delete(conn.cookies.cookies, key)
 }
+
 func saveCookie(conn *Connection) {
 	key := getCookieKey(conn)
-	if key == "" || conn.tcpNego == nil {
+	if key == "" || conn.cookies == nil || conn.tcpNego == nil {
 		return
 	}
 	nego := conn.tcpNego
@@ -83,9 +82,12 @@ func saveCookie(conn *Connection) {
 		ServerRuntimeCaps:     append([]byte(nil), nego.ServerRuntimeCaps...),
 		cookieKey:             key,
 	}
-	cookieMu.Lock()
-	cookieStore[key] = cookie
-	cookieMu.Unlock()
+	conn.cookies.mu.Lock()
+	if conn.cookies.cookies == nil {
+		conn.cookies.cookies = make(map[string]*ConnectionCookie)
+	}
+	conn.cookies.cookies[key] = cookie
+	conn.cookies.mu.Unlock()
 }
 
 func (c *ConnectionCookie) writeTTICookie(session *tns.Session) {

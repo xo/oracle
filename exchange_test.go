@@ -233,7 +233,6 @@ func TestRecordExchanges(t *testing.T) {
 	}
 	for _, name := range slices.Sorted(maps.Keys(scenarios)) {
 		t.Run(name, func(t *testing.T) {
-			oracle.ResetCookies()
 			rec := &tnstest.Recorder{Addr: u.Host}
 			db := openExchange(t, dsn, rec)
 			lines, err := scenarios[name](t.Context(), db)
@@ -296,7 +295,6 @@ func TestExchanges(t *testing.T) {
 				Host:   exchangeHost,
 				Path:   "/" + ex.Note("service"),
 			}).String()
-			oracle.ResetCookies()
 			player := tnstest.NewPlayer(ex)
 			db := openExchange(t, dsn, player)
 			got, err := run(t.Context(), db)

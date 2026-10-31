@@ -476,10 +476,8 @@ top of `exchange_test.go` gives the command. Every recorded
 connection names the address `oracle.test:1521` and a fixed client identity,
 in the `CID` key, so the packets do not depend on the machine.
 
-The driver keeps a cache of fast login cookies for the whole process, and a
-cookie changes the logon. So each scenario clears it first, through
-`ResetCookies` in `export_test.go`. D9 moves the cache to the `Connector`, and
-the hook goes with it.
+Each `Connector` keeps its own fast login cookies (D9), and a cookie changes
+the logon. Each scenario opens its own `Connector`, so each starts with none.
 
 A replay passes only while the driver sends the same packet types in the same
 order. A change that sends another packet, such as a new round trip at logon,

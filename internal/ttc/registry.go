@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/xo/oracle/internal/codec"
-	"github.com/xo/oracle/internal/codec/oson"
 	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/types"
 )
@@ -22,8 +21,8 @@ type Registry struct {
 	oracleTypeCoder map[uint16]codec.OracleParameterCoder
 	goTypeCoder     map[reflect.Type]codec.OracleParameterCoder
 	nameTypeCoder   map[string]codec.OracleParameterCoder
-	jsonEncoder     map[reflect.Type]oson.FieldEncoder
 	cusTyp          map[string]types.Object
+	cookies         cookieJar
 	mu              sync.Mutex
 	UserId          string
 	// Server    string
@@ -236,5 +235,6 @@ func (drv *Registry) NewConnection(config *config.ConnectionConfig) (*Connection
 	}
 	conn.buildParameterCoderMap(drv)
 	conn.cusTyp = drv.cusTyp
+	conn.cookies = &drv.cookies
 	return conn, nil
 }

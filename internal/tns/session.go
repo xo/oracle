@@ -86,6 +86,7 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 		tracer:  trace.NilTracer(),
 	}
 	ret.inBuffer = bytes.NewBuffer(input)
+	ret.terminal = ret
 	ret.UseBigClrChunks = false
 	ret.ClrChunkSize = 0x40
 	return ret

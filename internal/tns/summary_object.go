@@ -155,100 +155,100 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 		return nil, err
 	}
 	_, _ = session.ReadDLC()
-	if session.TTCVersion < 7 {
-		_, _ = session.ReadDLC()
-		_, _ = session.ReadDLC()
-		_, _ = session.ReadDLC()
-	} else {
-		length, err := session.ReadInt(2, true, true)
+	// the errors of an array DML come as three arrays on every version: the
+	// error codes, the row offsets and the messages. go-ora read them only
+	// from TTC 7, and read three empty DLCs before it, which matched while
+	// no row failed. On 11g a batch that failed waited for bytes that never
+	// came, which was sijms/go-ora#698. Only the return code and the row
+	// count after the arrays are new in TTC 7.
+	length, err := session.ReadInt(2, true, true)
+	if err != nil {
+		return nil, err
+	}
+	if length > 0 {
+		result.bindErrors = make([]BindError, length)
+		num, err := session.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		if length > 0 {
+		flag := num == 0xFE
+		for x := 0; x < length; x++ {
+			if flag {
+				if session.UseBigClrChunks {
+					_, _ = session.ReadInt(4, true, true)
+				} else {
+					_, _ = session.ReadByte()
+				}
+			}
+			result.bindErrors[x].errorCode, err = session.ReadInt(2, true, true)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if flag {
+			_, _ = session.ReadByte()
+		}
+	}
+	length, err = session.ReadInt(4, true, true)
+	if err != nil {
+		return nil, err
+	}
+	if length > 0 {
+		if len(result.bindErrors) == 0 {
 			result.bindErrors = make([]BindError, length)
-			num, err := session.ReadByte()
-			if err != nil {
-				return nil, err
-			}
-			flag := num == 0xFE
-			for x := 0; x < length; x++ {
-				if flag {
-					if session.UseBigClrChunks {
-						_, _ = session.ReadInt(4, true, true)
-					} else {
-						_, _ = session.ReadByte()
-					}
-				}
-				result.bindErrors[x].errorCode, err = session.ReadInt(2, true, true)
-				if err != nil {
-					return nil, err
-				}
-			}
-			if flag {
-				_, _ = session.ReadByte()
-			}
 		}
-		length, err = session.ReadInt(4, true, true)
+		num, err := session.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		if length > 0 {
-			if len(result.bindErrors) == 0 {
-				result.bindErrors = make([]BindError, length)
+		flag := num == 0xFE
+		for x := 0; x < length; x++ {
+			if flag {
+				if session.UseBigClrChunks {
+					_, _ = session.ReadInt(4, true, true)
+				} else {
+					_, _ = session.ReadByte()
+				}
 			}
-			num, err := session.ReadByte()
+			result.bindErrors[x].rowOffset, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return nil, err
 			}
-			flag := num == 0xFE
-			for x := 0; x < length; x++ {
-				if flag {
-					if session.UseBigClrChunks {
-						_, _ = session.ReadInt(4, true, true)
-					} else {
-						_, _ = session.ReadByte()
-					}
-				}
-				result.bindErrors[x].rowOffset, err = session.ReadInt(4, true, true)
-				if err != nil {
-					return nil, err
-				}
-			}
-			if flag {
-				_, _ = session.ReadByte()
-			}
 		}
-		length, err = session.ReadInt(2, true, true)
-		if err != nil {
-			return nil, err
+		if flag {
+			_, _ = session.ReadByte()
 		}
-		if length > 0 {
-			if len(result.bindErrors) == 0 {
-				result.bindErrors = make([]BindError, length)
+	}
+	length, err = session.ReadInt(2, true, true)
+	if err != nil {
+		return nil, err
+	}
+	if length > 0 {
+		if len(result.bindErrors) == 0 {
+			result.bindErrors = make([]BindError, length)
+		}
+		_, _ = session.ReadByte()
+		for x := 0; x < length; x++ {
+			_, err := session.ReadInt(2, true, true)
+			if err != nil {
+				return nil, err
+			}
+			result.bindErrors[x].errorMsg, err = session.ReadCLR()
+			if err != nil {
+				return nil, err
 			}
 			_, _ = session.ReadByte()
-			for x := 0; x < length; x++ {
-				_, err := session.ReadInt(2, true, true)
-				if err != nil {
-					return nil, err
-				}
-				result.bindErrors[x].errorMsg, err = session.ReadCLR()
-				if err != nil {
-					return nil, err
-				}
-				_, _ = session.ReadByte()
-				_, _ = session.ReadByte()
-			}
+			_, _ = session.ReadByte()
 		}
-		if session.TTCVersion >= 7 {
-			result.RetCode, err = session.ReadInt(4, true, true)
-			if err != nil {
-				return nil, err
-			}
-			result.CurRowNumber, err = session.ReadInt(8, true, true)
-			if err != nil {
-				return nil, err
-			}
+	}
+	if session.TTCVersion >= 7 {
+		result.RetCode, err = session.ReadInt(4, true, true)
+		if err != nil {
+			return nil, err
+		}
+		result.CurRowNumber, err = session.ReadInt(8, true, true)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if result.RetCode != 0 {
