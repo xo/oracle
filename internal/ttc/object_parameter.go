@@ -110,7 +110,8 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	session := tns.NewMemorySession(nil, nil, conn.Session().Properties())
 	inputType := getType(input)
 	rValue := reflect.ValueOf(input)
-	if input == nil {
+	// a nil slice is a NULL collection, and not an empty one
+	if input == nil || (rValue.Kind() == reflect.Slice && rValue.IsNil()) {
 		param.BValue = nil
 		return
 	}
@@ -119,35 +120,30 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 		coder.Init()
 		param.UpdateParameterInfo(coder.ParameterInfo())
 		size := rValue.Len()
-		if size > 0 {
-			session.PutBytes(1, 3)
-			if size > 0xF5 {
-				session.PutUint(0xFE, 2, true, false)
-				session.PutUint(size, 4, true, false)
+		// the prefix segment, of length 1, the flags of the collection, and
+		// its count, as the server writes a collection
+		session.PutBytes(1, 1, 0)
+		putImageLength(session, size)
+		for i := range size {
+			var item driver.Value
+			if rValue.Index(i).CanInterface() {
+				item, err = getValue(rValue.Index(i).Interface())
+				if err != nil {
+					return err
+				}
+				err = coder.Encode(item, conn)
 			} else {
-				session.PutUint(size, 2, true, false)
+				err = coder.Encode(nil, conn)
 			}
-			for i := range size {
-				var item driver.Value
-				if rValue.Index(i).CanInterface() {
-					item, err = getValue(rValue.Index(i).Interface())
-					if err != nil {
-						return err
-					}
-					err = coder.Encode(item, conn)
-				} else {
-					err = coder.Encode(nil, conn)
-				}
-				if err != nil {
-					return err
-				}
-				err = coder.Write(session)
-				if err != nil {
-					return err
-				}
-				coderPI := coder.ParameterInfo()
-				param.UpdateParameterInfo(coderPI)
+			if err != nil {
+				return err
 			}
+			err = coder.Write(session)
+			if err != nil {
+				return err
+			}
+			coderPI := coder.ParameterInfo()
+			param.UpdateParameterInfo(coderPI)
 		}
 	} else {
 		// this code is work for object struct
@@ -183,6 +179,22 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	return
 }
 
+// maxShortImageLength is the longest length that the image of an object
+// writes in one byte. A longer one is 0xFE and four bytes, big endian.
+const maxShortImageLength = 245
+
+// putImageLength writes n as the image of an object writes a length.
+func putImageLength(session tns.SessionWriter, n int) {
+	if n <= maxShortImageLength {
+		session.PutBytes(uint8(n))
+		return
+	}
+	session.PutBytes(0xFE)
+	session.PutUint(n, 4, true, false)
+}
+
+// encapsulate puts the header of an image before BValue: the flags, the
+// version, and the length of the whole image.
 func (param *ObjectParameter) encapsulate() (err error) {
 	code := uint8(0x84)
 	if param.isArray {
@@ -191,13 +203,11 @@ func (param *ObjectParameter) encapsulate() (err error) {
 	size := len(param.BValue)
 	objectBuffer := &bytes.Buffer{}
 	objectBuffer.Write([]byte{code, 0x1})
-	if (size + 7) < 0xfe {
-		size += 3
-		objectBuffer.Write([]byte{uint8(size)})
+	if size+3 <= maxShortImageLength {
+		objectBuffer.WriteByte(uint8(size + 3))
 	} else {
-		size += 7
-		objectBuffer.Write([]byte{0xfe})
-		err = binary.Write(objectBuffer, binary.BigEndian, uint32(size))
+		objectBuffer.WriteByte(0xfe)
+		err = binary.Write(objectBuffer, binary.BigEndian, uint32(size+7))
 		if err != nil {
 			return
 		}
@@ -232,16 +242,23 @@ func (param *ObjectParameter) Write(session tns.SessionWriter) error {
 		}
 
 	} else {
-		if param.BValue == nil {
-			if param.isArray {
-				param.BValue = []byte{0xFF}
-			} else {
-				param.BValue = []byte{0xFD}
+		// an attribute of an object. A collection there is an image of its
+		// own, with its header and its length, as the server writes one.
+		// go-ora wrote its body alone, which the server read as a length
+		// that it never stopped allocating for, sijms/go-ora#721
+		switch {
+		case param.isArray && param.BValue == nil:
+			// a NULL collection is 0xFF, with no length before it
+			session.PutBytes(0xFF)
+		case param.isArray:
+			if err := param.encapsulate(); err != nil {
+				return err
 			}
-		}
-		if param.isArray {
-			session.PutFixedClr(param.BValue)
-		} else {
+			putImageLength(session, len(param.BValue))
+			session.PutBytes(param.BValue...)
+		case param.BValue == nil:
+			session.PutBytes(0xFD)
+		default:
 			session.PutBytes(param.BValue...)
 		}
 	}
@@ -252,6 +269,10 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 	// need main session to get its properties
 	var objectType uint8
 	var err error
+	if param.PSession == nil && len(param.BValue) == 0 {
+		// a NULL object, which has no image
+		return nil, nil
+	}
 	if param.PSession == nil {
 		param.PSession = tns.NewMemorySession(param.BValue, nil, conn.Session().Properties())
 		objectType, err = param.PSession.ReadByte()
@@ -370,11 +391,8 @@ func (param *ObjectParameter) Read(session tns.SessionReader) error {
 			return err
 		}
 		if size == 0 {
-			// the object is null
-			_, err = session.ReadBytes(2) // 0x81 0x01
-			if err != nil {
-				return err
-			}
+			// a NULL object has no image. go-ora read two more bytes here,
+			// which the server never sent, sijms/go-ora#721
 			param.BValue = nil
 			return nil
 		}

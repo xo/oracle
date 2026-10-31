@@ -4,6 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -292,5 +296,177 @@ func TestClobCharset(t *testing.T) {
 	}
 	if c != long || v != short {
 		t.Errorf("got %d and %d bytes, want %d and %d", len(c), len(v), len(long), len(short))
+	}
+}
+
+// TestSkipNLS is sijms/go-ora#611: a logon ran a query of the NLS settings
+// that nothing reads, where the logon itself did not send them, as 11g does
+// not. skip_nls leaves it out.
+func TestSkipNLS(t *testing.T) {
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn == "" {
+		t.Skip("ORACLE_DSN is empty")
+	}
+	for _, skip := range []bool{false, true} {
+		cfg, err := oracle.ParseDSN(dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.SkipNLS = skip
+		h := new(records)
+		cfg.Logger = slog.New(h)
+		c, err := oracle.NewConnector(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		db := sql.OpenDB(c)
+		var n int
+		if err := db.QueryRowContext(t.Context(), "SELECT 1 FROM dual").Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		db.Close()
+		ran := false
+		h.mu.Lock()
+		for _, r := range h.recs {
+			r.Attrs(func(a slog.Attr) bool {
+				if a.Key == "query" && strings.Contains(a.Value.String(), "nls_session_parameters") {
+					ran = true
+				}
+				return true
+			})
+		}
+		h.mu.Unlock()
+		if skip && ran {
+			t.Error("skip_nls=true: the NLS query ran")
+		}
+	}
+}
+
+// TestTNSAlias connects through an alias of tnsnames.ora, which
+// sijms/go-ora#616 asks for and D20 decided.
+func TestTNSAlias(t *testing.T) {
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn == "" {
+		t.Skip("ORACLE_DSN is empty")
+	}
+	cfg, err := oracle.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Host == "" || cfg.Service == "" {
+		t.Skip("ORACLE_DSN names no host and service")
+	}
+	protocol := "TCP"
+	if cfg.SSLMode != "" && cfg.SSLMode != oracle.SSLDisable {
+		protocol = "TCPS"
+	}
+	port := cfg.Port
+	if port == 0 {
+		port = oracle.DefaultPort
+	}
+	dir := t.TempDir()
+	ora := fmt.Sprintf("# written by TestTNSAlias\nXO_TEST =\n  (DESCRIPTION =\n    (ADDRESS = (PROTOCOL = %s)(HOST = %s)(PORT = %d))\n    (CONNECT_DATA = (SERVICE_NAME = %s))\n  )\n", protocol, cfg.Host, port, cfg.Service)
+	if err := os.WriteFile(filepath.Join(dir, "tnsnames.ora"), []byte(ora), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Host, cfg.Port, cfg.Service = "", 0, ""
+	cfg.Alias, cfg.TNSAdmin = "xo_test", dir
+	c, err := oracle.NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := sql.OpenDB(c)
+	defer db.Close()
+	var n int
+	if err := db.QueryRowContext(t.Context(), "SELECT 1 FROM dual").Scan(&n); err != nil || n != 1 {
+		t.Errorf("through the alias: got %d, %v", n, err)
+	}
+}
+
+type xoNumbers struct {
+	ID   int64     `udt:"ID"`
+	Vals []float64 `udt:"VALS"`
+}
+
+// TestObjectCollection is sijms/go-ora#721: a VARRAY in an object went as
+// its body alone, which the server read as a length that it never stopped
+// allocating for, and a NULL object read two bytes too many. A VARRAY of
+// any size, a NULL one, an empty one, and a NULL object each go and come
+// back whole.
+func TestObjectCollection(t *testing.T) {
+	db := openLive(t)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	drop := []string{"DROP TABLE xo_oracle_objects PURGE", "DROP TYPE xo_oracle_object FORCE", "DROP TYPE xo_oracle_numbers FORCE"}
+	for _, s := range drop {
+		_, _ = db.ExecContext(ctx, s)
+	}
+	for _, s := range []string{
+		"CREATE TYPE xo_oracle_numbers AS VARRAY(2000) OF NUMBER",
+		"CREATE TYPE xo_oracle_object AS OBJECT (id NUMBER, vals xo_oracle_numbers)",
+		"CREATE TABLE xo_oracle_objects (k NUMBER, o xo_oracle_object) TABLESPACE USERS",
+	} {
+		if _, err := db.ExecContext(ctx, s); err != nil {
+			t.Fatalf("%s: %v", s, err)
+		}
+	}
+	t.Cleanup(func() {
+		for _, s := range drop {
+			_, _ = db.Exec(s)
+		}
+	})
+	if err := oracle.RegisterType(db, "NUMBER", "XO_ORACLE_NUMBERS", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := oracle.RegisterType(db, "XO_ORACLE_OBJECT", "", xoNumbers{}); err != nil {
+		t.Fatal(err)
+	}
+	big := make([]float64, 300)
+	for i := range big {
+		big[i] = float64(i) + 0.5
+	}
+	want := []*xoNumbers{
+		{ID: 1, Vals: []float64{1, 2, 3}},
+		{ID: 2, Vals: nil},
+		nil,
+		{ID: 4, Vals: []float64{}},
+		{ID: 5, Vals: big},
+	}
+	for k, o := range want {
+		var err error
+		if o == nil {
+			_, err = db.ExecContext(ctx, "INSERT INTO xo_oracle_objects VALUES (:1, NULL)", k)
+		} else {
+			_, err = db.ExecContext(ctx, "INSERT INTO xo_oracle_objects VALUES (:1, :2)", k, *o)
+		}
+		if err != nil {
+			t.Fatalf("row %d: %v", k, err)
+		}
+	}
+	rows, err := db.QueryContext(ctx, "SELECT k, o FROM xo_oracle_objects ORDER BY k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var k int
+		var got any
+		if err := rows.Scan(&k, &got); err != nil {
+			t.Fatal(err)
+		}
+		n++
+		if want[k] == nil {
+			if got != nil {
+				t.Errorf("row %d: got %v, want NULL", k, got)
+			}
+			continue
+		}
+		if g, ok := got.(xoNumbers); !ok || g.ID != want[k].ID || !reflect.DeepEqual(g.Vals, want[k].Vals) {
+			t.Errorf("row %d: got %#v, want %#v", k, got, *want[k])
+		}
+	}
+	if err := rows.Err(); err != nil || n != len(want) {
+		t.Errorf("read %d rows, %v", n, err)
 	}
 }

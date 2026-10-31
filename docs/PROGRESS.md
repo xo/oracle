@@ -84,10 +84,13 @@ which fixes #771, binds long text safely on 11g, and records D8 to D21. CI found
 fault of long text on 18c, and the sixth part covers every release before
 19c.
 
-The sixth part of step 9 is staged. A character that a charset lacks is the
-'?' of that charset, where every charset wrote 0xFD (#773). #733, for which
-Ken took #734, does not reproduce, and `TestClobCharset` holds the case.
-`oracle.EnableOutput`, `ReadOutput` and `DisableOutput` read `DBMS_OUTPUT`
-(D19). `README.md` has the badges and the related projects of the other `xo`
-repositories. Left: #721, `tnsnames.ora` (D20), the four features of D21,
-and #729.
+The sixth part of step 9 is done (`a06284d`, pushed). It replaces a missing
+character with '?' (#773), reads `DBMS_OUTPUT` (D19), and covers 18c.
+
+The seventh part of step 9 is staged. A collection in an object goes as an
+image of its own, which fixes a hang of the server for any VARRAY in an
+object (#721), and a NULL object reads. The keys `alias` and `tns_admin`
+read `tnsnames.ora` (D20), and `skip_nls` skips the NLS query (#611). The
+root package and `integration` pass on 11g, 26ai and both Autonomous
+Database releases. Left: the NULL row of an array bind of objects (#721),
+OCI IAM tokens, streaming, failover (D21), and #729.

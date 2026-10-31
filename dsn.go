@@ -142,6 +142,12 @@ type Config struct {
 	// the addresses and the service in place of the fields above.
 	Descriptor string
 
+	// Alias is an alias of tnsnames.ora, whose descriptor takes the place of
+	// Descriptor. The file is in the folder TNSAdmin, or in the folder that
+	// the environment variable TNS_ADMIN names when TNSAdmin is empty (D20).
+	Alias    string
+	TNSAdmin string
+
 	// SSLMode and the SSL fields say whether and how the connection uses TLS.
 	SSLMode       SSLMode
 	SSLRootCert   string
@@ -195,6 +201,10 @@ type Config struct {
 	// UnixSocket is a Unix socket to dial in place of TCP.
 	UnixSocket string
 
+	// SkipNLS skips the query of the NLS settings of the session that a
+	// logon runs, which saves a round trip. The driver does not use them.
+	SkipNLS bool
+
 	// Client is what the connect packet says about the client.
 	Client Client
 
@@ -218,6 +228,8 @@ type Config struct {
 const (
 	keySID            = "sid"
 	keyDescriptor     = "descriptor"
+	keyAlias          = "alias"
+	keyTNSAdmin       = "tns_admin"
 	keyServer         = "server"
 	keySSLMode        = "sslmode"
 	keySSLRootCert    = "sslrootcert"
@@ -243,18 +255,19 @@ const (
 	keyProgram        = "program"
 	keyProxyUser      = "proxy_user"
 	keyUnixSocket     = "unix_socket"
+	keySkipNLS        = "skip_nls"
 )
 
 // keys holds every key that a DSN can hold.
 var keys = []string{
-	keySID, keyDescriptor, keyServer,
+	keySID, keyDescriptor, keyAlias, keyTNSAdmin, keyServer,
 	keySSLMode, keySSLRootCert, keySSLCert, keySSLKey, keySSLServerName,
 	keyWallet, keyWalletPassword,
 	keyTimeout, keyConnectTimeout, keyPrefetch, keyLobFetch, keyLobRead,
 	keyAuth, keyPrivilege, keyToken, keyTokenKey,
 	keyEncryption, keyChecksum,
 	keyLanguage, keyTerritory, keyCharset,
-	keyProgram, keyProxyUser, keyUnixSocket,
+	keyProgram, keyProxyUser, keyUnixSocket, keySkipNLS,
 }
 
 // ParseDSN parses a DSN of the form
@@ -351,6 +364,10 @@ func (cfg *Config) set(key string, vals []string) error {
 		cfg.SID = v
 	case keyDescriptor:
 		cfg.Descriptor = v
+	case keyAlias:
+		cfg.Alias = v
+	case keyTNSAdmin:
+		cfg.TNSAdmin = v
 	case keyServer:
 		for _, s := range vals {
 			if _, _, err := net.SplitHostPort(s); err != nil {
@@ -410,13 +427,21 @@ func (cfg *Config) set(key string, vals []string) error {
 		cfg.ProxyUser = v
 	case keyUnixSocket:
 		cfg.UnixSocket = v
+	case keySkipNLS:
+		cfg.SkipNLS, err = strconv.ParseBool(v)
+		if err != nil {
+			err = fmt.Errorf("%q is not a boolean: %w", v, ErrInvalidValue)
+		}
 	}
 	return err
 }
 
 // check returns an error when cfg cannot name a database.
 func (cfg *Config) check() error {
-	if cfg.Descriptor == "" {
+	if cfg.Alias != "" && cfg.Descriptor != "" {
+		return fmt.Errorf("alias and descriptor both name the addresses: %w", ErrInvalidValue)
+	}
+	if cfg.Descriptor == "" && cfg.Alias == "" {
 		if cfg.Host == "" {
 			return fmt.Errorf("no host: %w", ErrInvalidValue)
 		}
@@ -478,6 +503,8 @@ func (cfg Config) DSN() string {
 	}
 	add(keySID, cfg.SID)
 	add(keyDescriptor, cfg.Descriptor)
+	add(keyAlias, cfg.Alias)
+	add(keyTNSAdmin, cfg.TNSAdmin)
 	for _, s := range cfg.Servers {
 		q.Add(keyServer, s)
 	}
@@ -511,6 +538,9 @@ func (cfg Config) DSN() string {
 	add(keyProgram, cfg.Program)
 	add(keyProxyUser, cfg.ProxyUser)
 	add(keyUnixSocket, cfg.UnixSocket)
+	if cfg.SkipNLS {
+		add(keySkipNLS, "true")
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }

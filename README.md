@@ -120,6 +120,8 @@ none of the key names of `go-ora`, such as `SSL VERIFY` or `SERVICE NAME`.
 | `language`, `territory`, `charset` | The NLS settings of the client | `AMERICAN`, `AMERICA` |
 | `program`, `proxy_user` | The program that the session reports, and a proxy user | none |
 | `unix_socket` | A Unix socket in place of TCP | none |
+| `alias`, `tns_admin` | An alias of `tnsnames.ora`, in place of the host, the port and the path, and the folder of the file | none, and `$TNS_ADMIN` |
+| `skip_nls` | `true` skips the query of the NLS settings at logon, which the driver does not use | `false` |
 
 A user named `SYS` gets no privilege by its name. Write `privilege=sysdba`.
 

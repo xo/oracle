@@ -295,6 +295,8 @@ The other keys:
 | `language`, `territory`, `charset` | The NLS settings of the client | `LANGUAGE`, `TERRITORY`, `CHARSET` |
 | `program`, `proxy_user` | What the session reports | `PROGRAM`, `PROXY CLIENT NAME` |
 | `unix_socket` | A Unix socket in place of TCP | `UNIX SOCKET` |
+| `alias`, `tns_admin` | An alias of `tnsnames.ora` and the folder of the file, which is `$TNS_ADMIN` when the key is absent (D20) | none |
+| `skip_nls` | `true` skips the query of the NLS settings at logon, which nothing reads (sijms/go-ora#611) | none |
 
 A user named `SYS` gets no privilege by its name. The DSN names it with
 `privilege=sysdba`.

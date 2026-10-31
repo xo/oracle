@@ -530,7 +530,9 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	conn.connOption.ServiceName = conn.SessionProperties["AUTH_SC_SERVICE_NAME"]
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
-	if len(conn.NLSData.Language) == 0 {
+	// nothing reads the NLS settings, and skip_nls saves the round trip,
+	// sijms/go-ora#611
+	if len(conn.NLSData.Language) == 0 && !conn.connOption.SkipNLS {
 		_, err = conn.NLS()
 		if err != nil {
 			logger.Debug("reading the NLS parameters", "error", err)

@@ -160,10 +160,24 @@ func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 		conn.Servers = append(conn.Servers, config.ServerAddr{Addr: cfg.Host, Port: port})
 	}
 	conn.ServiceName = cfg.Service
-	if cfg.Descriptor != "" {
+	desc := cfg.Descriptor
+	if cfg.Alias != "" {
+		dir := cfg.TNSAdmin
+		if dir == "" {
+			dir = os.Getenv("TNS_ADMIN")
+		}
+		if dir == "" {
+			return nil, fmt.Errorf("finding the alias %q: no tns_admin and no TNS_ADMIN: %w", cfg.Alias, ErrInvalidValue)
+		}
+		var err error
+		if desc, err = config.LookupAlias(dir, cfg.Alias); err != nil {
+			return nil, fmt.Errorf("finding the alias: %w", err)
+		}
+	}
+	if desc != "" {
 		// the descriptor names the addresses, and can name the service, the
 		// SID and the instance
-		if err := conn.UpdateDatabaseInfo(cfg.Descriptor); err != nil {
+		if err := conn.UpdateDatabaseInfo(desc); err != nil {
 			return nil, fmt.Errorf("reading the descriptor: %w", err)
 		}
 	}
@@ -219,6 +233,7 @@ func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 		conn.LobReadMode = config.LobReadModeNone
 	}
 	conn.UnixAddress = cfg.UnixSocket
+	conn.SkipNLS = cfg.SkipNLS
 	conn.TokenFile, conn.TokenPrivateKeyFile = cfg.Token, cfg.TokenKey
 	conn.ProxyClientName = cfg.ProxyUser
 	if cfg.Language != "" {

@@ -60,16 +60,12 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 that it tested. The vectors of `converters/other_types_test.go` moved to
 `internal/types/vectors_test.go`.
 
-### Read tnsnames.ora
-
-Write a parser of `tnsnames.ora` and a key that names an alias, found
-through `TNS_ADMIN` (D20). Test it with files in `testdata`, and live with a
-descriptor of a `dbrun` release.
-
 ### Take four upstream features
 
-Build the four requests of D21, each with a test: a key that skips the NLS
-query at connect (sijms/go-ora#611), a logon with an OCI IAM token (#530),
+Build the requests of D21, each with a test. Step 9 built the key
+`skip_nls` (sijms/go-ora#611). The query that it skips reads settings that
+nothing uses, so delete it outright when the exchanges of every release can
+be recorded again, 19c among them. Left: a logon with an OCI IAM token (#530),
 streaming of LOBs and rows (#681, #559 and #664), and failover to the next
 address of a descriptor (#707 and #619).
 
@@ -83,9 +79,10 @@ negotiation (D21).
 ### Write four upstream pull requests again
 
 Ken decided to take sijms/go-ora#734, #721, #770 and #773 (D18). Step 9 wrote
-#770, which reads XMLType, and #773, which replaces a character that a
-charset lacks. #734 is not applied, because its fault does not reproduce, as
-`UPSTREAM.md` says. Write #721 for this code, with a test. `UPSTREAM.md` says what each does. On 2026-10-31
+#770, which reads XMLType, #773, which replaces a character that a charset
+lacks, and #721, which encodes a collection in an object. #734 is not
+applied, because its fault does not reproduce, as `UPSTREAM.md` says. Left
+of #721: an array bind of objects with a NULL row, which needs a test. `UPSTREAM.md` says what each does. On 2026-10-31
 `dbrun` added the Autonomous Database Free image as `oracle-adb-26ai` and
 `oracle-adb-19c`, which CI leaves out. The driver connects to both with
 `sslmode=require` in place of the query that `dbrun dsn` prints, which names

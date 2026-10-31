@@ -28,6 +28,10 @@ func TestParseDSN(t *testing.T) {
 			Config{User: "u", Host: "h", Service: "a/b", Instance: "i"},
 		},
 		{
+			"oracle://u@h/s?skip_nls=true",
+			Config{User: "u", Host: "h", Service: "s", SkipNLS: true},
+		},
+		{
 			"oracle://u:p%40ss@h?sid=XE",
 			Config{User: "u", Password: "p@ss", Host: "h", SID: "XE"},
 		},
@@ -104,6 +108,7 @@ func TestParseDSNErrors(t *testing.T) {
 		{"oracle://u:p@h/s?SERVICE%20NAME=x", ErrUnknownKey},
 		{"oracle://u:p@h/s?tls=true", ErrUnknownKey},
 		{"oracle://u:p@h/s?sid=a&sid=b", ErrRepeatedKey},
+		{"oracle://u:p@h/s?skip_nls=maybe", ErrInvalidValue},
 		{"oracle://u:p@h:0/s", ErrInvalidValue},
 		{"oracle://u:p@h:x/s", ErrInvalidValue},
 		{"oracle://u:p@h/a/b/c", ErrInvalidValue},
@@ -236,5 +241,45 @@ func TestConnectorClose(t *testing.T) {
 	}
 	if d, ok := c.Driver().(Driver); !ok || d.c != c {
 		t.Error("Driver does not point back at its connector")
+	}
+}
+
+// TestConnectionConfigAlias reads the descriptor of an alias of
+// tnsnames.ora, from tns_admin or from TNS_ADMIN (D20).
+func TestConnectionConfigAlias(t *testing.T) {
+	const dir = "internal/config/testdata/tnsnames"
+	t.Setenv("TNS_ADMIN", "")
+	for _, dsn := range []string{
+		"oracle://u:p@?alias=orcl&tns_admin=" + url.QueryEscape(dir),
+		"oracle://u:p@?alias=ORCL",
+	} {
+		if !strings.Contains(dsn, "tns_admin") {
+			t.Setenv("TNS_ADMIN", dir)
+		}
+		cfg, err := ParseDSN(dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn, err := cfg.connectionConfig()
+		if err != nil {
+			t.Fatalf("%s: %v", dsn, err)
+		}
+		if len(conn.Servers) != 1 || conn.Servers[0].Addr != "db.example.com" || conn.ServiceName != "orclpdb1" {
+			t.Errorf("%s: got the servers %+v and the service %q", dsn, conn.Servers, conn.ServiceName)
+		}
+	}
+	t.Setenv("TNS_ADMIN", "")
+	for _, dsn := range []string{
+		"oracle://u:p@?alias=orcl",
+		"oracle://u:p@?alias=nothere&tns_admin=" + url.QueryEscape(dir),
+		"oracle://u:p@?alias=orcl&descriptor=%28DESCRIPTION%3D%29",
+	} {
+		cfg, err := ParseDSN(dsn)
+		if err != nil {
+			continue
+		}
+		if _, err := cfg.connectionConfig(); err == nil {
+			t.Errorf("%s: no error", dsn)
+		}
 	}
 }
