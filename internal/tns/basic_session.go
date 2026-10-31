@@ -17,13 +17,13 @@ type basicSession struct {
 	inBuffer  *bytes.Buffer
 	outBuffer *bytes.Buffer
 	SessionProperties
-	terminal   TerminalReader
+	terminal   terminalReader
 	TTCVersion uint8
 	ttcIndex   uint8
 }
 
-// GetByte read one uint8 from input buffer
-func (session *basicSession) GetByte() (uint8, error) {
+// ReadByte read one uint8 from input buffer
+func (session *basicSession) ReadByte() (byte, error) {
 	rb, err := session.terminal.read(1)
 	if err != nil {
 		return 0, err
@@ -31,18 +31,18 @@ func (session *basicSession) GetByte() (uint8, error) {
 	return rb[0], nil
 }
 
-// GetBytes read specified number of bytes from input buffer
-func (session *basicSession) GetBytes(length int) ([]byte, error) {
+// ReadBytes read specified number of bytes from input buffer
+func (session *basicSession) ReadBytes(length int) ([]byte, error) {
 	return session.terminal.read(length)
 }
 
-// GetInt64 read int64 number from input buffer.
+// ReadInt64 read int64 number from input buffer.
 // you should specify the size of the int and either compress or not and stored as big endian or not
-func (session *basicSession) GetInt64(size int, compress bool, bigEndian bool) (int64, error) {
+func (session *basicSession) ReadInt64(size int, compress bool, bigEndian bool) (int64, error) {
 	var ret int64
 	negFlag := false
 	if compress {
-		rb, err := session.GetByte()
+		rb, err := session.ReadByte()
 		if err != nil {
 			return 0, err
 		}
@@ -57,9 +57,9 @@ func (session *basicSession) GetInt64(size int, compress bool, bigEndian bool) (
 		return 0, nil
 	} else if size < 0 || size > 8 {
 		// When compress is true, "size" may be a value greater than 8 in some cases
-		return 0, errors.New("invalid size for GetInt64: " + strconv.Itoa(size))
+		return 0, errors.New("invalid size for ReadInt64: " + strconv.Itoa(size))
 	}
-	rb, err := session.GetBytes(size)
+	rb, err := session.ReadBytes(size)
 	if err != nil {
 		return 0, err
 	}
@@ -77,20 +77,20 @@ func (session *basicSession) GetInt64(size int, compress bool, bigEndian bool) (
 	return ret, nil
 }
 
-// GetInt read int number from input buffer.
+// ReadInt read int number from input buffer.
 // you should specify the size of the int and either compress or not and stored as big endian or not
-func (session *basicSession) GetInt(size int, compress bool, bigEndian bool) (int, error) {
-	temp, err := session.GetInt64(size, compress, bigEndian)
+func (session *basicSession) ReadInt(size int, compress bool, bigEndian bool) (int, error) {
+	temp, err := session.ReadInt64(size, compress, bigEndian)
 	if err != nil {
 		return 0, err
 	}
 	return int(temp), nil
 }
 
-// GetClr reed variable length bytearray from input buffer
-func (session *basicSession) GetClr() (output []byte, err error) {
+// ReadCLR reed variable length bytearray from input buffer
+func (session *basicSession) ReadCLR() (output []byte, err error) {
 	var nb byte
-	nb, err = session.GetByte()
+	nb, err = session.ReadByte()
 	if err != nil {
 		return
 	}
@@ -105,22 +105,22 @@ func (session *basicSession) GetClr() (output []byte, err error) {
 	if chunkSize == 0xFE {
 		for chunkSize > 0 {
 			if session.UseBigClrChunks {
-				chunkSize, err = session.GetInt(4, true, true)
+				chunkSize, err = session.ReadInt(4, true, true)
 			} else {
-				nb, err = session.GetByte()
+				nb, err = session.ReadByte()
 				chunkSize = int(nb)
 			}
 			if err != nil {
 				return
 			}
-			chunk, err = session.GetBytes(chunkSize)
+			chunk, err = session.ReadBytes(chunkSize)
 			if err != nil {
 				return
 			}
 			tempBuffer.Write(chunk)
 		}
 	} else {
-		chunk, err = session.GetBytes(chunkSize)
+		chunk, err = session.ReadBytes(chunkSize)
 		if err != nil {
 			return
 		}
@@ -130,15 +130,15 @@ func (session *basicSession) GetClr() (output []byte, err error) {
 	return
 }
 
-// GetDlc read variable length bytearray from input buffer
-func (session *basicSession) GetDlc() (output []byte, err error) {
+// ReadDLC read variable length bytearray from input buffer
+func (session *basicSession) ReadDLC() (output []byte, err error) {
 	var length int
-	length, err = session.GetInt(4, true, true)
+	length, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return
 	}
 	if length > 0 {
-		output, err = session.GetClr()
+		output, err = session.ReadCLR()
 		if len(output) > length {
 			output = output[:length]
 		}
@@ -146,8 +146,8 @@ func (session *basicSession) GetDlc() (output []byte, err error) {
 	return
 }
 
-func (session *basicSession) GetFixedClr() ([]byte, error) {
-	nb, err := session.GetByte()
+func (session *basicSession) ReadFixedCLR() ([]byte, error) {
+	nb, err := session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
@@ -156,43 +156,43 @@ func (session *basicSession) GetFixedClr() ([]byte, error) {
 	case 0, 0xFD, 0xFF:
 		return nil, nil
 	case 0xFE:
-		size, err = session.GetInt(4, false, true)
+		size, err = session.ReadInt(4, false, true)
 		if err != nil {
 			return nil, err
 		}
 	default:
 		size = int(nb)
 	}
-	return session.GetBytes(size)
+	return session.ReadBytes(size)
 }
 
-// GetString read a string data from input buffer
-func (session *basicSession) GetString(length int) (string, error) {
-	ret, err := session.GetClr()
+// ReadString read a string data from input buffer
+func (session *basicSession) ReadString(length int) (string, error) {
+	ret, err := session.ReadCLR()
 	return string(ret[:length]), err
 }
 
-// GetNullTermString read a null terminated string from input buffer
-func (session *basicSession) GetNullTermString() (result string, err error) {
+// ReadNullTermString read a null terminated string from input buffer
+func (session *basicSession) ReadNullTermString() (result string, err error) {
 	return session.inBuffer.ReadString(0)
 }
 
-// GetKeyVal read key, value (in form of bytearray), a number flag from input buffer
-func (session *basicSession) GetKeyVal() (key []byte, val []byte, num int, err error) {
-	key, err = session.GetDlc()
+// ReadKeyVal read key, value (in form of bytearray), a number flag from input buffer
+func (session *basicSession) ReadKeyVal() (key []byte, val []byte, num int, err error) {
+	key, err = session.ReadDLC()
 	if err != nil {
 		return
 	}
-	val, err = session.GetDlc()
+	val, err = session.ReadDLC()
 	if err != nil {
 		return
 	}
-	num, err = session.GetInt(4, true, true)
+	num, err = session.ReadInt(4, true, true)
 	return
 }
 
 func (session *basicSession) Peek() (byte, error) {
-	ret, err := session.GetByte()
+	ret, err := session.ReadByte()
 	if err != nil {
 		return 0, err
 	}
@@ -413,7 +413,7 @@ func (session *basicSession) PutKeyValString(key string, val string, num uint8) 
 	session.PutKeyVal([]byte(key), []byte(val), num)
 }
 
-func (session *basicSession) GetWriteBuffer() []byte {
+func (session *basicSession) WriteBuffer() []byte {
 	return session.outBuffer.Bytes()
 }
 

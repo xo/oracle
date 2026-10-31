@@ -43,7 +43,7 @@ func (h authheader) IsNTLM() bool {
 	return false
 }
 
-func (h authheader) GetData() ([]byte, error) {
+func (h authheader) Data() ([]byte, error) {
 	for _, s := range h {
 		if strings.HasPrefix(string(s), "NTLM") || strings.HasPrefix(string(s), "Negotiate") || strings.HasPrefix(string(s), "Basic ") {
 			p := strings.Split(string(s), " ")
@@ -56,8 +56,8 @@ func (h authheader) GetData() ([]byte, error) {
 	return nil, nil
 }
 
-func (h authheader) GetBasicCreds() (username, password string, err error) {
-	d, err := h.GetData()
+func (h authheader) BasicCreds() (username, password string, err error) {
+	d, err := h.Data()
 	if err != nil {
 		return "", "", err
 	}

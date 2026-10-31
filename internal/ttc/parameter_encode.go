@@ -30,7 +30,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	}
 
 	if value, ok := tempValue.(oraTypes.Object); ok {
-		par.encoder, err = connection.GetParameterCoder(value.Name)
+		par.encoder, err = connection.ParameterCoder(value.Name)
 		if err != nil {
 			return err
 		}
@@ -40,11 +40,11 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 			return err
 		}
 	} else {
-		if par.encoder, err = connection.GetParameterCoder(tempType); err == nil {
+		if par.encoder, err = connection.ParameterCoder(tempType); err == nil {
 		} else {
 			connection.tracer.Printf("Error get parameter encoder for type %v: %v", tempType, err)
 			if reflect.TypeOf(tempValue) != nil && tempType != reflect.TypeOf(tempValue) {
-				par.encoder, err = connection.GetParameterCoder(reflect.TypeOf(tempValue))
+				par.encoder, err = connection.ParameterCoder(reflect.TypeOf(tempValue))
 				if err != nil {
 					connection.tracer.Printf("Error get parameter encoder for type %v: %v", reflect.TypeOf(tempValue), err)
 				}
@@ -52,7 +52,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 			if par.encoder == nil && tempValue == nil {
 				// a NULL of a type with no coder, such as an invalid
 				// sql.Null[T] of an uncommon T, binds as a NULL VARCHAR2
-				par.encoder, err = connection.GetParameterCoder(reflect.TypeFor[string]())
+				par.encoder, err = connection.ParameterCoder(reflect.TypeFor[string]())
 			}
 			if par.encoder == nil {
 				if tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
@@ -63,14 +63,14 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 							itemType = itemType.Elem()
 						}
 					}
-					tempCoder, err := connection.GetParameterCoder(itemType)
+					tempCoder, err := connection.ParameterCoder(itemType)
 					if err != nil {
 						return err
 					}
 					tempCoder.Init()
 					// if item is of type xml so search for slice of item in the registered parameter coders
-					if tempCoder.GetParameterInfo().DataType == oraTypes.XMLType {
-						par.encoder, err = connection.GetParameterCoder(reflect.SliceOf(itemType))
+					if tempCoder.ParameterInfo().DataType == oraTypes.XMLType {
+						par.encoder, err = connection.ParameterCoder(reflect.SliceOf(itemType))
 					} else {
 						// if max length > 1 (mean it is set with size) so transfer size to array size
 						if par.MaxLen > 1 {
@@ -86,12 +86,12 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 			}
 		}
 	}
-	par.encoder.UpdateParameterInfo(par.GetParameterInfo())
+	par.encoder.UpdateParameterInfo(par.ParameterInfo())
 	err = par.encoder.Encode(tempValue, connection)
 	if err != nil {
 		return err
 	}
-	par.UpdateParameterInfo(par.encoder.GetParameterInfo())
+	par.UpdateParameterInfo(par.encoder.ParameterInfo())
 	if par.MaxLen < size {
 		par.MaxLen = size
 	}
@@ -104,11 +104,11 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		if par.MaxCharLen < size {
 			par.MaxCharLen = size
 		}
-		conv, err := connection.GetStringCoder(par.CharsetID, par.CharsetForm)
+		conv, err := connection.StringCoder(par.CharsetID, par.CharsetForm)
 		if err != nil {
 			return err
 		}
-		par.MaxLen = par.MaxCharLen * int64(converters.MaxBytePerChar(conv.GetLangID()))
+		par.MaxLen = par.MaxCharLen * int64(converters.MaxBytePerChar(conv.LangID))
 	}
 
 	//else {
@@ -135,7 +135,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	//			if err != nil {
 	//				return err
 	//			}
-	//			par.SetParameterInfo(par.encoder.GetParameterInfo())
+	//			par.SetParameterInfo(par.encoder.ParameterInfo())
 	//			if par.MaxLen < int64(size) {
 	//				par.MaxLen = int64(size)
 	//			}

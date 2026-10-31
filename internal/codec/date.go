@@ -28,11 +28,11 @@ func (param *DateParameter) Encode(input any, conn Conn) error {
 	if err != nil {
 		return err
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
 	param.BValue = encoder.Bytes()
 	return nil
@@ -40,8 +40,8 @@ func (param *DateParameter) Encode(input any, conn Conn) error {
 
 func (param *DateParameter) Decode(conn Conn) (any, error) {
 	decoder := types.Date{
-		DBTimeZone:       conn.GetDBTimeZone(),
-		DBServerTimeZone: conn.GetDBServerTimeZone(),
+		DBTimeZone:       conn.DBTimeZone(),
+		DBServerTimeZone: conn.DBServerTimeZone(),
 	}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)

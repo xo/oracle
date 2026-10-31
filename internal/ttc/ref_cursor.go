@@ -27,21 +27,21 @@ func (cursor *RefCursor) load() error {
 	cursor.stmtType = SELECT
 	session := cursor.connection.session
 	var err error
-	cursor.len, err = session.GetByte()
+	cursor.len, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
-	cursor.MaxRowSize, err = session.GetInt(4, true, true)
+	cursor.MaxRowSize, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	columnCount, err := session.GetInt(4, true, true)
+	columnCount, err := session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	if columnCount > 0 {
 		cursor.columns = make([]ParameterInfo, columnCount)
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -60,37 +60,37 @@ func (cursor *RefCursor) load() error {
 			}
 		}
 	}
-	_, err = session.GetDlc()
+	_, err = session.ReadDLC()
 	if err != nil {
 		return err
 	}
 	if session.TTCVersion >= 3 {
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
 	}
 	if session.TTCVersion >= 4 {
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
 	}
 	if session.TTCVersion >= 5 {
-		_, err = session.GetDlc()
+		_, err = session.ReadDLC()
 		if err != nil {
 			return err
 		}
 	}
-	cursor.cursorID, err = session.GetInt(4, true, true)
+	cursor.cursorID, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}

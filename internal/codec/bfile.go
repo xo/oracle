@@ -20,7 +20,7 @@ func (param *BFileParameter) Copy() OracleParameterCoder {
 func (param *BFileParameter) Encode(input any, conn Conn) (err error) {
 	param.Init()
 	encoder := &types.BFile{}
-	encoder.Conv, err = conn.GetDefaultStringCoder()
+	encoder.Conv, err = conn.DefaultStringCoder()
 	if err != nil {
 		return
 	}
@@ -30,19 +30,19 @@ func (param *BFileParameter) Encode(input any, conn Conn) (err error) {
 	if err != nil {
 		return
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
-	param.BValue = encoder.GetLocator()
+	param.BValue = encoder.Locator()
 	return
 }
 
 func (param *BFileParameter) Decode(conn Conn) (output any, err error) {
 	decoder := &types.BFile{}
-	decoder.Conv, err = conn.GetDefaultStringCoder()
+	decoder.Conv, err = conn.DefaultStringCoder()
 	if err != nil {
 		return
 	}

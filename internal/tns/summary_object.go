@@ -38,135 +38,135 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 	result := new(SummaryObject)
 	var err error
 	if session.HasEOSCapability {
-		result.EndOfCallStatus, err = session.GetInt(4, true, true)
+		result.EndOfCallStatus, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if session.TTCVersion >= 3 {
 		if session.HasFSAPCapability {
-			result.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+			result.EndToEndECIDSequence, err = session.ReadInt(2, true, true)
 			if err != nil {
 				return nil, err
 			}
 
 		}
 	}
-	result.CurRowNumber, err = session.GetInt(4, true, true)
+	result.CurRowNumber, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.RetCode, err = session.GetInt(2, true, true)
+	result.RetCode, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.arrayElmWError, err = session.GetInt(2, true, true)
+	result.arrayElmWError, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.arrayElmErrno, err = session.GetInt(2, true, true)
+	result.arrayElmErrno, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.CursorID, err = session.GetInt(2, true, true)
+	result.CursorID, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.errorPos, err = session.GetInt(2, true, true)
+	result.errorPos, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.sqlType, err = session.GetByte()
+	result.sqlType, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	result.oerFatal, err = session.GetByte()
+	result.oerFatal, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
 	if session.TTCVersion >= 4 {
-		result.Flags, err = session.GetInt(2, true, true)
+		result.Flags, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
-		result.userCursorOPT, err = session.GetInt(2, true, true)
+		result.userCursorOPT, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		var temp uint8
-		temp, err = session.GetByte()
+		temp, err = session.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 		result.Flags = int(temp)
-		temp, err = session.GetByte()
+		temp, err = session.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 		result.userCursorOPT = int(temp)
 	}
-	result.upiParam, err = session.GetByte()
+	result.upiParam, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	result.warningFlag, err = session.GetByte()
+	result.warningFlag, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	result.rba, err = session.GetInt(4, true, true)
+	result.rba, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.partitionID, err = session.GetInt(2, true, true)
+	result.partitionID, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.tableID, err = session.GetByte()
+	result.tableID, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	result.blockNumber, err = session.GetInt(4, true, true)
+	result.blockNumber, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.slotNumber, err = session.GetInt(2, true, true)
+	result.slotNumber, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.osError, err = session.GetInt(4, true, true)
+	result.osError, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.stmtNumber, err = session.GetByte()
+	result.stmtNumber, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	result.callNumber, err = session.GetByte()
+	result.callNumber, err = session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
-	result.pad1, err = session.GetInt(2, true, true)
+	result.pad1, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.successIter, err = session.GetInt(4, true, true)
+	result.successIter, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return nil, err
 	}
-	_, _ = session.GetDlc()
+	_, _ = session.ReadDLC()
 	if session.TTCVersion < 7 {
-		_, _ = session.GetDlc()
-		_, _ = session.GetDlc()
-		_, _ = session.GetDlc()
+		_, _ = session.ReadDLC()
+		_, _ = session.ReadDLC()
+		_, _ = session.ReadDLC()
 	} else {
-		length, err := session.GetInt(2, true, true)
+		length, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
 		if length > 0 {
 			result.bindErrors = make([]BindError, length)
-			num, err := session.GetByte()
+			num, err := session.ReadByte()
 			if err != nil {
 				return nil, err
 			}
@@ -174,21 +174,21 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			for x := 0; x < length; x++ {
 				if flag {
 					if session.UseBigClrChunks {
-						_, _ = session.GetInt(4, true, true)
+						_, _ = session.ReadInt(4, true, true)
 					} else {
-						_, _ = session.GetByte()
+						_, _ = session.ReadByte()
 					}
 				}
-				result.bindErrors[x].errorCode, err = session.GetInt(2, true, true)
+				result.bindErrors[x].errorCode, err = session.ReadInt(2, true, true)
 				if err != nil {
 					return nil, err
 				}
 			}
 			if flag {
-				_, _ = session.GetByte()
+				_, _ = session.ReadByte()
 			}
 		}
-		length, err = session.GetInt(4, true, true)
+		length, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +196,7 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			if len(result.bindErrors) == 0 {
 				result.bindErrors = make([]BindError, length)
 			}
-			num, err := session.GetByte()
+			num, err := session.ReadByte()
 			if err != nil {
 				return nil, err
 			}
@@ -204,21 +204,21 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			for x := 0; x < length; x++ {
 				if flag {
 					if session.UseBigClrChunks {
-						_, _ = session.GetInt(4, true, true)
+						_, _ = session.ReadInt(4, true, true)
 					} else {
-						_, _ = session.GetByte()
+						_, _ = session.ReadByte()
 					}
 				}
-				result.bindErrors[x].rowOffset, err = session.GetInt(4, true, true)
+				result.bindErrors[x].rowOffset, err = session.ReadInt(4, true, true)
 				if err != nil {
 					return nil, err
 				}
 			}
 			if flag {
-				_, _ = session.GetByte()
+				_, _ = session.ReadByte()
 			}
 		}
-		length, err = session.GetInt(2, true, true)
+		length, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
@@ -226,33 +226,33 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			if len(result.bindErrors) == 0 {
 				result.bindErrors = make([]BindError, length)
 			}
-			_, _ = session.GetByte()
+			_, _ = session.ReadByte()
 			for x := 0; x < length; x++ {
-				_, err := session.GetInt(2, true, true)
+				_, err := session.ReadInt(2, true, true)
 				if err != nil {
 					return nil, err
 				}
-				result.bindErrors[x].errorMsg, err = session.GetClr()
+				result.bindErrors[x].errorMsg, err = session.ReadCLR()
 				if err != nil {
 					return nil, err
 				}
-				_, _ = session.GetByte()
-				_, _ = session.GetByte()
+				_, _ = session.ReadByte()
+				_, _ = session.ReadByte()
 			}
 		}
 		if session.TTCVersion >= 7 {
-			result.RetCode, err = session.GetInt(4, true, true)
+			result.RetCode, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return nil, err
 			}
-			result.CurRowNumber, err = session.GetInt(8, true, true)
+			result.CurRowNumber, err = session.ReadInt(8, true, true)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
 	if result.RetCode != 0 {
-		result.ErrorMessage, err = session.GetClr()
+		result.ErrorMessage, err = session.ReadCLR()
 		if err != nil {
 			return nil, err
 		}
@@ -273,22 +273,22 @@ type WarningObject struct {
 func NewWarningObject(session *Session) (*WarningObject, error) {
 	result := new(WarningObject)
 	var err error
-	result.retCode, err = session.GetInt(2, true, true)
+	result.retCode, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	length, err := session.GetInt(2, true, true)
+	length, err := session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	result.flag, err = session.GetInt(2, true, true)
+	result.flag, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
 	if result.retCode == 0 || length == 0 {
 		return nil, nil
 	} else {
-		msg, err := session.GetClr()
+		msg, err := session.ReadCLR()
 		if err != nil {
 			return nil, err
 		}

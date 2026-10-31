@@ -60,10 +60,6 @@ func (conv *StringConverter) Clone() *StringConverter {
 	}
 }
 
-func (conv *StringConverter) GetLangID() int {
-	return conv.LangID
-}
-
 func (conv *StringConverter) Encode(input string) []byte {
 	if len(input) == 0 {
 		return nil

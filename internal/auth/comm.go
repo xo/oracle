@@ -16,11 +16,11 @@ func (comm *AdvancedNegoComm) writePacketHeader(length, _type int) {
 }
 
 func (comm *AdvancedNegoComm) readPacketHeader(_type int) (length int, err error) {
-	length, err = comm.session.GetInt(2, false, true)
+	length, err = comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return
 	}
-	receivedType, err := comm.session.GetInt(2, false, true)
+	receivedType, err := comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return 0, err
 	}
@@ -66,7 +66,7 @@ func (comm *AdvancedNegoComm) readUB1() (number uint8, err error) {
 	if err != nil {
 		return
 	}
-	number, err = comm.session.GetByte()
+	number, err = comm.session.ReadByte()
 	return
 }
 
@@ -77,7 +77,7 @@ func (comm *AdvancedNegoComm) writeUB1(number uint8) {
 
 func (comm *AdvancedNegoComm) readUB2() (number int, err error) {
 	_, err = comm.readPacketHeader(3)
-	number, err = comm.session.GetInt(2, false, true)
+	number, err = comm.session.ReadInt(2, false, true)
 	return
 }
 
@@ -88,7 +88,7 @@ func (comm *AdvancedNegoComm) writeUB2(number int) {
 
 func (comm *AdvancedNegoComm) readUB4() (number int, err error) {
 	_, err = comm.readPacketHeader(4)
-	number, err = comm.session.GetInt(4, false, true)
+	number, err = comm.session.ReadInt(4, false, true)
 	return
 }
 
@@ -102,7 +102,7 @@ func (comm *AdvancedNegoComm) readString() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resultBytes, err := comm.session.GetBytes(stringLen)
+	resultBytes, err := comm.session.ReadBytes(stringLen)
 	if err != nil {
 		return "", err
 	}
@@ -124,7 +124,7 @@ func (comm *AdvancedNegoComm) readStatus() (status int, err error) {
 	if err != nil {
 		return
 	}
-	status, err = comm.session.GetInt(2, false, true)
+	status, err = comm.session.ReadInt(2, false, true)
 	return
 }
 
@@ -133,7 +133,7 @@ func (comm *AdvancedNegoComm) readVersion() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	version, err := comm.session.GetInt(4, false, true)
+	version, err := comm.session.ReadInt(4, false, true)
 	return uint32(version), err
 }
 
@@ -147,7 +147,7 @@ func (comm *AdvancedNegoComm) readBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return comm.session.GetBytes(length)
+	return comm.session.ReadBytes(length)
 }
 
 func (comm *AdvancedNegoComm) writeBytes(input []byte) {
@@ -160,15 +160,15 @@ func (comm *AdvancedNegoComm) readUB2Array() ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	num1, err := comm.session.GetInt64(4, false, true)
+	num1, err := comm.session.ReadInt64(4, false, true)
 	if err != nil {
 		return nil, err
 	}
-	num2, err := comm.session.GetInt(2, false, true)
+	num2, err := comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return nil, err
 	}
-	size, err := comm.session.GetInt(4, false, true)
+	size, err := comm.session.ReadInt(4, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (comm *AdvancedNegoComm) readUB2Array() ([]int, error) {
 	}
 	output := make([]int, size)
 	for i := range size {
-		output[i], err = comm.session.GetInt(2, false, true)
+		output[i], err = comm.session.ReadInt(2, false, true)
 		if err != nil {
 			return nil, err
 		}

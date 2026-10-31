@@ -48,7 +48,7 @@ func (lob *LobStream) initialize() {
 //	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&0x40 == 0x40
 //}
 
-func (lob *LobStream) GetLocator() ora_types.Locator {
+func (lob *LobStream) Locator() ora_types.Locator {
 	return lob.sourceLocator
 }
 func (lob *LobStream) SetLocator(locator ora_types.Locator) {
@@ -58,7 +58,7 @@ func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	}
 
 }
-func (lob *LobStream) GetTracer() trace.Tracer {
+func (lob *LobStream) Tracer() trace.Tracer {
 	return lob.conn.tracer
 }
 
@@ -66,12 +66,12 @@ func (lob *LobStream) DatabaseVersionNumber() int {
 	return int(lob.conn.dBVersion.Number)
 }
 
-func (lob *LobStream) GetStringCoder() converters.StringCoder {
+func (lob *LobStream) StringCoder() converters.StringCoder {
 	return lob.conn
 }
 
 // getSize return lob size
-func (lob *LobStream) GetSize() (size int64, err error) {
+func (lob *LobStream) Size() (size int64, err error) {
 	if lob.sourceLocator == nil {
 		return 0, errEmptyLocator
 	}
@@ -164,10 +164,10 @@ func (lob *LobStream) Exists() (bool, error) {
 	return lob.isNull, nil
 }
 
-func (lob *LobStream) GetLobStreamMode() config.LobFetch {
+func (lob *LobStream) LobStreamMode() config.LobFetch {
 	return lob.conn.connOption.Lob
 }
-func (lob *LobStream) GetLobReadMode() config.LobReadMode {
+func (lob *LobStream) LobReadMode() config.LobReadMode {
 	return lob.conn.connOption.LobReadMode
 }
 
@@ -386,7 +386,7 @@ func (lob *LobStream) read() error {
 	loop := true
 	session := lob.conn.session
 	for loop {
-		msg, err := session.GetByte()
+		msg, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -394,13 +394,13 @@ func (lob *LobStream) read() error {
 		case 8:
 			// read rpa message
 			if len(lob.sourceLocator) > 0 {
-				lob.sourceLocator, err = session.GetBytes(len(lob.sourceLocator))
+				lob.sourceLocator, err = session.ReadBytes(len(lob.sourceLocator))
 				if err != nil {
 					return err
 				}
 			}
 			if len(lob.destLocator) != 0 {
-				lob.destLocator, err = session.GetBytes(len(lob.destLocator))
+				lob.destLocator, err = session.ReadBytes(len(lob.destLocator))
 				if err != nil {
 					return err
 				}
@@ -409,7 +409,7 @@ func (lob *LobStream) read() error {
 				lob.destLen = 0
 			}
 			if lob.charsetID != 0 {
-				lob.charsetID, err = session.GetInt(2, true, true)
+				lob.charsetID, err = session.ReadInt(2, true, true)
 				if err != nil {
 					return err
 				}
@@ -417,19 +417,19 @@ func (lob *LobStream) read() error {
 			if lob.sendSize {
 				// get data size
 				if session.TTCVersion < 3 {
-					lob.size, err = session.GetInt64(4, true, true)
+					lob.size, err = session.ReadInt64(4, true, true)
 					if err != nil {
 						return err
 					}
 				} else {
-					lob.size, err = session.GetInt64(8, true, true)
+					lob.size, err = session.ReadInt64(8, true, true)
 					if err != nil {
 						return err
 					}
 				}
 			}
 			if lob.bNullO2U {
-				temp, err := session.GetInt(2, true, true)
+				temp, err := session.ReadInt(2, true, true)
 				if err != nil {
 					return err
 				}
@@ -459,7 +459,7 @@ func (lob *LobStream) read() error {
 // read lob data chunks from network session
 func (lob *LobStream) readData() error {
 	session := lob.conn.session
-	tempBytes, err := session.GetClr()
+	tempBytes, err := session.ReadCLR()
 	if err != nil {
 		return err
 	}
@@ -467,7 +467,7 @@ func (lob *LobStream) readData() error {
 	return nil
 }
 
-func (lob *LobStream) GetLobId() []byte {
+func (lob *LobStream) LobID() []byte {
 	if lob.sourceLocator == nil {
 		return nil
 	}

@@ -32,7 +32,7 @@ type SessionContext struct {
 	IsNTConnected       bool
 	OnBreakReset        bool
 	GotReset            bool
-	nego                AdvancedNegotiator
+	nego                Negotiator
 	isRedirect          bool
 	FastAuthEnabled     bool
 	EODDAFlagEnabled    bool
@@ -56,12 +56,12 @@ func NewSessionContext(config *config.ConnectionConfig) *SessionContext {
 	return ctx
 }
 
-type AdvancedNegotiator interface {
+type Negotiator interface {
 	WriteDataBuffer(data []byte) ([]byte, error)
 	ReadDataBuffer(data []byte) ([]byte, error)
 	Reset() error
 }
 
-func (ctx *SessionContext) SetAdvancedNegotiator(nego AdvancedNegotiator) {
+func (ctx *SessionContext) SetAdvancedNegotiator(nego Negotiator) {
 	ctx.nego = nego
 }

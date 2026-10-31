@@ -83,7 +83,7 @@ func (stmt *defaultStmt) hasBLOB() bool {
 // through it the stmt data will send to network stream
 func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session := stmt.connection.session
-	strConv := stmt.connection.GetServerStringCoder()
+	strConv := stmt.connection.ServerStringCoder()
 	session.PutTTCFunc(0x3, 0x5E)
 	session.PutUint(exeOp, 4, true, true)
 	session.PutUint(stmt.cursorID, 2, true, true)
@@ -346,7 +346,7 @@ func (stmt *Stmt) writePars() error {
 		}
 		if !par.isLongType() {
 			if par.encoder != nil {
-				par.encoder.UpdateParameterInfo(par.GetParameterInfo())
+				par.encoder.UpdateParameterInfo(par.ParameterInfo())
 				err := par.encoder.Write(ms)
 				if err != nil {
 					return err
@@ -381,7 +381,7 @@ func (stmt *Stmt) writePars() error {
 			ms.PutClr(par.BValue)
 		}
 	}
-	buffer := ms.GetWriteBuffer()
+	buffer := ms.WriteBuffer()
 	if len(buffer) > 0 {
 		session.PutBytes(7)
 		session.PutBytes(buffer...)
@@ -656,7 +656,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 		}
 	}()
 	for loop {
-		msg, err := session.GetByte()
+		msg, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -675,7 +675,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			if stmt._hasReturnClause && stmt.containOutputPars {
 				for x := 0; x < len(stmt.Pars); x++ {
 					if stmt.Pars[x].Direction == Output {
-						num, err := session.GetInt(4, true, true)
+						num, err := session.ReadInt(4, true, true)
 						if err != nil {
 							return err
 						}
@@ -708,7 +708,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 										return err
 									}
 									if stmt.stmtType == PLSQL {
-										_, err = session.GetInt(2, true, true)
+										_, err = session.ReadInt(2, true, true)
 										if err != nil {
 											return err
 										}
@@ -738,11 +738,11 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 								return err
 							}
 							if col.isLongType() {
-								_, err = session.GetInt(4, true, true)
+								_, err = session.ReadInt(4, true, true)
 								if err != nil {
 									return err
 								}
-								_, err = session.GetInt(4, true, true)
+								_, err = session.ReadInt(4, true, true)
 								if err != nil {
 									return err
 								}
@@ -755,29 +755,29 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				}
 			}
 		case 8:
-			size, err := session.GetInt(2, true, true)
+			size, err := session.ReadInt(2, true, true)
 			if err != nil {
 				return err
 			}
 			for x := range 2 {
-				stmt.scnForSnapshot[x], err = session.GetInt(4, true, true)
+				stmt.scnForSnapshot[x], err = session.ReadInt(4, true, true)
 				if err != nil {
 					return err
 				}
 			}
 			for x := 2; x < size; x++ {
-				_, err = session.GetInt(4, true, true)
+				_, err = session.ReadInt(4, true, true)
 				if err != nil {
 					return err
 				}
 			}
-			_, err = session.GetInt(2, true, true)
+			_, err = session.ReadInt(2, true, true)
 			if err != nil {
 				return err
 			}
-			size, err = session.GetInt(2, true, true)
+			size, err = session.ReadInt(2, true, true)
 			for x := 0; x < size; x++ {
-				_, val, num, err := session.GetKeyVal()
+				_, val, num, err := session.ReadKeyVal()
 				if err != nil {
 					return err
 				}
@@ -787,12 +787,12 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			}
 			if session.TTCVersion >= 4 {
 				// get queryID
-				size, err = session.GetInt(4, true, true)
+				size, err = session.ReadInt(4, true, true)
 				if err != nil {
 					return err
 				}
 				if size > 0 {
-					bty, err := session.GetBytes(size)
+					bty, err := session.ReadBytes(size)
 					if err != nil {
 						return err
 					}
@@ -803,14 +803,14 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				}
 			}
 			if session.TTCVersion >= 7 && stmt.stmtType == DML && stmt.arrayBindCount > 0 {
-				length, err := session.GetInt(4, true, true)
+				length, err := session.ReadInt(4, true, true)
 				if err != nil {
 					return err
 				}
 				// for (int index = 0; index < length3; ++index)
 				//	rowsAffectedByArrayBind[index] = this.m_marshallingEngine.UnmarshalSB8();
 				for range length {
-					_, err = session.GetInt(8, true, true)
+					_, err = session.ReadInt(8, true, true)
 					if err != nil {
 						return err
 					}
@@ -822,7 +822,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				return err
 			}
 			for x := 0; x < resultSet.columnCount; x++ {
-				direction, err := session.GetByte()
+				direction, err := session.ReadByte()
 				switch direction {
 				case 32:
 					stmt.Pars[x].Direction = Input
@@ -838,24 +838,24 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				}
 			}
 		case 16:
-			size, err := session.GetByte()
+			size, err := session.ReadByte()
 			if err != nil {
 				return err
 			}
-			_, err = session.GetBytes(int(size))
+			_, err = session.ReadBytes(int(size))
 			if err != nil {
 				return err
 			}
-			resultSet.maxRowSize, err = session.GetInt(4, true, true)
+			resultSet.maxRowSize, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
-			resultSet.columnCount, err = session.GetInt(4, true, true)
+			resultSet.columnCount, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
 			if resultSet.columnCount > 0 {
-				_, err = session.GetByte() // session.GetInt(1, false, false)
+				_, err = session.ReadByte() // session.ReadInt(1, false, false)
 			}
 			stmt.columns = make([]ParameterInfo, resultSet.columnCount)
 			for x := 0; x < resultSet.columnCount; x++ {
@@ -870,17 +870,17 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 					stmt._hasBLOB = true
 				}
 			}
-			_, err = session.GetDlc()
+			_, err = session.ReadDLC()
 			if session.TTCVersion >= 3 {
-				_, err = session.GetInt(4, true, true)
-				_, err = session.GetInt(4, true, true)
+				_, err = session.ReadInt(4, true, true)
+				_, err = session.ReadInt(4, true, true)
 			}
 			if session.TTCVersion >= 4 {
-				_, err = session.GetInt(4, true, true)
-				_, err = session.GetInt(4, true, true)
+				_, err = session.ReadInt(4, true, true)
+				_, err = session.ReadInt(4, true, true)
 			}
 			if session.TTCVersion >= 5 {
-				_, err = session.GetDlc()
+				_, err = session.ReadDLC()
 			}
 		case 19:
 			session.ResetBuffer()
@@ -891,7 +891,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			}
 			continue
 		case 21:
-			_, err := session.GetInt(2, true, true) // noOfColumnSent
+			_, err := session.ReadInt(2, true, true) // noOfColumnSent
 			if err != nil {
 				return err
 			}
@@ -901,14 +901,14 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			}
 			bitVector := make([]byte, bitVectorLen)
 			for x := 0; x < bitVectorLen; x++ {
-				bitVector[x], err = session.GetByte()
+				bitVector[x], err = session.ReadByte()
 				if err != nil {
 					return err
 				}
 			}
 			resultSet.setBitVector(bitVector)
 		case 27:
-			count, err := session.GetInt(4, true, true)
+			count, err := session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
@@ -960,7 +960,7 @@ func (stmt *defaultStmt) requestCustomTypeInfo(typeName string) error {
 	if err != nil {
 		return err
 	}
-	data, err := session.GetBytes(0x10)
+	data, err := session.ReadBytes(0x10)
 	if err != nil {
 		return err
 	}
@@ -981,7 +981,7 @@ func (stmt *defaultStmt) calculateColumnValue(col *ParameterInfo, udt bool) erro
 			return err
 		}
 		if stmt.stmtType == PLSQL {
-			_, err = session.GetInt(2, true, true)
+			_, err = session.ReadInt(2, true, true)
 			if err != nil {
 				return err
 			}
@@ -1008,7 +1008,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if param.DataType != oraTypes.XMLType && param.ArraySize > 0 {
 		return nil
 	}
-	_, err = stmt.connection.session.GetInt(2, true, true)
+	_, err = stmt.connection.session.ReadInt(2, true, true)
 	if err != nil {
 		return err
 	}
@@ -1733,7 +1733,7 @@ func (stmt *Stmt) execError(ctx context.Context, err error) error {
 	}
 	session := stmt.connection.session
 	if session.HasError() {
-		err = session.GetError()
+		err = session.ServerError()
 	}
 	if isBadConn(err) {
 		stmt.connection.setBad()
@@ -1826,7 +1826,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 						return err
 					}
 				} else {
-					if val.GetReadMode() == config.LobReadModeAuto {
+					if val.ReadMode() == config.LobReadModeAuto {
 						err = val.Load()
 						if err != nil {
 							return err
@@ -1838,7 +1838,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					}
 				}
 			case *oraTypes.Clob:
-				if val.GetReadMode() == config.LobReadModeAuto {
+				if val.ReadMode() == config.LobReadModeAuto {
 					err = val.Load()
 					if err != nil {
 						return err
@@ -1849,7 +1849,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					}
 				}
 			case *oraTypes.Blob:
-				if val.GetReadMode() == config.LobReadModeAuto {
+				if val.ReadMode() == config.LobReadModeAuto {
 					err = val.Load()
 					if err != nil {
 						return err

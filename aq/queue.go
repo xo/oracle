@@ -56,11 +56,11 @@ func CreateQueue(db Execer, name string, messageType MessageType, udtName string
 		ret.toid = XMLTypeTOID
 	default:
 		if len(udtName) > 0 {
-			coder, err := ret.conn.GetParameterCoder(udtName)
+			coder, err := ret.conn.ParameterCoder(udtName)
 			if err != nil {
 				return nil, err
 			}
-			ret.toid = coder.GetParameterInfo().ToID
+			ret.toid = coder.ParameterInfo().ToID
 		} else {
 			return nil, fmt.Errorf("message type udt should have udtName")
 		}
@@ -101,11 +101,11 @@ func (qu *queue) NewMessage(data any) (*Message, error) {
 	var encoder codec.OracleParameterCoder
 	switch qu.messageType {
 	case RAW:
-		encoder, err = qu.conn.GetParameterCoder(types.RAW)
+		encoder, err = qu.conn.ParameterCoder(types.RAW)
 	case UDT:
-		encoder, err = qu.conn.GetParameterCoder(qu.udtName)
+		encoder, err = qu.conn.ParameterCoder(qu.udtName)
 	case JSON:
-		encoder, err = qu.conn.GetParameterCoder(types.JSONType)
+		encoder, err = qu.conn.ParameterCoder(types.JSONType)
 		if err != nil {
 			return nil, err
 		}
@@ -120,17 +120,17 @@ func (qu *queue) NewMessage(data any) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	ms := tns.NewMemorySession(nil, nil, qu.conn.GetSession().GetProperties())
+	ms := tns.NewMemorySession(nil, nil, qu.conn.Session().Properties())
 	err = encoder.Write(ms)
-	message.bValue = ms.GetWriteBuffer()
+	message.bValue = ms.WriteBuffer()
 	return message, err
 }
 func (qu *queue) Enqueue(message *Message) error {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x79)
 
-	queueNameBytes := qu.conn.GetServerStringCoder().Encode(qu.Name)
+	queueNameBytes := qu.conn.ServerStringCoder().Encode(qu.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(queueNameBytes), 2, true, true)
@@ -244,10 +244,10 @@ func (qu *queue) Enqueue(message *Message) error {
 
 func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	outMsg := &Message{}
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x7A)
-	queueNameBytes := qu.conn.GetServerStringCoder().Encode(qu.Name)
+	queueNameBytes := qu.conn.ServerStringCoder().Encode(qu.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(queueNameBytes), 2, true, true)
@@ -255,7 +255,7 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 		session.PutBytes(0, 0)
 	}
 	session.PutBytes(1, 1, 1, 1)
-	consumer := qu.conn.GetServerStringCoder().Encode(options.Consumer)
+	consumer := qu.conn.ServerStringCoder().Encode(options.Consumer)
 	if len(consumer) > 0 {
 		session.PutBytes(1)
 		session.PutUint(len(consumer), 4, true, true)
@@ -272,7 +272,7 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	} else {
 		session.PutBytes(0, 0)
 	}
-	correlation := qu.conn.GetServerStringCoder().Encode(options.Correlation)
+	correlation := qu.conn.ServerStringCoder().Encode(options.Correlation)
 	if len(correlation) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(correlation), 4, true, true)
@@ -300,7 +300,7 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 		num |= 16
 	}
 	session.PutUint(num, 4, true, true)
-	condition := qu.conn.GetServerStringCoder().Encode(options.Condition)
+	condition := qu.conn.ServerStringCoder().Encode(options.Condition)
 	if len(condition) > 0 {
 		session.PutBytes(1)
 		session.PutInt(len(condition), 4, true, true)
@@ -347,17 +347,17 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 }
 
 func (qu *queue) readEnqueueResponse(message *Message) error {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	loop := true
 	for loop {
-		msg, err := session.GetByte()
+		msg, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
 		switch msg {
 		case 8:
-			message.messageID, err = session.GetBytes(16)
-			_, err = session.GetInt(2, true, true)
+			message.messageID, err = session.ReadBytes(16)
+			_, err = session.ReadInt(2, true, true)
 		default:
 			err = qu.conn.ProcessTCCResponse(msg)
 			if err != nil {
@@ -372,10 +372,10 @@ func (qu *queue) readEnqueueResponse(message *Message) error {
 }
 
 func (qu *queue) readDequeueResponse(message *Message) error {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	loop := true
 	for loop {
-		msg, err := session.GetByte()
+		msg, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -383,7 +383,7 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 		case 8:
 			var num int
 			var err error
-			num, err = session.GetInt(4, true, true)
+			num, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
@@ -393,7 +393,7 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 					return err
 				}
 			}
-			_, err = session.GetInt(4, true, true)
+			_, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
@@ -408,7 +408,7 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 					return err
 				}
 			}
-			message.messageID, err = session.GetBytes(16)
+			message.messageID, err = session.ReadBytes(16)
 		default:
 			err = qu.conn.ProcessTCCResponse(msg)
 			if err != nil {
@@ -423,36 +423,36 @@ func (qu *queue) readDequeueResponse(message *Message) error {
 }
 
 func (qu *queue) readTypeInformation() (dataLen int, err error) {
-	session := qu.conn.GetSession()
-	_ /*qu.toid*/, err = session.GetDlc()
+	session := qu.conn.Session()
+	_ /*qu.toid*/, err = session.ReadDLC()
 	if err != nil {
 		return
 	}
-	_ /*oid*/, err = session.GetDlc()
+	_ /*oid*/, err = session.ReadDLC()
 	if err != nil {
 		return
 	}
-	_ /*snapshot*/, err = session.GetDlc()
+	_ /*snapshot*/, err = session.ReadDLC()
 	if err != nil {
 		return
 	}
-	_ /*version*/, err = session.GetInt(2, true, true)
+	_ /*version*/, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return
 	}
-	dataLen, err = session.GetInt(4, true, true)
+	dataLen, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return
 	}
-	_ /*flag*/, err = session.GetInt(2, true, true)
+	_ /*flag*/, err = session.ReadInt(2, true, true)
 	return
 }
 
 func (qu *queue) readArrayResponse(messages []*Message, isEnqueue bool) error {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	loop := true
 	for loop {
-		msgCode, err := session.GetByte()
+		msgCode, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -476,9 +476,9 @@ func (qu *queue) readArrayResponse(messages []*Message, isEnqueue bool) error {
 }
 
 func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 
-	numResp, err := session.GetInt(4, true, true)
+	numResp, err := session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
@@ -488,12 +488,12 @@ func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
 			break
 		}
 		var num int
-		num, err = session.GetInt(2, true, true)
+		num, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 		if num > 0 {
-			_, err = session.GetByte()
+			_, err = session.ReadByte()
 			if err != nil {
 				return err
 			}
@@ -502,12 +502,12 @@ func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
 				return err
 			}
 		}
-		_, err = session.GetInt(2, true, true)
+		_, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 		var dataLen int
-		dataLen, err = session.GetInt(2, true, true)
+		dataLen, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
@@ -524,7 +524,7 @@ func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
 				return err
 			}
 		}
-		msgID, err := session.GetDlc()
+		msgID, err := session.ReadDLC()
 		if err != nil {
 			return err
 		}
@@ -538,18 +538,18 @@ func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
 				copy(messages[j].messageID, msgID[i*16:(i+1)*0x10])
 			}
 		}
-		_, err = session.GetInt(2, true, true)
+		_, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(2, true, true)
+		_, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 
 	}
 	if isEnqueue {
-		_ /*count*/, err = session.GetInt(4, true, true)
+		_ /*count*/, err = session.ReadInt(4, true, true)
 	}
 	return err
 }

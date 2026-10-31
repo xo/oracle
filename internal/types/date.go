@@ -28,7 +28,7 @@ func NewTimestampTZ(t time.Time) *Date {
 	return ret
 }
 
-func (date *Date) GetMaxLen() int64 {
+func (date *Date) MaxLen() int64 {
 	switch date.dataType {
 	case DATE:
 		return MaxLenDate

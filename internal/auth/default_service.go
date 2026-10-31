@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type AdvNegoService interface {
+type negoService interface {
 	getServiceDataLength() int
 	writeServiceData() error
 	readServiceData(subPacketNum int) error

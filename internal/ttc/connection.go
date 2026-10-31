@@ -150,9 +150,9 @@ func (conn *Connection) buildParameterCoderMap(drv *Registry) {
 
 }
 
-// GetNLS return NLS properties of the connection.
+// NLS return NLS properties of the connection.
 // this function is left from v1. but v2 is using another method
-func (conn *Connection) GetNLS() (*NLSData, error) {
+func (conn *Connection) NLS() (*NLSData, error) {
 	// we read from sys.nls_session_parameters ONCE
 	cmdText := `
 	BEGIN
@@ -240,13 +240,13 @@ func (conn *Connection) Ping(ctx context.Context) error {
 	}).exec()
 }
 
-func (conn *Connection) GetMaxStringLength() int64 {
+func (conn *Connection) MaxStringLength() int64 {
 	if conn.maxLen.varchar == 0 {
 		return 0x7FFF
 	}
 	return conn.maxLen.varchar
 }
-func (conn *Connection) GetMaxRawLength() int64 {
+func (conn *Connection) MaxRawLength() int64 {
 	if conn.maxLen.raw == 0 {
 		return 0x7FFF
 	}
@@ -256,11 +256,11 @@ func (conn *Connection) getDefaultCharsetID() int {
 
 	return conn.tcpNego.ServerCharset
 }
-func (conn *Connection) GetDefaultStringCoder() (*converters.StringConverter, error) {
-	return conn.GetStringCoder(conn.getDefaultCharsetID(), 1)
+func (conn *Connection) DefaultStringCoder() (*converters.StringConverter, error) {
+	return conn.StringCoder(conn.getDefaultCharsetID(), 1)
 }
 
-func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (*converters.StringConverter, error) {
+func (conn *Connection) StringCoder(charsetID, charsetForm int) (*converters.StringConverter, error) {
 	errStringCoder := fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
 	if charsetID == 0 {
 		if charsetForm == 1 {
@@ -277,17 +277,17 @@ func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (*converters.
 		}
 		return nil, errStringCoder
 	}
-	if conn.cStrConv != nil && charsetID == conn.cStrConv.GetLangID() {
+	if conn.cStrConv != nil && charsetID == conn.cStrConv.LangID {
 		return conn.cStrConv, nil
 	}
-	if conn.sStrConv != nil && charsetID == conn.sStrConv.GetLangID() {
+	if conn.sStrConv != nil && charsetID == conn.sStrConv.LangID {
 		if conn.cStrConv != nil {
 			return conn.cStrConv, nil
 		}
 		return conn.sStrConv, nil
 	}
 
-	if conn.nStrConv != nil && charsetID == conn.nStrConv.GetLangID() {
+	if conn.nStrConv != nil && charsetID == conn.nStrConv.LangID {
 		return conn.nStrConv, nil
 	}
 	temp := converters.NewStringConverter(charsetID)
@@ -297,10 +297,10 @@ func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (*converters.
 	return temp, nil
 }
 
-func (conn *Connection) GetServerStringCoder() *converters.StringConverter {
+func (conn *Connection) ServerStringCoder() *converters.StringConverter {
 	return conn.sStrConv
 }
-func (conn *Connection) GetServerNStringCoder() *converters.StringConverter {
+func (conn *Connection) ServerNStringCoder() *converters.StringConverter {
 	return conn.nStrConv
 }
 func (conn *Connection) Logoff() error {
@@ -319,7 +319,7 @@ func (conn *Connection) read() error {
 	loop := true
 	session := conn.session
 	for loop {
-		msg, err := session.GetByte()
+		msg, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -522,7 +522,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	if conn.connectionCookie == nil && conn.isFastLoginEnabled() && conn.tcpNego != nil {
 		saveCookie(conn)
 	}
-	conn.dBVersion, err = GetDBVersion(conn.session)
+	conn.dBVersion, err = ReadDBVersion(conn.session)
 	if err != nil {
 		return err
 	}
@@ -544,7 +544,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	conn.connOption.DomainName = conn.SessionProperties["AUTH_SC_DB_DOMAIN"]
 	conn.connOption.DBName = conn.SessionProperties["AUTH_SC_DBUNIQUE_NAME"]
 	if len(conn.NLSData.Language) == 0 {
-		_, err = conn.GetNLS()
+		_, err = conn.NLS()
 		if err != nil {
 			tracer.Print("Error getting NLS: ", err)
 		}
@@ -813,19 +813,19 @@ func (conn *Connection) doAuth() error {
 	}
 	stop := false
 	for !stop {
-		msg, err := conn.session.GetByte()
+		msg, err := conn.session.ReadByte()
 		if err != nil {
 			return err
 		}
 		switch msg {
 		case 8:
-			dictLen, err := conn.session.GetInt(2, true, true)
+			dictLen, err := conn.session.ReadInt(2, true, true)
 			if err != nil {
 				return err
 			}
 			conn.SessionProperties = make(map[string]string, dictLen)
 			for range dictLen {
-				key, val, _, err := conn.session.GetKeyVal()
+				key, val, _, err := conn.session.ReadKeyVal()
 				if err != nil {
 					return err
 				}
@@ -849,85 +849,85 @@ func (conn *Connection) doAuth() error {
 
 // loadNLSData get nls data for v2
 func (conn *Connection) loadNLSData() error {
-	_, err := conn.session.GetInt(2, true, true)
+	_, err := conn.session.ReadInt(2, true, true)
 	if err != nil {
 		return err
 	}
-	_, err = conn.session.GetByte()
+	_, err = conn.session.ReadByte()
 	if err != nil {
 		return err
 	}
-	length, err := conn.session.GetInt(4, true, true)
+	length, err := conn.session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	_, err = conn.session.GetByte()
+	_, err = conn.session.ReadByte()
 	if err != nil {
 		return err
 	}
 	for range length {
-		nlsKey, nlsVal, nlsCode, err := conn.session.GetKeyVal()
+		nlsKey, nlsVal, nlsCode, err := conn.session.ReadKeyVal()
 		if err != nil {
 			return err
 		}
 		conn.NLSData.SaveNLSValue(string(nlsKey), string(nlsVal), nlsCode)
 	}
-	_, err = conn.session.GetInt(4, true, true)
+	_, err = conn.session.ReadInt(4, true, true)
 	return err
 }
 
 func (conn *Connection) getServerNetworkInformation(code uint8) error {
 	session := conn.session
 	if code == 0 {
-		_, err := session.GetByte()
+		_, err := session.ReadByte()
 		return err
 	}
 	switch code - 1 {
 	case 1:
 		// receive OCOSPID
-		length, err := session.GetInt(2, true, true)
+		length, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
-		_, err = session.GetBytes(length)
+		_, err = session.ReadBytes(length)
 		if err != nil {
 			return err
 		}
 	case 3:
 		// receive OCSESSRET session return values
-		_, err := session.GetInt(2, true, true)
+		_, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
-		length, err := session.GetInt(2, true, true)
+		length, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 		// get nls data
 		for range length {
-			nlsKey, nlsVal, nlsCode, err := session.GetKeyVal()
+			nlsKey, nlsVal, nlsCode, err := session.ReadKeyVal()
 			if err != nil {
 				return err
 			}
 			conn.NLSData.SaveNLSValue(string(nlsKey), string(nlsVal), nlsCode)
 		}
-		flag, err := session.GetInt(4, true, true)
+		flag, err := session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		sessionID, err := session.GetInt(4, true, true)
+		sessionID, err := session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		serialID, err := session.GetInt(2, true, true)
+		serialID, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
@@ -942,45 +942,45 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 			return err
 		}
 	case 6:
-		length, err := session.GetInt(4, true, true)
+		length, err := session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		conn.transactionID, err = session.GetClr()
+		conn.transactionID, err = session.ReadCLR()
 		if len(conn.transactionID) > length {
 			conn.transactionID = conn.transactionID[:length]
 		}
 	case 7:
-		_, err := session.GetInt(2, true, true)
+		_, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
-		_, err = session.GetDlc()
+		_, err = session.ReadDLC()
 		if err != nil {
 			return err
 		}
 	case 8:
-		_, err := session.GetInt(2, true, true)
+		_, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -1347,26 +1347,26 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		}
 		tracer.Printf("Summary: RetCode:%d, Error Message:%q", session.Summary.RetCode, string(session.Summary.ErrorMessage))
 		if conn.session.HasError() {
-			return conn.session.GetError()
+			return conn.session.ServerError()
 		}
 	case 8:
-		size, err := session.GetInt(2, true, true)
+		size, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 		for x := 0; x < size; x++ {
-			_, err = session.GetInt(4, true, true)
+			_, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
 		}
-		_, err = session.GetInt(2, true, true)
+		_, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		size, err = session.GetInt(2, true, true)
+		size, err = session.ReadInt(2, true, true)
 		for x := 0; x < size; x++ {
-			_, val, num, err := session.GetKeyVal()
+			_, val, num, err := session.ReadKeyVal()
 			if err != nil {
 				return err
 			}
@@ -1376,12 +1376,12 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		}
 		if session.TTCVersion >= 4 {
 			// get queryID
-			size, err = session.GetInt(4, true, true)
+			size, err = session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
 			if size > 0 {
-				bty, err := session.GetBytes(size)
+				bty, err := session.ReadBytes(size)
 				if err != nil {
 					return err
 				}
@@ -1392,12 +1392,12 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			}
 		}
 		if session.TTCVersion >= 7 {
-			length, err := session.GetInt(4, true, true)
+			length, err := session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
 			for range length {
-				_, err = session.GetInt(8, true, true)
+				_, err = session.ReadInt(8, true, true)
 				if err != nil {
 					return err
 				}
@@ -1405,7 +1405,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		}
 	case 9:
 		if session.HasEOSCapability {
-			temp, err := session.GetInt(4, true, true)
+			temp, err := session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
@@ -1417,7 +1417,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			if session.Summary == nil {
 				session.Summary = new(tns.SummaryObject)
 			}
-			session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+			session.Summary.EndToEndECIDSequence, err = session.ReadInt(2, true, true)
 			if err != nil {
 				return err
 			}
@@ -1431,7 +1431,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			_, _ = os.Stderr.WriteString(fmt.Sprintln(warning))
 		}
 	case 23:
-		opCode, err := session.GetByte()
+		opCode, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
@@ -1515,7 +1515,7 @@ func (conn *Connection) appendTemporaryLoc(loc types.Locator) {
 	conn.temporaryLocs = append(conn.temporaryLocs, loc)
 }
 
-func (conn *Connection) GetSession() tns.SessionReadWriter {
+func (conn *Connection) Session() tns.SessionReadWriter {
 	return conn.session
 }
 
@@ -1523,7 +1523,7 @@ func (conn *Connection) NewLobStreamer() types.LobStreamer {
 	return &LobStream{conn: conn}
 }
 
-func (conn *Connection) GetParameterCoder(input any) (codec.OracleParameterCoder, error) {
+func (conn *Connection) ParameterCoder(input any) (codec.OracleParameterCoder, error) {
 	switch input := input.(type) {
 	case reflect.Type:
 		if coder, ok := conn.goTypeCoder[input]; ok {
@@ -1557,7 +1557,7 @@ func (conn *Connection) GetParameterCoder(input any) (codec.OracleParameterCoder
 
 		return nil, fmt.Errorf("no parameter coder registered for oracle type %d", index)
 	default:
-		return nil, fmt.Errorf("accepted values for GetParameterCoder: reflec.Type, int/uint or string")
+		return nil, fmt.Errorf("accepted values for ParameterCoder: reflec.Type, int/uint or string")
 	}
 }
 
@@ -1565,11 +1565,11 @@ func (conn *Connection) SendTimeAsUTC() bool {
 	return conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion == conn.dataNego.serverTZVersion
 }
 
-func (conn *Connection) GetDBTimeZone() *time.Location {
+func (conn *Connection) DBTimeZone() *time.Location {
 	return conn.dbTimeZone
 }
 
-func (conn *Connection) GetDBServerTimeZone() *time.Location {
+func (conn *Connection) DBServerTimeZone() *time.Location {
 	return conn.dbServerTimeZone
 }
 

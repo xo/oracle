@@ -48,7 +48,7 @@ func NewDaySecondInterval(days, hours, minutes, seconds, nanoseconds int) (*Inte
 	return ret, ret.SetValue(d)
 }
 
-func (interval *Interval) GetMaxLen() int64 {
+func (interval *Interval) MaxLen() int64 {
 	switch interval.dataType {
 	case IntervalYMDTY:
 		return MaxLenIntervalYM

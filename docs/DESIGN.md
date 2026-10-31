@@ -583,9 +583,24 @@ Also done, the same day:
 - `internal/configurations` is `internal/config`. `TestIssues` is
   `integration`, a package of tests alone, with a README for `dbrun`.
 
-Left: the `Get` prefixes, the interfaces with one implementation that the list
-above names, `internal/converters` until step 8 splits it, and one file of
-integration tests for each area.
+Then, with Ken's agreement on the names:
+
+- No method starts with `Get`. A read from the stream of a session starts
+  with `Read`: `ReadInt`, `ReadCLR`, `ReadDLC`, and `ReadByte`, which is now
+  `io.ByteReader`. An accessor drops the prefix: `MaxLen`, `Locator`,
+  `DBTimeZone`, `ParameterCoder`. `Session.GetError` is `ServerError`, so that
+  a session is no `error`, and `StringConverter.GetLangID` is gone, because
+  `LangID` is its field. `GetDBVersion` is `ReadDBVersion`.
+- Each interface that stays has a reason. `negoService`, the ciphers, the
+  wallet algorithms, the session readers and writers and `parentStmt` have
+  more than one implementation. `Negotiator`, `LobStreamer`, `Lob`,
+  `OracleType` and `codec.Conn` break an import cycle. `AdvNegoService`,
+  `AdvancedNegotiator`, `TerminalReader` and `ValueStreamWriter` took the
+  names `negoService`, `Negotiator`, `terminalReader` and `ValueWriter`, and
+  `ValueStreamReader` and `ValueStreamer` had no user and are gone.
+
+Left: the JSON coder interfaces, which step 7 removes, `internal/converters`
+until step 8 splits it, and one file of integration tests for each area.
 
 ## The order of the work
 

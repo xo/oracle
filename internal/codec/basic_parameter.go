@@ -50,9 +50,9 @@ func (basic *BasicParameter) BasicRead(session tns.SessionReader) ([]byte, error
 	var err error
 	var bValue []byte
 	if basic.IsUDTPar {
-		bValue, err = session.GetFixedClr()
+		bValue, err = session.ReadFixedCLR()
 	} else {
-		bValue, err = session.GetClr()
+		bValue, err = session.ReadCLR()
 	}
 	return bValue, err
 }
@@ -76,7 +76,7 @@ func (basic *BasicParameter) SetDefault() {
 func (basic *BasicParameter) Bytes() []byte {
 	return basic.BValue
 }
-func (basic *BasicParameter) GetParameterInfo() BasicParameter {
+func (basic *BasicParameter) ParameterInfo() BasicParameter {
 	return *basic
 }
 func (basic *BasicParameter) UpdateParameterInfo(data BasicParameter) {

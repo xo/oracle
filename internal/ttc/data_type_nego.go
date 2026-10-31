@@ -504,7 +504,7 @@ func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
 func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 	var msg uint8
 	session := nego.conn.session
-	msg, err = session.GetByte()
+	msg, err = session.ReadByte()
 	if err != nil {
 		return
 	}
@@ -514,7 +514,7 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 	}
 	if nego.RuntimeCap[1] == 1 {
 		var tzBytes []byte
-		tzBytes, err = session.GetBytes(11)
+		tzBytes, err = session.ReadBytes(11)
 		if err != nil {
 			return
 		}
@@ -528,16 +528,16 @@ func (nego *DataTypeNego) read() (zone *time.Location, err error) {
 		zone = time.FixedZone(fmt.Sprintf("%+03d:%02d", tzHours, tzMin),
 			tzHours*60*60+tzMin*60+tzSec)
 		if nego.CompileTimeCaps[37]&2 == 2 {
-			nego.serverTZVersion, _ = session.GetInt(4, false, true)
+			nego.serverTZVersion, _ = session.ReadInt(4, false, true)
 		}
 	}
 	level := 0
 	for {
 		var num int
 		if nego.CompileTimeCaps[27] == 0 {
-			num, err = session.GetInt(1, false, false)
+			num, err = session.ReadInt(1, false, false)
 		} else {
-			num, err = session.GetInt(2, false, true)
+			num, err = session.ReadInt(2, false, true)
 		}
 		if num == 0 && level == 0 {
 			break

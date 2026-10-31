@@ -46,11 +46,12 @@ hold 'abc', which also made the logon NLS query fail on 11g. That is fixed,
 which was sijms/go-ora#703. The tests pass on 11g and 26ai, and `TestIssues`
 on 26ai gives the same 42 passes and 3 failures.
 
-The `sql.Null` work is done (`ff69666`), and the first part of the cleanup of
-step 11 is done (`d993e1c`). The renames are done and staged: no declared name
-has an underscore, the `I` and `Interface` names are gone, `Json` is `JSON`,
-`TimeStamp` is `Timestamp`, `internal/configurations` is `internal/config`, and
-`TestIssues` is `integration`. `DESIGN.md`, under Where the cleanup stands,
-lists what is left: the `Get` prefixes and the interfaces with one
-implementation. The tests pass, and `integration` on 26ai gives the same 42
+The `sql.Null` work is done (`ff69666`). The cleanup of step 11 is done in
+`d993e1c` and `2ca0f62`, and its last part is staged: no method starts with
+`Get`, and each interface that stays has more than one implementation or
+breaks an import cycle. `DESIGN.md`, under Where the cleanup stands, lists
+what is left. The tests pass, and `integration` on 26ai gives the same 42
 passes and 3 failures.
+
+The next step is step 7: move JSON and OSON to `encoding/json/v2`, which also
+removes the JSON coder interfaces.

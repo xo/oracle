@@ -25,11 +25,11 @@ func (param *BlobParameter) Encode(input any, conn Conn) (err error) {
 	if err != nil {
 		return
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
 	if !encoder.IsDataUploaded() && len(encoder.Bytes()) > 0 {
 		encoder.SetStreamer(conn.NewLobStreamer())
@@ -38,7 +38,7 @@ func (param *BlobParameter) Encode(input any, conn Conn) (err error) {
 			return
 		}
 	}
-	param.BValue = encoder.GetLocator()
+	param.BValue = encoder.Locator()
 	return
 }
 func (param *BlobParameter) Decode(_ Conn) (any, error) {

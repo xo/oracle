@@ -57,18 +57,18 @@ func (obj *AuthObject) read() error {
 	loop := true
 	session := obj.conn.session
 	for loop {
-		messageCode, err := session.GetByte()
+		messageCode, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
 		switch messageCode {
 		case 8:
-			dictLen, err := session.GetInt(4, true, true)
+			dictLen, err := session.ReadInt(4, true, true)
 			if err != nil {
 				return err
 			}
 			for range dictLen {
-				key, val, num, err := session.GetKeyVal()
+				key, val, num, err := session.ReadKeyVal()
 				if err != nil {
 					return err
 				}
@@ -117,7 +117,7 @@ func (obj *AuthObject) read() error {
 			}
 			if messageCode == 4 {
 				if session.HasError() {
-					return session.GetError()
+					return session.ServerError()
 				}
 				loop = false
 			}
@@ -294,7 +294,7 @@ func (obj *AuthObject) Write() error {
 		index++
 	}
 	if len(obj.conn.token) > 0 {
-		addr := obj.conn.connOption.GetActiveServer(false)
+		addr := obj.conn.connOption.ActiveServer(false)
 		if addr != nil {
 			serviceName := obj.conn.connOption.ServiceName
 			header := generateTokenHeader(addr.Addr, serviceName, addr.Port)

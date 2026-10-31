@@ -18,9 +18,9 @@ type DBVersion struct {
 	// isDb11gR10OrHigher bool
 }
 
-// GetDBVersion write a request to get database version the read
+// ReadDBVersion write a request to get database version the read
 // database version from network session
-func GetDBVersion(session *tns.Session) (*DBVersion, error) {
+func ReadDBVersion(session *tns.Session) (*DBVersion, error) {
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x3B)
 	session.PutBytes(1)
@@ -33,22 +33,22 @@ func GetDBVersion(session *tns.Session) (*DBVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	msg, err := session.GetByte()
+	msg, err := session.ReadByte()
 	if err != nil {
 		return nil, err
 	}
 	if msg != 8 {
 		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 8", msg))
 	}
-	length, err := session.GetInt(2, true, true)
+	length, err := session.ReadInt(2, true, true)
 	if err != nil {
 		return nil, err
 	}
-	info, err := session.GetString(int(length))
+	info, err := session.ReadString(int(length))
 	if err != nil {
 		return nil, err
 	}
-	number, err := session.GetInt(4, true, true)
+	number, err := session.ReadInt(4, true, true)
 	if err != nil {
 		return nil, err
 	}

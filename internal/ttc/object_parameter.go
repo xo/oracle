@@ -107,7 +107,7 @@ func (param *ObjectParameter) Init() {
 
 func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	param.Init()
-	session := tns.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
+	session := tns.NewMemorySession(nil, nil, conn.Session().Properties())
 	inputType := getType(input)
 	rValue := reflect.ValueOf(input)
 	if input == nil {
@@ -117,7 +117,7 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	if param.isArray {
 		coder := param.attribs[""].Copy()
 		coder.Init()
-		param.UpdateParameterInfo(coder.GetParameterInfo())
+		param.UpdateParameterInfo(coder.ParameterInfo())
 		size := rValue.Len()
 		if size > 0 {
 			session.PutBytes(1, 3)
@@ -145,7 +145,7 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 				if err != nil {
 					return err
 				}
-				coderPI := coder.GetParameterInfo()
+				coderPI := coder.ParameterInfo()
 				param.UpdateParameterInfo(coderPI)
 			}
 		}
@@ -179,7 +179,7 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	}
 
 	// save BValue to buffer
-	param.BValue = session.GetWriteBuffer()
+	param.BValue = session.WriteBuffer()
 	return
 }
 
@@ -253,17 +253,17 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 	var objectType uint8
 	var err error
 	if param.PSession == nil {
-		param.PSession = tns.NewMemorySession(param.BValue, nil, conn.GetSession().GetProperties())
-		objectType, err = param.PSession.GetByte()
+		param.PSession = tns.NewMemorySession(param.BValue, nil, conn.Session().Properties())
+		objectType, err = param.PSession.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		ctl, err := param.PSession.GetInt64(4, true, true)
+		ctl, err := param.PSession.ReadInt64(4, true, true)
 		if err != nil {
 			return nil, err
 		}
 		if ctl == 0xFE {
-			_, err = param.PSession.GetInt(4, false, true)
+			_, err = param.PSession.ReadInt(4, false, true)
 			if err != nil {
 				return nil, err
 			}
@@ -278,17 +278,17 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 	}
 	switch objectType {
 	case 0x88:
-		_ /*attribsLen*/, err := param.PSession.GetInt(2, true, true)
+		_ /*attribsLen*/, err := param.PSession.ReadInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
 
-		itemsLen, err := param.PSession.GetInt(2, false, true)
+		itemsLen, err := param.PSession.ReadInt(2, false, true)
 		if err != nil {
 			return nil, err
 		}
 		if itemsLen == 0xFE {
-			itemsLen, err = param.PSession.GetInt(4, false, true)
+			itemsLen, err = param.PSession.ReadInt(4, false, true)
 			if err != nil {
 				return nil, err
 			}
@@ -296,7 +296,7 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 		items := make([]any, itemsLen)
 		for i := 0; i < itemsLen; i++ {
 			decoder := param.attribs[""].Copy()
-			decoder.UpdateParameterInfo(param.GetParameterInfo())
+			decoder.UpdateParameterInfo(param.ParameterInfo())
 			decoder.SetLobStreamer(conn.NewLobStreamer())
 			err = decoder.Read(param.PSession)
 			if err != nil {
@@ -343,35 +343,35 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 func (param *ObjectParameter) Read(session tns.SessionReader) error {
 	var err error
 	if param.IsArrayPar {
-		param.BValue, err = session.GetFixedClr()
+		param.BValue, err = session.ReadFixedCLR()
 		return err
 	}
 	if param.PSession != nil && param.isArray {
-		param.BValue, err = session.GetFixedClr()
+		param.BValue, err = session.ReadFixedCLR()
 		param.PSession = nil
 		return err
 	}
 	if param.PSession == nil {
-		_, err = session.GetDlc() // contain toid and some 0s
+		_, err = session.ReadDLC() // contain toid and some 0s
 		if err != nil {
 			return err
 		}
-		_, err = session.GetBytes(3) // 3 0s
+		_, err = session.ReadBytes(3) // 3 0s
 		if err != nil {
 			return err
 		}
 		var size int
-		size, err = session.GetInt(4, true, true)
+		size, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetBytes(2) // 0x1 0x1
+		_, err = session.ReadBytes(2) // 0x1 0x1
 		if err != nil {
 			return err
 		}
 		if size == 0 {
 			// the object is null
-			_, err = session.GetBytes(2) // 0x81 0x01
+			_, err = session.ReadBytes(2) // 0x81 0x01
 			if err != nil {
 				return err
 			}

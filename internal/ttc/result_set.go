@@ -32,16 +32,16 @@ type ResultSet struct {
 
 func (resultSet *ResultSet) load(session *tns.Session) error {
 	var err error
-	_, err = session.GetByte()
+	_, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
 	var columnCount, num int
-	columnCount, err = session.GetInt(2, true, true)
+	columnCount, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return err
 	}
-	num, err = session.GetInt(4, true, true)
+	num, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
@@ -53,20 +53,20 @@ func (resultSet *ResultSet) load(session *tns.Session) error {
 	if len(resultSet.currentRow) != resultSet.columnCount {
 		resultSet.currentRow = make(Row, resultSet.columnCount)
 	}
-	resultSet.rowCount, err = session.GetInt(4, true, true)
+	resultSet.rowCount, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	resultSet.uACBufferLength, err = session.GetInt(2, true, true)
+	resultSet.uACBufferLength, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return err
 	}
-	bitVector, err := session.GetDlc()
+	bitVector, err := session.ReadDLC()
 	if err != nil {
 		return err
 	}
 	resultSet.setBitVector(bitVector)
-	_, err = session.GetDlc()
+	_, err = session.ReadDLC()
 	return nil
 }
 

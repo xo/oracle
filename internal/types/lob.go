@@ -9,15 +9,15 @@ import (
 )
 
 type Lob interface {
-	GetLocator() Locator
+	Locator() Locator
 	Free() error
-	GetLength() (int64, error)
+	Length() (int64, error)
 	Read(ctx context.Context) error
 	// Load reads the whole value with no context of its own. The driver
 	// calls it inside a call whose context it watches already, and while it
 	// fetches rows, where database/sql gives it no context.
 	Load() error
-	GetReadMode() config.LobReadMode
+	ReadMode() config.LobReadMode
 	sql.Scanner
 }
 
@@ -35,29 +35,29 @@ func (l *lobBase) createStreamer(ctx context.Context, db *sql.DB) error {
 	}
 	return err
 }
-func (l *lobBase) GetStreamer() LobStreamer {
+func (l *lobBase) Streamer() LobStreamer {
 	return l.stream
 }
 func (l *lobBase) SetStreamer(input LobStreamer) {
 	l.stream = input
 }
-func (l *lobBase) GetLocator() Locator {
+func (l *lobBase) Locator() Locator {
 	if l.IsNil() {
 		return nil
 	}
-	return l.stream.GetLocator()
+	return l.stream.Locator()
 }
 func (l *lobBase) IsNil() bool {
-	return l.stream == nil || l.stream.GetLocator() == nil
+	return l.stream == nil || l.stream.Locator() == nil
 }
 func (l *lobBase) IsInline() bool {
 	if l.IsNil() {
 		return true
 	}
-	return l.stream.GetLocator().IsInline()
+	return l.stream.Locator().IsInline()
 }
 func (l *lobBase) IsDataUploaded() bool {
-	return l.stream != nil && l.stream.GetLocator() != nil
+	return l.stream != nil && l.stream.Locator() != nil
 }
 
 func (lob *lobBase) uploadData(data []byte, charsetID, charsetForm int) error {
@@ -88,16 +88,16 @@ func (l *lobBase) Free() error {
 	return nil
 }
 
-func (l *lobBase) GetLength() (int64, error) {
+func (l *lobBase) Length() (int64, error) {
 	if !l.IsInline() {
-		return l.stream.GetSize()
+		return l.stream.Size()
 	}
 	return 0, nil
 }
 
-func (l *lobBase) GetReadMode() config.LobReadMode {
+func (l *lobBase) ReadMode() config.LobReadMode {
 	if !l.IsInline() {
-		return l.stream.GetLobReadMode()
+		return l.stream.LobReadMode()
 	}
 	return config.LobReadModeNone
 }

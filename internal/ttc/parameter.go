@@ -70,16 +70,16 @@ type ParameterInfo struct {
 func (par *ParameterInfo) load(conn *Connection) error {
 	session := conn.session
 	par.getDataFromServer = true
-	dataType, err := session.GetByte()
+	dataType, err := session.ReadByte()
 	if err != nil {
 		return err
 	}
 	par.DataType = uint16(dataType)
-	par.Flag, err = session.GetByte()
+	par.Flag, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
-	par.Precision, err = session.GetByte()
+	par.Precision, err = session.ReadByte()
 	switch par.DataType {
 	case oraTypes.NUMBER:
 		fallthrough
@@ -98,7 +98,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case oraTypes.TimestampLTZDTY:
 		fallthrough
 	case oraTypes.TimestampLTZ:
-		scale, err := session.GetInt(2, true, true)
+		scale, err := session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
@@ -110,14 +110,14 @@ func (par *ParameterInfo) load(conn *Connection) error {
 			par.Scale = uint8(scale)
 		}
 	default:
-		par.Scale, err = session.GetByte()
+		par.Scale, err = session.ReadByte()
 	}
 	if par.DataType == oraTypes.NUMBER && par.Precision == 0 && (par.Scale == 0 || par.Scale == 0xFF) {
 		par.Precision = 38
 		par.Scale = 0xFF
 	}
 
-	par.MaxLen, err = session.GetInt64(4, true, true)
+	par.MaxLen, err = session.ReadInt64(4, true, true)
 	if err != nil {
 		return err
 	}
@@ -141,58 +141,58 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case oraTypes.INTERVALDS:
 		par.MaxLen = 11
 	}
-	par.ArraySize, err = session.GetInt(4, true, true)
+	par.ArraySize, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	if session.TTCVersion >= 10 {
-		par.ContFlag, err = session.GetInt(8, true, true)
+		par.ContFlag, err = session.ReadInt(8, true, true)
 	} else {
-		par.ContFlag, err = session.GetInt(4, true, true)
+		par.ContFlag, err = session.ReadInt(4, true, true)
 	}
 	if err != nil {
 		return err
 	}
-	par.ToID, err = session.GetDlc()
-	par.Version, err = session.GetInt(2, true, true)
+	par.ToID, err = session.ReadDLC()
+	par.Version, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return err
 	}
-	par.CharsetID, err = session.GetInt(2, true, true)
+	par.CharsetID, err = session.ReadInt(2, true, true)
 	if err != nil {
 		return err
 	}
-	par.CharsetForm, err = session.GetInt(1, false, false)
+	par.CharsetForm, err = session.ReadInt(1, false, false)
 	if err != nil {
 		return err
 	}
-	par.MaxCharLen, err = session.GetInt64(4, true, true)
+	par.MaxCharLen, err = session.ReadInt64(4, true, true)
 	if err != nil {
 		return err
 	}
 	if session.TTCVersion >= 8 {
-		par.oaccollid, err = session.GetInt(4, true, true)
+		par.oaccollid, err = session.ReadInt(4, true, true)
 	}
-	num1, err := session.GetInt(1, false, false)
+	num1, err := session.ReadInt(1, false, false)
 	if err != nil {
 		return err
 	}
 	par.AllowNull = num1 > 0
-	_, err = session.GetByte() //  v7 length of name
+	_, err = session.ReadByte() //  v7 length of name
 	if err != nil {
 		return err
 	}
-	bName, err := session.GetDlc()
+	bName, err := session.ReadDLC()
 	if err != nil {
 		return err
 	}
 	par.Name = session.StrConv.Decode(bName)
-	bName, err = session.GetDlc() // schema name
+	bName, err = session.ReadDLC() // schema name
 	if err != nil {
 		return err
 	}
 	par.SchemaName = strings.ToUpper(session.StrConv.Decode(bName))
-	bName, err = session.GetDlc()
+	bName, err = session.ReadDLC()
 	if err != nil {
 		return err
 	}
@@ -212,22 +212,22 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if session.TTCVersion < 3 {
 		return nil
 	}
-	_, err = session.GetInt(2, true, true)
+	_, err = session.ReadInt(2, true, true)
 	if session.TTCVersion < 6 {
 		return nil
 	}
 	var udsFlags int
-	udsFlags, err = session.GetInt(4, true, true)
+	udsFlags, err = session.ReadInt(4, true, true)
 	par.IsJSON = (udsFlags & 0x500) > 0
 	if session.TTCVersion < 17 {
 		return nil
 	}
-	bName, err = session.GetDlc()
+	bName, err = session.ReadDLC()
 	if err != nil {
 		return err
 	}
 	par.DomainSchema = strings.ToUpper(session.StrConv.Decode(bName))
-	bName, err = session.GetDlc()
+	bName, err = session.ReadDLC()
 	if err != nil {
 		return err
 	}
@@ -235,26 +235,26 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if session.TTCVersion < 20 {
 		return nil
 	}
-	numAnnotations, err := session.GetInt(4, true, true)
+	numAnnotations, err := session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	if numAnnotations > 0 {
 		par.Annotations = make(map[string]string)
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
-		numAnnotations, err = session.GetInt(4, true, true)
+		numAnnotations, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetByte()
+		_, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
 		for i := 0; i < numAnnotations; i++ {
-			bKey, bValue, _, err := session.GetKeyVal()
+			bKey, bValue, _, err := session.ReadKeyVal()
 			if err != nil {
 				return err
 			}
@@ -262,7 +262,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 			value := session.StrConv.Decode(bValue)
 			par.Annotations[key] = value
 		}
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
@@ -271,15 +271,15 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return nil
 	}
 	if par.DataType == oraTypes.VECTOR {
-		par.VectorDim, err = session.GetInt(4, true, true)
+		par.VectorDim, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		par.VectorFormat, err = session.GetByte()
+		par.VectorFormat, err = session.ReadByte()
 		if err != nil {
 			return err
 		}
-		par.VectorFlag, err = session.GetByte()
+		par.VectorFlag, err = session.ReadByte()
 
 		par.VectorType = oraTypes.VectorDense
 		if par.VectorFlag&2 == 2 {
@@ -290,15 +290,15 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		//colMetaData.m_vectorFlag = (int)((byte)mEngine.UnmarshalUB1(bAsync, false));
 		//colMetaData.m_vectorType = (((colMetaData.m_vectorFlag & 2) != 0) ? OracleVectorType.Sparse : OracleVectorType.Dense);
 	} else {
-		_, err = session.GetInt(4, true, true)
+		_, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(1, true, true)
+		_, err = session.ReadInt(1, true, true)
 		if err != nil {
 			return err
 		}
-		_, err = session.GetInt(1, true, true)
+		_, err = session.ReadInt(1, true, true)
 		if err != nil {
 			return err
 		}
@@ -374,7 +374,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	} else if par.DataType == 0 {
 		// untyped NULL column (e.g. SELECT NULL FROM dual): read the
 		// null value from the stream without needing a registered coder
-		par.BValue, err = session.GetClr()
+		par.BValue, err = session.ReadCLR()
 		if err != nil {
 			return err
 		}
@@ -383,15 +383,15 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 		return nil
 	} else {
 		if par.DataType == oraTypes.XMLType {
-			decoder, err = conn.GetParameterCoder(par.TypeName)
+			decoder, err = conn.ParameterCoder(par.TypeName)
 		} else {
-			decoder, err = conn.GetParameterCoder(par.DataType)
+			decoder, err = conn.ParameterCoder(par.DataType)
 		}
 	}
 	if err != nil {
 		return err
 	}
-	decoder.SetParameterInfo(par.GetParameterInfo())
+	decoder.SetParameterInfo(par.ParameterInfo())
 	if par.isLobType() {
 		streamer := &LobStream{conn: conn}
 		decoder.SetLobStreamer(streamer)

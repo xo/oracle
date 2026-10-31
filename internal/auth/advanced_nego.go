@@ -32,7 +32,7 @@ type AdvNego struct {
 	clientInfo   *config.ClientInfo
 	negoInfo     *config.AdvNegoServiceInfo
 	tracer       trace.Tracer
-	serviceList  []AdvNegoService
+	serviceList  []negoService
 	sessionKey   []byte
 	iv           []byte
 	oldIV        []byte
@@ -48,7 +48,7 @@ func NewAdvNego(session *tns.Session, tracer trace.Tracer, config *config.Connec
 		clientInfo:  &config.ClientInfo,
 		negoInfo:    &config.AdvNegoServiceInfo,
 		tracer:      tracer,
-		serviceList: make([]AdvNegoService, 5),
+		serviceList: make([]negoService, 5),
 	}
 	var err error
 	output.serviceList[1], err = newAuthService(output, output.negoInfo)
@@ -72,7 +72,7 @@ func NewAdvNego(session *tns.Session, tracer trace.Tracer, config *config.Connec
 
 func (nego *AdvNego) readHeader() (length, version, servCount int, err error) {
 	var num int64
-	num, err = nego.comm.session.GetInt64(4, false, true)
+	num, err = nego.comm.session.ReadInt64(4, false, true)
 	if err != nil {
 		return
 	}
@@ -80,20 +80,20 @@ func (nego *AdvNego) readHeader() (length, version, servCount int, err error) {
 		err = errors.New("advanced negotiation error: during receive header")
 		return
 	}
-	length, err = nego.comm.session.GetInt(2, false, true)
+	length, err = nego.comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return
 	}
-	version, err = nego.comm.session.GetInt(4, false, true)
+	version, err = nego.comm.session.ReadInt(4, false, true)
 	if err != nil {
 		return
 	}
-	servCount, err = nego.comm.session.GetInt(2, false, true)
+	servCount, err = nego.comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return
 	}
 	var errFlags int
-	errFlags, err = nego.comm.session.GetInt(1, false, true)
+	errFlags, err = nego.comm.session.ReadInt(1, false, true)
 	if err != nil {
 		return
 	}
@@ -113,16 +113,16 @@ func (nego *AdvNego) writeHeader(length, servCount int) {
 }
 
 func (nego *AdvNego) readServiceHeader() (serviceType, serviceSubPacket int, err error) {
-	serviceType, err = nego.comm.session.GetInt(2, false, true)
+	serviceType, err = nego.comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return
 	}
-	serviceSubPacket, err = nego.comm.session.GetInt(2, false, true)
+	serviceSubPacket, err = nego.comm.session.ReadInt(2, false, true)
 	if err != nil {
 		return
 	}
 	var errFlags int
-	errFlags, err = nego.comm.session.GetInt(4, false, true)
+	errFlags, err = nego.comm.session.ReadInt(4, false, true)
 	if err != nil {
 		return
 	}
@@ -235,13 +235,13 @@ func (nego *AdvNego) Read() error {
 		if err != nil {
 			return err
 		}
-		ntsHeader, err := nego.comm.session.GetBytes(33)
+		ntsHeader, err := nego.comm.session.ReadBytes(33)
 		if err != nil {
 			return err
 		}
 		sizeOffset := len(ntsHeader) - 8
 		chaSize := binary.LittleEndian.Uint32(ntsHeader[sizeOffset : sizeOffset+4])
-		chaData, err := nego.comm.session.GetBytes(int(chaSize))
+		chaData, err := nego.comm.session.ReadBytes(int(chaSize))
 		if err != nil {
 			return err
 		}
@@ -389,7 +389,7 @@ func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthenticator, authServ 
 		return err
 	}
 	// num2 = get ub1
-	_, err = nego.comm.session.GetByte()
+	_, err = nego.comm.session.ReadByte()
 	if err != nil {
 		return err
 	}

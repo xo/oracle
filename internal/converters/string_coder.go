@@ -1,9 +1,9 @@
 package converters
 
 type StringCoder interface {
-	GetStringCoder(charsetID, charsetForm int) (*StringConverter, error)
-	GetDefaultStringCoder() (*StringConverter, error)
-	GetServerStringCoder() *StringConverter
-	GetServerNStringCoder() *StringConverter
-	GetMaxStringLength() int64
+	StringCoder(charsetID, charsetForm int) (*StringConverter, error)
+	DefaultStringCoder() (*StringConverter, error)
+	ServerStringCoder() *StringConverter
+	ServerNStringCoder() *StringConverter
+	MaxStringLength() int64
 }

@@ -212,7 +212,7 @@ func (info *DatabaseInfo) ResetServerIndex() {
 	info.serverIndex = 0
 }
 
-func (info *DatabaseInfo) GetActiveServer(jump bool) *ServerAddr {
+func (info *DatabaseInfo) ActiveServer(jump bool) *ServerAddr {
 	if jump {
 		info.serverIndex++
 	}

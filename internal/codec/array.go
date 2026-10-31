@@ -37,9 +37,9 @@ func (param *ArrayParameter) FillAttrib(input any, conn Conn) error {
 					itemType = itemType.Elem()
 				}
 			}
-			param.attrib, err = conn.GetParameterCoder(itemType)
+			param.attrib, err = conn.ParameterCoder(itemType)
 		} else if param.DataType != 0 {
-			param.attrib, err = conn.GetParameterCoder(param.DataType)
+			param.attrib, err = conn.ParameterCoder(param.DataType)
 		} else {
 			err = fmt.Errorf("to set array item type either pass non-nil value or pass data type")
 		}
@@ -59,14 +59,14 @@ func (param *ArrayParameter) Encode(input any, conn Conn) (err error) {
 		}
 		coder = param.attrib.Copy()
 		coder.Init()
-		param.UpdateParameterInfo(coder.GetParameterInfo())
+		param.UpdateParameterInfo(coder.ParameterInfo())
 		rValue := reflect.ValueOf(input)
 		length := rValue.Len()
 		if length > param.ArraySize {
 			param.ArraySize = length
 		}
 		if param.ArraySize > 0 {
-			session := tns.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
+			session := tns.NewMemorySession(nil, nil, conn.Session().Properties())
 			session.PutUint(param.ArraySize, 4, true, true)
 			if length > 0 {
 				for i := range length {
@@ -96,15 +96,15 @@ func (param *ArrayParameter) Encode(input any, conn Conn) (err error) {
 					return err
 				}
 			}
-			param.UpdateParameterInfo(coder.GetParameterInfo())
+			param.UpdateParameterInfo(coder.ParameterInfo())
 			if param.DataType == types.NCHAR {
-				param.MaxLen = conn.GetMaxStringLength()
+				param.MaxLen = conn.MaxStringLength()
 				param.MaxCharLen = param.MaxLen // / converters.MaxBytePerChar(par.CharsetID)
 			}
 			if param.DataType == types.RAW {
-				param.MaxLen = conn.GetMaxRawLength()
+				param.MaxLen = conn.MaxRawLength()
 			}
-			param.BValue = session.GetWriteBuffer()
+			param.BValue = session.WriteBuffer()
 		} else {
 			param.BValue = nil
 		}
@@ -123,17 +123,17 @@ func (param *ArrayParameter) Decode(conn Conn) (value any, err error) {
 	if err != nil {
 		return nil, err
 	}
-	session := conn.GetSession()
+	session := conn.Session()
 	if param.ArraySize > 0 {
 		items := make([]any, param.ArraySize)
 		for i := 0; i < param.ArraySize; i++ {
 			decoder := param.attrib.Copy()
-			decoder.UpdateParameterInfo(param.GetParameterInfo())
+			decoder.UpdateParameterInfo(param.ParameterInfo())
 			err = decoder.Read(session)
 			if err != nil {
 				return nil, err
 			}
-			_, err = session.GetInt(2, true, true)
+			_, err = session.ReadInt(2, true, true)
 			if err != nil {
 				return nil, err
 			}
@@ -151,7 +151,7 @@ func (param *ArrayParameter) Read(session tns.SessionReader) error {
 	// non-xml array
 	// this code should be in basic_read
 	var err error
-	param.ArraySize, err = session.GetInt(4, true, true)
+	param.ArraySize, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}

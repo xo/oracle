@@ -82,62 +82,62 @@ type Message struct {
 }
 
 func (message *Message) read(conn Conn) error {
-	session := conn.GetSession()
+	session := conn.Session()
 	var err error
-	message.Priority, err = session.GetInt(4, true, true)
+	message.Priority, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	message.Delay, err = session.GetInt(4, true, true)
+	message.Delay, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	message.Expiration, err = session.GetInt(4, true, true)
+	message.Expiration, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	var num int
-	num, err = session.GetInt(4, true, true)
+	num, err = session.ReadInt(4, true, true)
 	if num > 0 {
 		var temp []byte
-		temp, err = session.GetClr()
+		temp, err = session.ReadCLR()
 		if err != nil {
 			return err
 		}
-		message.correlation = conn.GetServerStringCoder().Decode(temp)
+		message.correlation = conn.ServerStringCoder().Decode(temp)
 	} else {
 		message.correlation = ""
 	}
-	message.deqAttempts, err = session.GetInt(4, true, true)
+	message.deqAttempts, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	num, err = session.GetInt(4, true, true)
+	num, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	if num > 0 {
 		var temp []byte
-		temp, err = session.GetClr()
+		temp, err = session.ReadCLR()
 		if err != nil {
 			return err
 		}
-		message.exceptionQueue = conn.GetServerStringCoder().Decode(temp)
+		message.exceptionQueue = conn.ServerStringCoder().Decode(temp)
 	} else {
 		message.exceptionQueue = ""
 	}
-	num, err = session.GetInt(4, true, true)
+	num, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	message.State = MessageState(num)
-	num, err = session.GetInt(4, true, true)
+	num, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
 	if num > 0 {
 		var temp []byte
-		temp, err = session.GetClr()
+		temp, err = session.ReadCLR()
 		if err != nil {
 			return err
 		}
@@ -163,44 +163,44 @@ func (message *Message) read(conn Conn) error {
 		//}
 	}
 	if conn.TTCVersion() >= 3 {
-		num, err = session.GetInt(2, true, true)
+		num, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
 		if num > 0 {
 			var temp []byte
-			temp, err = session.GetClr()
+			temp, err = session.ReadCLR()
 			if err != nil {
 				return err
 			}
-			message.transactionGroup = conn.GetServerStringCoder().Decode(temp)
+			message.transactionGroup = conn.ServerStringCoder().Decode(temp)
 		} else {
 			message.transactionGroup = ""
 		}
 	}
 	var length int
-	length, err = session.GetInt(4, true, true)
+	length, err = session.ReadInt(4, true, true)
 	if err != nil {
 		return err
 	}
-	_, err = session.GetByte()
+	_, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
 	for i := 0; i < length; i++ {
 		var key, val []byte
-		key, val, num, err = session.GetKeyVal()
+		key, val, num, err = session.ReadKeyVal()
 		if err != nil {
 			return err
 		}
 		switch num {
 		case 64:
 			if len(key) > 0 {
-				message.senderName = conn.GetServerStringCoder().Decode(key)
+				message.senderName = conn.ServerStringCoder().Decode(key)
 			}
 		case 65:
 			if len(key) > 0 {
-				message.senderAddress = conn.GetServerStringCoder().Decode(key)
+				message.senderAddress = conn.ServerStringCoder().Decode(key)
 			}
 		case 66:
 			if len(val) > 0 {
@@ -208,27 +208,27 @@ func (message *Message) read(conn Conn) error {
 			}
 		case 69:
 			if len(val) > 0 {
-				message.ID = conn.GetServerStringCoder().Decode(val)
+				message.ID = conn.ServerStringCoder().Decode(val)
 			}
 		}
 	}
 	if conn.TTCVersion() >= 3 {
-		_, err = session.GetInt(2, true, true)
+		_, err = session.ReadInt(2, true, true)
 		if err != nil {
 			return err
 		}
-		/*csn*/ _, err = session.GetInt(4, true, true)
+		/*csn*/ _, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
-		/*dsn*/ _, err = session.GetInt(4, true, true)
+		/*dsn*/ _, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
 	}
 	if conn.TTCVersion() >= 4 {
 		var flag int
-		flag, err = session.GetInt(4, true, true)
+		flag, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
@@ -238,7 +238,7 @@ func (message *Message) read(conn Conn) error {
 		message.DeliveryMode = DeliveryMode(flag)
 	}
 	if conn.TTCVersion() >= 16 {
-		message.shareNum, err = session.GetInt(4, true, true)
+		message.shareNum, err = session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
@@ -246,12 +246,12 @@ func (message *Message) read(conn Conn) error {
 	return nil
 }
 func (message *Message) write(conn Conn) {
-	session := conn.GetSession()
+	session := conn.Session()
 	session.PutInt(message.Priority, 4, true, true)
 	session.PutInt(message.Delay, 4, true, true)
 	session.PutInt(message.Expiration, 4, true, true)
 	if len(message.correlation) > 0 {
-		temp := conn.GetServerStringCoder().Encode(message.correlation)
+		temp := conn.ServerStringCoder().Encode(message.correlation)
 		session.PutInt(len(temp), 2, true, true)
 		session.PutClr(temp)
 	} else {
@@ -259,7 +259,7 @@ func (message *Message) write(conn Conn) {
 	}
 	session.PutBytes(0)
 	if len(message.exceptionQueue) > 0 {
-		temp := conn.GetServerStringCoder().Encode(message.exceptionQueue)
+		temp := conn.ServerStringCoder().Encode(message.exceptionQueue)
 		session.PutInt(len(message.exceptionQueue), 2, true, true)
 		session.PutClr(temp)
 	} else {
@@ -268,7 +268,7 @@ func (message *Message) write(conn Conn) {
 	session.PutInt(int(message.State), 4, true, true)
 	session.PutBytes(0)
 	if conn.TTCVersion() >= 3 {
-		temp := conn.GetServerStringCoder().Encode(message.transactionGroup)
+		temp := conn.ServerStringCoder().Encode(message.transactionGroup)
 		if len(temp) > 0 {
 			session.PutInt(len(temp), 2, true, true)
 			session.PutClr(temp)
@@ -299,20 +299,20 @@ func (message *Message) ServerMessageID() []byte {
 
 func (message *Message) readData(conn Conn, messageType MessageType, udtName string) error {
 	var err error
-	session := conn.GetSession()
-	message.bValue, err = session.GetClr()
+	session := conn.Session()
+	message.bValue, err = session.ReadCLR()
 	if err != nil {
 		return err
 	}
 	var decoder codec.OracleParameterDecoder
 	switch messageType {
 	case RAW:
-		decoder, err = conn.GetParameterCoder(types.RAW)
+		decoder, err = conn.ParameterCoder(types.RAW)
 
 	case JSON:
-		decoder, err = conn.GetParameterCoder(types.JSONType)
+		decoder, err = conn.ParameterCoder(types.JSONType)
 	default:
-		decoder, err = conn.GetParameterCoder(udtName)
+		decoder, err = conn.ParameterCoder(udtName)
 
 	}
 	if err != nil {

@@ -12,14 +12,14 @@ import (
 type (
 	Conn interface {
 		converters.StringCoder
-		GetSession() tns.SessionReadWriter
+		Session() tns.SessionReadWriter
 		NewLobStreamer() types.LobStreamer
 		ProcessTCCResponse(msgCode uint8) error
-		GetParameterCoder(input any) (codec.OracleParameterCoder, error)
+		ParameterCoder(input any) (codec.OracleParameterCoder, error)
 		SendTimeAsUTC() bool
-		GetDBTimeZone() *time.Location
-		GetDBServerTimeZone() *time.Location
+		DBTimeZone() *time.Location
+		DBServerTimeZone() *time.Location
 		TTCVersion() uint8
-		GetMaxRawLength() int64
+		MaxRawLength() int64
 	}
 )

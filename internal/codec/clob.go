@@ -46,21 +46,21 @@ func (param *ClobParameter) Encode(input any, conn Conn) (err error) {
 		}
 	}
 	encoder := &types.Clob{}
-	encoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
+	encoder.Conv, err = conn.StringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return
 	}
-	param.CharsetID = encoder.Conv.GetLangID()
+	param.CharsetID = encoder.Conv.LangID
 	encoder.SetDataType(param.DataType)
 	err = encoder.SetValue(input)
 	if err != nil {
 		return
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
 	if !encoder.IsDataUploaded() && len(encoder.Bytes()) > 0 {
 		encoder.SetStreamer(conn.NewLobStreamer())
@@ -69,7 +69,7 @@ func (param *ClobParameter) Encode(input any, conn Conn) (err error) {
 			return
 		}
 	}
-	param.BValue = encoder.GetLocator()
+	param.BValue = encoder.Locator()
 	return
 }
 
@@ -77,16 +77,16 @@ func (param *ClobParameter) Decode(conn Conn) (any, error) {
 	decoder := &types.Clob{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
-	locator := param.streamer.GetLocator()
+	locator := param.streamer.Locator()
 	var err error
 	if locator.IsVarWidthChar() {
 		if param.streamer.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
-			decoder.Conv, err = conn.GetStringCoder(2002, 0)
+			decoder.Conv, err = conn.StringCoder(2002, 0)
 		} else {
-			decoder.Conv, err = conn.GetStringCoder(2000, 0)
+			decoder.Conv, err = conn.StringCoder(2000, 0)
 		}
 	} else {
-		decoder.Conv, err = conn.GetStringCoder(param.CharsetID, param.CharsetForm)
+		decoder.Conv, err = conn.StringCoder(param.CharsetID, param.CharsetForm)
 	}
 	return decoder, err
 }

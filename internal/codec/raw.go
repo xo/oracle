@@ -29,20 +29,20 @@ func (param *RawParameter) Encode(input any, conn Conn) error {
 	if err != nil {
 		return err
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
 	if len(param.BValue) > 0 {
 		param.MaxLen = int64(len(param.BValue))
 	}
-	if param.MaxLen <= conn.GetMaxStringLength() {
+	if param.MaxLen <= conn.MaxStringLength() {
 		param.DataType = types.RAW
 	} else {
 		param.DataType = types.LongRaw
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
 	return nil
 }

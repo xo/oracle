@@ -28,9 +28,9 @@ type JSON struct {
 
 var jsonTypeError = errors.New("unexpected data for json type")
 
-func (js *JSON) GetLocator() Locator {
-	if js.lobBase.GetLocator() != nil {
-		return js.lobBase.GetLocator()
+func (js *JSON) Locator() Locator {
+	if js.lobBase.Locator() != nil {
+		return js.lobBase.Locator()
 	}
 	return js.loc
 }

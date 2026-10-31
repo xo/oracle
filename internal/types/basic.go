@@ -19,8 +19,8 @@ func (b *Basic) SetDataType(dt uint16) {
 	}
 }
 
-func (b *Basic) GetDataType() uint16 {
+func (b *Basic) DataType() uint16 {
 	return b.dataType
 }
 
-func (b *Basic) GetMaxLen() int64 { return 1 }
+func (b *Basic) MaxLen() int64 { return 1 }

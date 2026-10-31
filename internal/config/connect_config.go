@@ -70,7 +70,7 @@ func (config *ConnectionConfig) ConnectionData() string {
 	if len(config.connStr) != 0 {
 		return config.connStr
 	}
-	host := config.GetActiveServer(false)
+	host := config.ActiveServer(false)
 	protocol := config.Protocol
 	if host.Protocol != "" {
 		protocol = host.Protocol

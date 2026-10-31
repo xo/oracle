@@ -24,18 +24,18 @@ func (clob *Clob) Upload() error {
 	if !clob.IsDataUploaded() && clob.stream != nil {
 		// the upload runs inside the call that binds the CLOB, which
 		// watches the context of that call
-		_, err = clob.stream.CreateTemporaryLocator(clob.Conv.GetLangID(), charsetForm)
+		_, err = clob.stream.CreateTemporaryLocator(clob.Conv.LangID, charsetForm)
 		if err != nil {
 			return err
 		}
 		if clob.Conv != nil {
-			locator := clob.GetLocator()
+			locator := clob.Locator()
 			if locator.IsVarWidthChar() {
 				tempValue := clob.Conv.Decode(clob.bValue)
 				if clob.stream.DatabaseVersionNumber() < 10200 && locator.IsLittleEndian() {
-					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2002, 0)
+					clob.Conv, err = clob.stream.StringCoder().StringCoder(2002, 0)
 				} else {
-					clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(2000, 0)
+					clob.Conv, err = clob.stream.StringCoder().StringCoder(2000, 0)
 				}
 				clob.bValue = clob.Conv.Encode(tempValue)
 			}
@@ -56,7 +56,7 @@ func (clob *Clob) SetValue(input any) error {
 	}
 	if clob.Conv == nil {
 		if clob.stream != nil {
-			clob.Conv, err = clob.stream.GetStringCoder().GetStringCoder(0, charsetForm)
+			clob.Conv, err = clob.stream.StringCoder().StringCoder(0, charsetForm)
 			if err != nil {
 				return err
 			}
@@ -69,7 +69,7 @@ func (clob *Clob) SetValue(input any) error {
 		if input.IsDataUploaded() {
 			*clob = input
 		} else {
-			if clob.Conv != nil && input.Conv != nil && clob.Conv.GetLangID() == input.Conv.GetLangID() {
+			if clob.Conv != nil && input.Conv != nil && clob.Conv.LangID == input.Conv.LangID {
 				*clob = input
 			} else {
 				temp, err := input.Value()
@@ -84,7 +84,7 @@ func (clob *Clob) SetValue(input any) error {
 		if input.IsDataUploaded() {
 			*clob = *input
 		} else {
-			if clob.Conv != nil && input.Conv != nil && clob.Conv.GetLangID() == input.Conv.GetLangID() {
+			if clob.Conv != nil && input.Conv != nil && clob.Conv.LangID == input.Conv.LangID {
 				*clob = *input
 			} else {
 				temp, err := input.Value()

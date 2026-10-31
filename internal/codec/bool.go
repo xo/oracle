@@ -28,11 +28,11 @@ func (param *BoolParameter) Encode(input any, _ Conn) error {
 	if err != nil {
 		return err
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
 	param.BValue = encoder.Bytes()
 	return nil

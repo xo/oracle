@@ -22,9 +22,9 @@ type Vector struct {
 	lobBase
 }
 
-func (vector *Vector) GetLocator() Locator {
-	if vector.lobBase.GetLocator() != nil {
-		return vector.lobBase.GetLocator()
+func (vector *Vector) Locator() Locator {
+	if vector.lobBase.Locator() != nil {
+		return vector.lobBase.Locator()
 	}
 	return vector.loc
 }

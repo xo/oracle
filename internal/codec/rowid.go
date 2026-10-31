@@ -27,11 +27,11 @@ func (param *RowIDParameter) Encode(input any, _ Conn) error {
 	coder := &types.RowID{}
 	coder.SetDataType(param.DataType)
 	err := coder.SetValue(input)
-	if dt := coder.GetDataType(); dt != 0 {
+	if dt := coder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < coder.GetMaxLen() {
-		param.MaxLen = coder.GetMaxLen()
+	if param.MaxLen < coder.MaxLen() {
+		param.MaxLen = coder.MaxLen()
 	}
 	return err
 }
@@ -51,30 +51,30 @@ func (param *RowIDParameter) Write(session tns.SessionWriter) error {
 func (param *RowIDParameter) Read(session tns.SessionReader) error {
 	switch param.DataType {
 	case types.ROWID:
-		length, err := session.GetByte()
+		length, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
 		if length == 0 {
 			return nil
 		}
-		param.rowid.Rba, err = session.GetInt64(4, true, true)
+		param.rowid.Rba, err = session.ReadInt64(4, true, true)
 		if err != nil {
 			return err
 		}
-		param.rowid.PartitionID, err = session.GetInt64(2, true, true)
+		param.rowid.PartitionID, err = session.ReadInt64(2, true, true)
 		if err != nil {
 			return err
 		}
-		num, err := session.GetByte()
+		num, err := session.ReadByte()
 		if err != nil {
 			return err
 		}
-		param.rowid.BlockNumber, err = session.GetInt64(4, true, true)
+		param.rowid.BlockNumber, err = session.ReadInt64(4, true, true)
 		if err != nil {
 			return err
 		}
-		param.rowid.SlotNumber, err = session.GetInt64(2, true, true)
+		param.rowid.SlotNumber, err = session.ReadInt64(2, true, true)
 		if err != nil {
 			return err
 		}
@@ -83,12 +83,12 @@ func (param *RowIDParameter) Read(session tns.SessionReader) error {
 		}
 		return nil
 	case types.UROWID:
-		length, err := session.GetInt(4, true, true)
+		length, err := session.ReadInt(4, true, true)
 		if err != nil {
 			return err
 		}
 		if length > 0 {
-			param.BValue, err = session.GetClr()
+			param.BValue, err = session.ReadCLR()
 			if err != nil {
 				return err
 			}

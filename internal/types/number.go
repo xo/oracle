@@ -14,7 +14,7 @@ type Number struct {
 	Basic
 }
 
-func (number *Number) GetMaxLen() int64 {
+func (number *Number) MaxLen() int64 {
 	switch number.dataType {
 	case IBFLOAT:
 		return MaxLenBFloat

@@ -36,7 +36,7 @@ func (str *String) SetValue(input any) error {
 	}
 	switch data := input.(type) {
 	case String:
-		if str.Conv.GetLangID() == data.Conv.GetLangID() {
+		if str.Conv.LangID == data.Conv.LangID {
 			*str = data
 		} else {
 			temp, err := data.Value()
@@ -47,7 +47,7 @@ func (str *String) SetValue(input any) error {
 		}
 
 	case *String:
-		if str.Conv.GetLangID() == data.Conv.GetLangID() {
+		if str.Conv.LangID == data.Conv.LangID {
 			*str = *data
 		} else {
 			temp, err := data.Value()

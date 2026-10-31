@@ -10,13 +10,13 @@ import (
 
 type Conn interface {
 	converters.StringCoder
-	GetSession() tns.SessionReadWriter
+	Session() tns.SessionReadWriter
 	NewLobStreamer() types.LobStreamer
-	GetParameterCoder(input any) (OracleParameterCoder, error)
+	ParameterCoder(input any) (OracleParameterCoder, error)
 	SendTimeAsUTC() bool
-	GetDBTimeZone() *time.Location
-	GetDBServerTimeZone() *time.Location
-	GetMaxRawLength() int64
+	DBTimeZone() *time.Location
+	DBServerTimeZone() *time.Location
+	MaxRawLength() int64
 }
 
 type (
@@ -33,8 +33,8 @@ type (
 	}
 	OracleParameterEncoder interface {
 		Encode(input any, conn Conn) error
-		tns.ValueStreamWriter
-		GetParameterInfo() BasicParameter
+		tns.ValueWriter
+		ParameterInfo() BasicParameter
 		UpdateParameterInfo(data BasicParameter)
 	}
 

@@ -38,6 +38,6 @@ func (ms *MemorySession) ResetBuffer() {
 	ms.outBuffer.Reset()
 }
 
-func (ms *MemorySession) GetProperties() SessionProperties {
+func (ms *MemorySession) Properties() SessionProperties {
 	return ms.SessionProperties
 }

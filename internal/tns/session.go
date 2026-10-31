@@ -175,7 +175,7 @@ func (session *Session) ResetBuffer() {
 	session.resetRead()
 }
 
-func (session *Session) GetProperties() SessionProperties {
+func (session *Session) Properties() SessionProperties {
 	return session.SessionProperties
 }
 func (session *Session) SetConnected() {
@@ -327,7 +327,7 @@ func (session *Session) LoadSSLData(certs, keys, certRequests [][]byte) error {
 // used to create sslConn object
 func (session *Session) negotiate() {
 	connOption := session.Context.connConfig
-	host := connOption.GetActiveServer(false)
+	host := connOption.ActiveServer(false)
 
 	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
 		// a copy, so that the configuration of the caller does not change,
@@ -437,7 +437,7 @@ func (session *Session) Connect(ctx context.Context) error {
 		}
 	}
 	for loop {
-		host = connOption.GetActiveServer(false)
+		host = connOption.ActiveServer(false)
 		if host == nil {
 			if err != nil {
 				return err
@@ -461,7 +461,7 @@ func (session *Session) Connect(ctx context.Context) error {
 
 		if err != nil {
 			session.tracer.Printf("using: %s ..... [FAILED]", addr)
-			host = connOption.GetActiveServer(true)
+			host = connOption.ActiveServer(true)
 			if host == nil {
 				break
 			}
@@ -530,7 +530,7 @@ func (session *Session) Connect(ctx context.Context) error {
 			port = host.Port
 		}
 		session.tracer.Printf("connection to %s:%d refused with error: %s", addr, port, refusePacket.Err.Error())
-		host = connOption.GetActiveServer(true)
+		host = connOption.ActiveServer(true)
 		if host == nil {
 			session.Disconnect()
 			return refusePacket.Err
@@ -734,8 +734,8 @@ func (session *Session) HasError() bool {
 	return session.Summary != nil && (session.Summary.RetCode != 0 && session.Summary.RetCode != 1403)
 }
 
-// GetError Return the error in form or OracleError
-func (session *Session) GetError() *OracleError {
+// ServerError Return the error in form or OracleError
+func (session *Session) ServerError() *OracleError {
 	err := &OracleError{}
 	if session.HasError() {
 		err.ErrCode = session.Summary.RetCode

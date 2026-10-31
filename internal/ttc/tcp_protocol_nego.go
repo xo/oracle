@@ -37,7 +37,7 @@ func (nego *TCPNego) readMessage() error {
 	var err error
 	session := nego.conn.session
 	tracer := nego.conn.tracer
-	nego.MessageCode, err = session.GetByte()
+	nego.MessageCode, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (nego *TCPNego) readMessage() error {
 		return fmt.Errorf("message code error: received code %d and expected code is 1", nego.MessageCode)
 	}
 	var protocolServerVersion uint8
-	protocolServerVersion, err = session.GetByte()
+	protocolServerVersion, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
@@ -59,15 +59,15 @@ func (nego *TCPNego) readMessage() error {
 	default:
 		return fmt.Errorf("unsupported protocol server version: %d", protocolServerVersion)
 	}
-	_, err = session.GetByte()
+	_, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
-	nego.ProtocolServerString, err = session.GetNullTermString()
+	nego.ProtocolServerString, err = session.ReadNullTermString()
 	if err != nil {
 		return err
 	}
-	nego.ServerCharset, err = session.GetInt(2, false, false)
+	nego.ServerCharset, err = session.ReadInt(2, false, false)
 	if err != nil {
 		return err
 	}
@@ -80,23 +80,23 @@ func (nego *TCPNego) readMessage() error {
 		}
 	}
 	nego.conn.session.StrConv = nego.conn.sStrConv
-	nego.ServerFlags, err = session.GetByte()
+	nego.ServerFlags, err = session.ReadByte()
 	if err != nil {
 		return err
 	}
 	var charsetElem int
-	charsetElem, err = session.GetInt(2, false, false)
+	charsetElem, err = session.ReadInt(2, false, false)
 	if err != nil {
 		return err
 	}
 	if charsetElem > 0 {
-		_, _ = session.GetBytes(charsetElem * 5)
+		_, _ = session.ReadBytes(charsetElem * 5)
 	}
-	len1, err := session.GetInt(2, false, true)
+	len1, err := session.ReadInt(2, false, true)
 	if err != nil {
 		return err
 	}
-	numArray, err := session.GetBytes(len1)
+	numArray, err := session.ReadBytes(len1)
 	if err != nil {
 		return err
 	}
@@ -109,19 +109,19 @@ func (nego *TCPNego) readMessage() error {
 		}
 	}
 	tracer.Print("Server National Charset: ", nego.ServerNCharset)
-	len2, err := session.GetByte()
+	len2, err := session.ReadByte()
 	if err != nil {
 		return err
 	}
-	nego.ServerCompileTimeCaps, err = session.GetBytes(int(len2))
+	nego.ServerCompileTimeCaps, err = session.ReadBytes(int(len2))
 	if err != nil {
 		return err
 	}
-	len3, err := session.GetByte()
+	len3, err := session.ReadByte()
 	if err != nil {
 		return err
 	}
-	nego.ServerRuntimeCaps, err = session.GetBytes(int(len3))
+	nego.ServerRuntimeCaps, err = session.ReadBytes(int(len3))
 	if err != nil {
 		return err
 	}

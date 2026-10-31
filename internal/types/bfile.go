@@ -36,7 +36,7 @@ func CreateBFile(ctx context.Context, db *sql.DB, dirName, fileName string) (*BF
 	}
 	return ret, ret.SetValue(filePath)
 }
-func (file *BFile) GetMaxLen() int64 {
+func (file *BFile) MaxLen() int64 {
 	return MaxLenBFile
 }
 func (file *BFile) SetValue(input any) error {
@@ -118,9 +118,9 @@ func (file *BFile) SetStreamer(input LobStreamer) {
 	file.stream = input
 	if input != nil {
 		// get dir and file name before change conversion
-		dirName := file.GetDirName()
-		fileName := file.GetFileName()
-		file.Conv, _ = file.stream.GetStringCoder().GetDefaultStringCoder()
+		dirName := file.DirName()
+		fileName := file.FileName()
+		file.Conv, _ = file.stream.StringCoder().DefaultStringCoder()
 		filePath := ""
 		if len(dirName) != 0 && len(fileName) != 0 {
 			filePath = dirName + "/" + fileName
@@ -141,7 +141,7 @@ func (file *BFile) IsOpen() bool {
 }
 
 func (file *BFile) IsInit() bool {
-	if file.stream != nil && file.stream.GetLocator() == nil && file.bValue != nil {
+	if file.stream != nil && file.stream.Locator() == nil && file.bValue != nil {
 		file.stream.SetLocator(file.bValue)
 	}
 	return len(file.bValue) > 0 && file.stream != nil
@@ -177,9 +177,9 @@ func (file *BFile) Close() error {
 	return nil
 }
 
-func (file *BFile) GetDirName() string {
+func (file *BFile) DirName() string {
 	dirName := ""
-	locator := file.GetLocator()
+	locator := file.Locator()
 	if len(locator) > 16 && file.Conv != nil {
 		index := 16
 		length := int(binary.BigEndian.Uint16(locator[index : index+2]))
@@ -189,9 +189,9 @@ func (file *BFile) GetDirName() string {
 	return dirName
 }
 
-func (file *BFile) GetFileName() string {
+func (file *BFile) FileName() string {
 	fileName := ""
-	locator := file.GetLocator()
+	locator := file.Locator()
 	if len(locator) > 16 && file.Conv != nil {
 		index := 16
 		length := int(binary.BigEndian.Uint16(locator[index : index+2]))

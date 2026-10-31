@@ -19,9 +19,9 @@ type QAExtension struct {
 }
 
 func (qu *queue) writeArrayHeader(messages []*Message) {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	session.PutBytes(6)
-	queueNameBytes := qu.conn.GetServerStringCoder().Encode(qu.Name)
+	queueNameBytes := qu.conn.ServerStringCoder().Encode(qu.Name)
 	if len(queueNameBytes) > 0 {
 		session.PutInt(len(queueNameBytes), 2, true, true)
 	}
@@ -50,7 +50,7 @@ func (qu *queue) writeArrayHeader(messages []*Message) {
 }
 
 func (qu *queue) writeArrayData(messages []*Message) error {
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	for _, message := range messages {
 		session.PutBytes(7)
 
@@ -95,7 +95,7 @@ func (qu *queue) EnqueueMessages(messages []*Message) error {
 	if len(messages) == 0 {
 		return errors.New("no messages to enqueue")
 	}
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	session.ResetBuffer()
 
 	session.PutTTCFunc(0x3, 0x91)
@@ -155,7 +155,7 @@ func (qu *queue) DequeueMessages(options *DequeueOptions, count int) ([]*Message
 		return nil, errors.New("count must be positive")
 	}
 
-	session := qu.conn.GetSession()
+	session := qu.conn.Session()
 	session.ResetBuffer()
 
 	session.PutTTCFunc(0x3, 0x91)
@@ -192,7 +192,7 @@ func (qu *queue) DequeueMessages(options *DequeueOptions, count int) ([]*Message
 		}
 
 		// ===== Dequeue options section =====
-		queueNameBytes := qu.conn.GetServerStringCoder().Encode(qu.Name)
+		queueNameBytes := qu.conn.ServerStringCoder().Encode(qu.Name)
 		session.PutDlc(queueNameBytes)
 		message.write(qu.conn)
 		if len(message.recipients) > 0 {
@@ -204,16 +204,16 @@ func (qu *queue) DequeueMessages(options *DequeueOptions, count int) ([]*Message
 			session.PutBytes(0)
 		}
 		// consumer name bytes
-		consumer := qu.conn.GetServerStringCoder().Encode(options.Consumer)
+		consumer := qu.conn.ServerStringCoder().Encode(options.Consumer)
 		session.PutDlc(consumer)
 		session.PutInt(int(options.Mode), 4, true, true)
 		session.PutInt(int(options.Navigation), 4, true, true)
 		session.PutInt(int(options.Visibility), 4, true, true)
 		session.PutInt(options.Wait, 4, true, true)
 		session.PutDlc(message.messageID)
-		correlation := qu.conn.GetServerStringCoder().Encode(options.Correlation)
+		correlation := qu.conn.ServerStringCoder().Encode(options.Correlation)
 		session.PutDlc(correlation)
-		condition := qu.conn.GetServerStringCoder().Encode(options.Condition)
+		condition := qu.conn.ServerStringCoder().Encode(options.Condition)
 		session.PutDlc(condition)
 		session.PutBytes(0)
 		session.PutDlc(nil)

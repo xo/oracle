@@ -12,14 +12,14 @@ import (
 type LobStreamer interface {
 	StartContext(ctx context.Context) func()
 	EndContext(end func())
-	GetLocator() Locator
+	Locator() Locator
 	SetLocator(locator Locator)
 	DatabaseVersionNumber() int
-	GetStringCoder() converters.StringCoder
-	GetLobStreamMode() config.LobFetch
-	GetLobReadMode() config.LobReadMode
-	GetTracer() trace.Tracer
-	GetSize() (int64, error)
+	StringCoder() converters.StringCoder
+	LobStreamMode() config.LobFetch
+	LobReadMode() config.LobReadMode
+	Tracer() trace.Tracer
+	Size() (int64, error)
 	Exists() (bool, error)
 	CreateTemporaryLocator(charsetID, charsetForm int) (Locator, error)
 	FreeTemporaryLocator() error
@@ -33,7 +33,7 @@ type OracleType interface {
 	SetValue(input any) error
 	Value() (any, error)
 	SetDataType(dt uint16)
-	GetDataType() uint16
-	GetMaxLen() int64
+	DataType() uint16
+	MaxLen() int64
 	sql.Scanner
 }

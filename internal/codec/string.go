@@ -36,12 +36,12 @@ func (param *StringParameter) Encode(input any, conn Conn) error {
 			param.CharsetForm = 2
 		}
 	}
-	conv, err := conn.GetStringCoder(param.CharsetID, param.CharsetForm)
+	conv, err := conn.StringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return err
 	}
 	if param.CharsetID == 0 {
-		param.CharsetID = conv.GetLangID()
+		param.CharsetID = conv.LangID
 	}
 	encoder := &types.String{
 		Conv: conv,
@@ -51,7 +51,7 @@ func (param *StringParameter) Encode(input any, conn Conn) error {
 	if err != nil {
 		return err
 	}
-	if dt := encoder.GetDataType(); dt != 0 {
+	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
 	param.BValue = encoder.Bytes()
@@ -59,25 +59,25 @@ func (param *StringParameter) Encode(input any, conn Conn) error {
 	length = max(length, param.MaxLen, param.MaxCharLen)
 	param.MaxLen = length
 	param.MaxCharLen = length
-	length = conn.GetMaxStringLength()
+	length = conn.MaxStringLength()
 	if param.MaxLen > length {
 		param.DataType = types.LongVarChar
 	} else {
 		param.DataType = types.NCHAR
 	}
-	if param.MaxLen < encoder.GetMaxLen() {
-		param.MaxLen = encoder.GetMaxLen()
+	if param.MaxLen < encoder.MaxLen() {
+		param.MaxLen = encoder.MaxLen()
 	}
 	return nil
 }
 
 func (param *StringParameter) Decode(conn Conn) (any, error) {
-	conv, err := conn.GetStringCoder(param.CharsetID, param.CharsetForm)
+	conv, err := conn.StringCoder(param.CharsetID, param.CharsetForm)
 	if err != nil {
 		return nil, err
 	}
 	if param.CharsetID == 0 {
-		param.CharsetID = conv.GetLangID()
+		param.CharsetID = conv.LangID
 	}
 	decoder := &types.String{
 		Conv: conv,
