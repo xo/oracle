@@ -62,10 +62,11 @@ yourself and do not write it as though it were settled.
 
 ## Layout
 
-- `/` is the driver, in package `go_ora` until step 4 of `docs/DESIGN.md`
-  renames it `oracle` (D8).
-- `configurations`, `types` and `aq` are public. Step 4 moves the first two
-  into the root package.
+- `/` is the driver, the package `oracle` (D8). `dsn.go` holds `Config` and
+  `ParseDSN`, `connector.go` the `Driver` and the `Connector`, and `errors.go`
+  the sentinel errors.
+- `types` and `aq` are public. Step 6 moves the values of `types` into the
+  root package.
 - `internal/` holds everything that a caller does not use, and the table in
   `docs/DESIGN.md`, under Packages, says what each package holds (D12).
 - `internal/repotest` holds the tests of the repository setup.

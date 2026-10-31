@@ -32,7 +32,7 @@ The code is a major rewrite focused on extensibility, modern Oracle features, an
 go get github.com/xo/oracle
 ```
 
-**Requires Go 1.24 or later**
+Requires Go 1.27.1 or later.
 
 ## Quick Start
 
@@ -48,7 +48,7 @@ import (
 )
 
 func main() {
-    db, err := sql.Open("oracle", "oracle://user:pass@host:1521/service")
+    db, err := sql.Open("oracle", "oracle://user:pass@host/service")
     if err != nil {
         log.Fatal(err)
     }
@@ -62,29 +62,62 @@ func main() {
 }
 ```
 
-## Connection Options
+## Connection options
+
+A DSN is a URL whose scheme is `oracle`:
 
 ```text
-oracle://USER:PASSWORD@HOST:PORT/SERVICE_NAME?PARAM1=value&PARAM2=value
+oracle://user:password@host:port/service/instance?key=value
 ```
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `USER` | Database username | -- |
-| `PASSWORD` | Database password | -- |
-| `SERVER` | Hostname or IP | -- |
-| `PORT` | Listener port | `1521` |
-| `SERVICE` | Oracle service name | -- |
-| `SSL` | Enable TLS | `false` |
-| `SSL VERIFY` | Verify server certificate | `true` |
-| `WALLET` | Path to Oracle wallet | -- |
-| `AUTH TYPE` | Authentication type (`KERBEROS`) | -- |
-| `FAST LOGIN` | Enable fast login optimization | `false` |
-| `TOKEN FILE` | Path to authentication token file | -- |
-| `TOKEN PRIVATE KEY FILE` | Path to token private key | -- |
-| `LOB READ` | `AUTO`/`IMPLICIT` (default) or `NO`/`EXPLICIT` | `AUTO` |
-| `TRACE DIR` | Directory for trace files | -- |
-| `CONNECT TIMEOUT` | Connection timeout | -- |
+The port is 1521 when the DSN names none. The path is the service name, and
+an instance name after it. A service name that holds a `/` is written as
+`%2F`. Every key is lower case. A key that the driver does not know is an
+error, and so is a key that appears twice, other than `server`. The DSN takes
+none of the key names of `go-ora`, such as `SSL VERIFY` or `SERVICE NAME`.
+
+| Key | Holds | Default |
+| --- | --- | --- |
+| `sid` | A SID, in place of a service name | none |
+| `descriptor` | A TNS descriptor, `(DESCRIPTION=...)`, in place of the host, the port and the path | none |
+| `server` | One more address, `host:port`. Repeat it for more | none |
+| `sslmode` | `disable`, `require`, `verify-ca` or `verify-full`, as in `pgx` | `disable` |
+| `sslrootcert`, `sslcert`, `sslkey` | The PEM files of the authority, and of the certificate and key of the client | none |
+| `sslservername` | The name to check the certificate against | the host |
+| `wallet`, `wallet_password` | A folder with `cwallet.sso` or `ewallet.p12`, and its password | none |
+| `timeout`, `connect_timeout` | Go durations, such as `30s` | none, and `60s` |
+| `prefetch` | The rows that one fetch asks for | `25` |
+| `lob_fetch`, `lob_read` | `inline` or `stream`, and `auto` or `explicit` | `inline`, `auto` |
+| `auth` | `password`, `os`, `kerberos` or `token` | `password` |
+| `privilege` | `sysdba`, `sysoper`, `sysasm`, `sysbackup`, `sysdg`, `syskm` or `sysrac` | none |
+| `token`, `token_key` | The files of a token and its private key | none |
+| `encryption`, `checksum` | `accepted`, `rejected`, `requested` or `required` | the server decides |
+| `language`, `territory`, `charset` | The NLS settings of the client | `AMERICAN`, `AMERICA` |
+| `program`, `proxy_user` | The program that the session reports, and a proxy user | none |
+| `unix_socket` | A Unix socket in place of TCP | none |
+
+A user named `SYS` gets no privilege by its name. Write `privilege=sysdba`.
+
+`ParseDSN` returns a `Config`. A caller that needs more than a DSN can say,
+such as a `*tls.Config`, a `Dialer` or a `*slog.Logger`, changes the `Config`
+and opens the database with a connector:
+
+```go
+cfg, err := oracle.ParseDSN(dsn)
+if err != nil {
+    return err
+}
+cfg.Dialer = myDialer
+c, err := oracle.NewConnector(cfg, oracle.WithSessionParam("nls_date_format", "'YYYY-MM-DD'"))
+if err != nil {
+    return err
+}
+db := sql.OpenDB(c)
+```
+
+Each connector holds the state of its own database: the session parameters,
+the registered types and the coders. Two databases in one process share none
+of it.
 
 ## New Types
 
@@ -130,7 +163,7 @@ The driver encodes and decodes Oracle Binary JSON (OSON) itself.
 input := types.Bool{}
 input.SetValue(true)
 
-db.Exec("BEGIN my_proc(:1, :2); END;", input, go_ora.Out{Dest: &message})
+db.Exec("BEGIN my_proc(:1, :2); END;", input, oracle.Out{Dest: &message})
 ```
 
 ## Advanced Queuing
@@ -161,31 +194,25 @@ Features: batch enqueue/dequeue, persistent and buffered delivery, visibility mo
 
 ```go
 // Register with array counterpart
-go_ora.RegisterType(db, "MY_OBJECT", "MY_ARRAY", MyStruct{})
+oracle.RegisterType(db, "MY_OBJECT", "MY_ARRAY", MyStruct{})
 
 // Register with explicit owner
-go_ora.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStruct{})
+oracle.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStruct{})
 ```
 
 Supports nested objects, collections (VARRAY, TABLE OF), and struct mapping via `udt` tags.
+A type registers with the database of `db` alone.
 
-## Session Parameters
-
-```go
-go_ora.AddSessionParam(db, "cursor_sharing", "force")
-go_ora.AddSessionParam(db, "nls_language", "arabic")
-go_ora.DelSessionParam(db, "nls_language")
-```
-
-Parameters persist across connections in the pool.
-
-## Custom Type Coders
+## Session parameters
 
 ```go
-go_ora.AddParameterCoder(db, reflect.TypeOf(MyType{}), MY_ORACLE_TYPE_ID, &MyCoder{})
+c, err := oracle.NewConnector(cfg,
+    oracle.WithSessionParam("cursor_sharing", "force"),
+    oracle.WithSessionParam("nls_language", "arabic"))
 ```
 
-Implement the `OracleParameterCoder` interface to add support for any Oracle type.
+The connector sets each parameter with `ALTER SESSION` on each connection
+after its logon.
 
 ## Architecture
 
@@ -226,10 +253,14 @@ oracle/
 | `github.com/sijms/go-ora/v2` | `github.com/xo/oracle` |
 | Types in driver package | Types in `github.com/xo/oracle/types` |
 | `go_ora/dbms.NewAQ` | `aq.CreateQueue` |
-| Manual UDT setup | `go_ora.RegisterType` with struct tags |
-| URL options for session params | `go_ora.AddSessionParam` / `DelSessionParam` |
+| Manual UDT setup | `oracle.RegisterType` with struct tags |
+| `go_ora.AddSessionParam` / `DelSessionParam` | `oracle.WithSessionParam` on the connector |
+| `go_ora.NewConnector(dsn)`, `Dialer`, `WithTLSConfig` | `oracle.NewConnector(cfg)` with `Config.Dialer` and `Config.TLS` |
+| `go_ora.AddParameterCoder`, `SetStringConverter`, `RegisterConnConfig` | Removed |
+| `go_ora.BuildUrl`, `BuildJDBC` | `Config.DSN` |
+| The package `go_ora` | The package `oracle` |
 
-Connection string format is compatible.
+The DSN is not compatible. See Connection options.
 
 ## Contributing
 

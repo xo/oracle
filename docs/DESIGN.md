@@ -135,11 +135,22 @@ DSN with `ParseDSN` and changes the result, and calls
 | Today | Design |
 | --- | --- |
 | `AddSessionParam(db, k, v)` | `WithSessionParam(k, v)`, a `ConnectorOption`, run after each logon |
-| `RegisterType(db, name, array, v)` | `WithType(name, array, v)`, a `ConnectorOption` |
+| `RegisterType(db, name, array, v)` | `WithType(name, array, v)`, a `ConnectorOption`. Until step 4b, `RegisterType` keeps its `*sql.DB`, and reaches the registry of that database alone through `db.Driver()` |
 | `AddParameterCoder(db, t, id, c)` | Removed until a caller needs it. A user defined type covers the case that issues name |
 | `SetStringConverter(db, ...)` | Removed. The server names the charset at logon, and the connection keeps it |
 | `WithTLSConfig(cfg)` | `Config.TLS`, a `*tls.Config` that the connector clones for each dial, which fixes sijms/go-ora#757 |
 | `RegisterConnConfig(cfg)` | Removed |
+
+Step 4 built this, with one difference. `Config` hands its values to the
+parser of `go-ora`, through `Config.connectionConfig`, because that parser
+holds the defaults and the checks that the exchanges were recorded with. So
+the driver sends the same packets as before, and the 30 exchanges prove it.
+Step 4b writes the configuration of the protocol code directly and deletes
+that parser.
+
+`Driver` is the value that `init` registers, and it holds nothing. Each
+`Connector` returns a `Driver` that points back at it, so a function that
+takes a `*sql.DB` reaches the state of that database through `db.Driver()`.
 
 `sql.Open` and `OpenConnector` never connect. The first network traffic is the
 first `Connect`, as in `cassandra`.
@@ -397,8 +408,13 @@ Each step leaves a driver that builds and passes its tests.
    transaction against each release, and write the fake server.
 3. Move the protocol code to `internal/`, with no change of behavior.
 4. Write the root package as this document says, as the package `oracle`:
-   `Driver`, `Connector`, `conn`, `stmt`, `rows`, `tx`, the DSN and the errors.
-   Delete the package variable.
+   `Driver`, `Connector`, `Config` with the DSN, and the errors. Delete the
+   package variable and the functions that take a `*sql.DB` for state.
+4b. Move the TTC code of the root package to `internal/ttc`, and unexport
+   `Connection`, `Stmt`, `DataSet`, `ParameterInfo` and the other types that
+   `go-ora` exported, as `conn`, `stmt`, `rows` and `tx`. Write the
+   configuration of the protocol code from `Config` directly, delete the
+   parser of `go-ora`, and replace `RegisterType` with `WithType`.
 5. Replace `StartContext` with deadlines and `context.AfterFunc`.
 6. Change the values to the table above, and add `RowsColumnScanner`.
 7. Move JSON and OSON to `encoding/json/v2`.
@@ -406,6 +422,6 @@ Each step leaves a driver that builds and passes its tests.
 9. Fix the upstream faults in `UPSTREAM.md`, each with a test.
 10. Tell the consumers about the package name and the keys of the DSN. They are
     `dburl`, `usql` and `dbmeta`. `dburl` staged a scheme on 2026-10-31 that
-    passes the old keys through, so it changes with step 4.
+    passes the query through, and it rechecks when the parser of step 4 lands.
 
 Steps 4 to 6 change what a caller sees. Nothing is tagged until they are done.

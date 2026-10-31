@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+
+	"github.com/xo/oracle"
 	"os"
 	"reflect"
 	"testing"
@@ -36,9 +38,10 @@ func dropMainTable(db *sql.DB) error {
 }
 
 // getDB opens the database that ORACLE_DSN names, with the keys of
-// urlOptions added to its query. It skips the test when ORACLE_DSN is empty.
-// dbrun prints the DSN of each release. See docs/DESIGN.md, under Testing.
-func getDB(t testing.TB) (*sql.DB, error) {
+// urlOptions added to its query, and with opts. It skips the test when
+// ORACLE_DSN is empty. dbrun prints the DSN of each release. See
+// docs/DESIGN.md, under Testing.
+func getDB(t testing.TB, opts ...oracle.ConnectorOption) (*sql.DB, error) {
 	t.Helper()
 	dsn := os.Getenv("ORACLE_DSN")
 	if dsn == "" {
@@ -53,7 +56,15 @@ func getDB(t testing.TB) (*sql.DB, error) {
 		q.Set(k, v)
 	}
 	u.RawQuery = q.Encode()
-	return sql.Open("oracle", u.String())
+	cfg, err := oracle.ParseDSN(u.String())
+	if err != nil {
+		return nil, err
+	}
+	c, err := oracle.NewConnector(cfg, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return sql.OpenDB(c), nil
 }
 
 func execCmd(db *sql.DB, stmts ...string) error {

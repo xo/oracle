@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 )
 
 // Servers speaking TNS protocol versions below 315 (e.g. Oracle 11g) reply

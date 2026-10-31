@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xo/oracle/configurations"
 	"github.com/xo/oracle/internal/auth/security"
+	"github.com/xo/oracle/internal/configurations"
 )
 
 type encryptService struct {

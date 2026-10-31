@@ -1,9 +1,8 @@
-package go_ora
+package oracle
 
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
@@ -18,8 +17,8 @@ import (
 	"time"
 
 	"github.com/xo/oracle/aq"
-	"github.com/xo/oracle/configurations"
 	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/lazyinit"
 	"github.com/xo/oracle/internal/trace"
 	"github.com/xo/oracle/types"
@@ -150,110 +149,8 @@ type ConnectionProperties struct {
 	dbServerTimeZone         *time.Location // equivalent to timezone of the server carry the database
 	dbServerTimeZoneExplicit *time.Location
 }
-type OracleConnector struct {
-	drv           *OracleDriver
-	connectString string
-	dialer        configurations.DialerContext
-	tlsConfig     *tls.Config
-	kerberos      configurations.KerberosAuthInterface
-	wallet        *configurations.Wallet
-}
 
-func NewConnector(connString string) driver.Connector {
-	return &OracleConnector{connectString: connString, drv: NewDriver()}
-}
-
-func (driver *OracleDriver) OpenConnector(connString string) (driver.Connector, error) {
-	// create hash from connection string
-	return &OracleConnector{drv: driver, connectString: connString}, nil
-}
-
-func (connector *OracleConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	conn, err := NewConnection(connector.connectString, connector.drv.connOption)
-	if err != nil {
-		return nil, err
-	}
-	conn.buildParameterCoderMap(connector.drv)
-	//conn.cusTyp = connector.drv.cusTyp
-	//"TCP negotiation for character set updates fails when multiple database connections
-	// with varying encodings coexist in the same process,
-	// due to the cloning of the character converter."
-	// eg. Chinese GBK and UTF8
-	// if connector.drv.sStrConv != nil {
-	// 	conn.sStrConv = connector.drv.sStrConv.Clone()
-	// }
-	// if connector.drv.nStrConv != nil {
-	// 	conn.nStrConv = connector.drv.nStrConv.Clone()
-	// }
-	if conn.connOption.Dialer == nil {
-		conn.connOption.Dialer = connector.dialer
-	}
-	if conn.connOption.TLSConfig == nil {
-		conn.connOption.TLSConfig = connector.tlsConfig
-	}
-	if conn.connOption.Kerberos == nil {
-		conn.connOption.Kerberos = connector.kerberos
-	}
-	if conn.connOption.Wallet == nil && connector.wallet != nil {
-		conn.connOption.Wallet = connector.wallet
-	}
-	err = conn.OpenWithContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	err = connector.drv.initFromConn(conn)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
-func (connector *OracleConnector) Driver() driver.Driver {
-	return connector.drv
-}
-
-func (connector *OracleConnector) Dialer(dialer configurations.DialerContext) {
-	connector.dialer = dialer
-}
-
-func (connector *OracleConnector) WithTLSConfig(config *tls.Config) {
-	connector.tlsConfig = config
-}
-
-func (connector *OracleConnector) WithWallet(reader io.Reader) error {
-	wallet, err := configurations.NewWalletFromReader(reader)
-	if err != nil {
-		return err
-	}
-	connector.wallet = wallet
-	return nil
-}
-
-// WithKerberosAuth sets the Kerberos authenticator to be used by this connector. It does not enable the Kerberos; set AUTH TYPE to KERBEROS to do so.
-func (connector *OracleConnector) WithKerberosAuth(auth configurations.KerberosAuthInterface) {
-	connector.kerberos = auth
-}
-
-// Open return a new open connection
-func (driver *OracleDriver) Open(name string) (driver.Conn, error) {
-	conn, err := NewConnection(name, driver.connOption)
-	if err != nil {
-		return nil, err
-	}
-	conn.buildParameterCoderMap(driver)
-	conn.cusTyp = driver.cusTyp
-	err = conn.Open()
-	if err != nil {
-		return nil, err
-	}
-	err = driver.initFromConn(conn)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
-func (conn *Connection) buildParameterCoderMap(drv *OracleDriver) {
+func (conn *Connection) buildParameterCoderMap(drv *registry) {
 	conn.goTypeCoder = drv.goTypeCoder
 	conn.nameTypeCoder = drv.nameTypeCoder
 	conn.oracleTypeCoder = drv.oracleTypeCoder
@@ -817,17 +714,10 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 }
 
 // NewConnection create a new connection from databaseURL string or configuration
-func NewConnection(databaseUrl string, config *configurations.ConnectionConfig) (*Connection, error) {
+func NewConnection(config *configurations.ConnectionConfig) (*Connection, error) {
 	var err error
-	if len(databaseUrl) > 0 {
-		config, err = ParseConfig(databaseUrl)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if config == nil {
-			return nil, errors.New("database url or configuration is required")
-		}
+	if config == nil {
+		return nil, errors.New("database url or configuration is required")
 	}
 	var token, tokenPrivateKey []byte
 	if len(config.TokenFile) > 0 {

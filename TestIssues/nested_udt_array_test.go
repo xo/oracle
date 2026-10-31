@@ -14,7 +14,7 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 	"time"
 )
@@ -168,7 +168,7 @@ BEGIN
 	v_child.child := childType2(6, 'child2_6', :ldate);
 	v_parent.CHILD := v_child;
 	:output := v_parent;
-END;`, sql.Named("ldate", refDate), sql.Named("output", go_ora.Out{Dest: &parent}))
+END;`, sql.Named("ldate", refDate), sql.Named("output", oracle.Out{Dest: &parent}))
 		if err != nil {
 			return err
 		}
@@ -226,7 +226,7 @@ begin
 	parent.child := v_child;
 	:output := parent;
 end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name),
-			sql.Named("ldate", input), sql.Named("output", go_ora.Out{Dest: &output}))
+			sql.Named("ldate", input), sql.Named("output", oracle.Out{Dest: &output}))
 		if err != nil {
 			return err
 		}
@@ -288,7 +288,7 @@ end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name)
 		parent.child := v_child;
 		:output := parent;
 	end;`, sql.Named("parents", parents), sql.Named("id", id), sql.Named("name", name),
-			sql.Named("ldate", refDate), sql.Named("output", go_ora.Out{Dest: &output}))
+			sql.Named("ldate", refDate), sql.Named("output", oracle.Out{Dest: &output}))
 		if err != nil {
 			return err
 		}
@@ -332,7 +332,7 @@ end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name)
 			v_parents(y) := v_parent;
 		end loop;
 		:output := v_parents;
-	END;`, sql.Named("ldate", refDate), sql.Named("output", go_ora.Out{Dest: &parents, Size: 10}))
+	END;`, sql.Named("ldate", refDate), sql.Named("output", oracle.Out{Dest: &parents, Size: 10}))
 		if err != nil {
 			return err
 		}
@@ -370,17 +370,17 @@ end;`, sql.Named("parent", parent), sql.Named("id", id), sql.Named("name", name)
 			t.Error(err)
 		}
 	}()
-	err = go_ora.RegisterType(db, "childType2", "childType2Col", typeChild2{})
+	err = oracle.RegisterType(db, "childType2", "childType2Col", typeChild2{})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	err = go_ora.RegisterType(db, "childType", "childTypeCol", typeChild{})
+	err = oracle.RegisterType(db, "childType", "childTypeCol", typeChild{})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	err = go_ora.RegisterType(db, "parentType", "parentTypeCol", typeParent{})
+	err = oracle.RegisterType(db, "parentType", "parentTypeCol", typeParent{})
 	if err != nil {
 		t.Error(err)
 		return

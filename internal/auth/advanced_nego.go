@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/xo/oracle/configurations"
 	"github.com/xo/oracle/internal/auth/security"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/trace"
 )

@@ -1,4 +1,4 @@
-package go_ora
+package oracle
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"github.com/xo/oracle/internal/utils"
 	oraTypes "github.com/xo/oracle/types"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/tns"
 )
 

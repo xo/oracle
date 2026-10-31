@@ -9,10 +9,34 @@ decided on the way (D3).
 
 ## Repository
 
-### Rename the package
+### Remove the state that the whole process shares
 
-D8 settled the name as `oracle`. The package is still `go_ora`, and step 4 of
-`DESIGN.md` renames it.
+Step 4 removed the package variable `oracleDriver` (D9). Four pieces of state
+for the whole process remain:
+
+- `auth.NTSAuth`, which `SetNTSAuth` sets, and which a configuration with an
+  OS password sets for every connection after it.
+- `auth.kerberosAuth`, a Kerberos authenticator for every connection.
+  `Config.Kerberos` sets one for each connector already.
+- `cookieStore` in `connection_cookie.go`, the fast login cookies. A cookie
+  changes the logon, and `ResetCookies` in `export_test.go` clears it for the
+  exchange tests.
+- `jsonEncoder` in `internal/codec/oson`, a map of encoders.
+
+Move each to the `Connector` or to the connection.
+
+### Stop printing on reconnect
+
+`connection.go` prints a line to standard output with `fmt.Printf` when it
+reconnects after a bad connection. The driver logs nothing (D14). Send it to
+`Config.Logger`, or return the error.
+
+### Write the configuration directly
+
+`Config.connectionConfig` writes the DSN of `go-ora` and parses it with
+`configurations.ParseConfig`, so that step 4 changed no packet. Step 4b writes
+the `ConnectionConfig` from `Config` directly, and deletes the old parser and
+its tests.
 
 ### Fix the decoding of intervals
 
@@ -69,11 +93,19 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 that it tested. The vectors of `converters/other_types_test.go`, now under `internal/`, moved to
 `types/vectors_test.go`.
 
-### Make 11g to 19c pass
+### Make TestIssues pass on every release
 
 `TestIssues` reads `ORACLE_DSN` and skips without it, and CI sets it from
-`dbrun dsn --json`. Nothing ran it against a server yet. Run it on every
-release, and fix or record each failure.
+`dbrun dsn --json`. On 2026-10-31 it ran against 26ai alone: 42 tests passed
+and 3 failed, the same 3 at `eb5e173` before step 4 and after it.
+
+- `TestColumnType`: `ColumnTypeDatabaseTypeName` returns "" for an `NCHAR`
+  column. sijms/go-ora#760 rewrites the column metadata.
+- `TestIssue543`: a query returns no row where the test expects one.
+- `TestTime`: a timestamp comes back in UTC and without its fraction of a
+  second. Step 6 of `DESIGN.md` changes the values of dates.
+
+Run it on the other five releases, and fix or record each failure.
 
 ### Make 19c start in CI
 

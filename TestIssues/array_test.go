@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"strings"
 	"testing"
 	"time"
@@ -100,13 +100,13 @@ func TestArray(t *testing.T) {
 	}
 
 	var query1 = func(db *sql.DB) error {
-		var cursor go_ora.RefCursor
+		var cursor oracle.RefCursor
 		// sql code take input array of integer and return a cursor that can be queried for result
 		_, err := db.Exec(`BEGIN GOORA_TEMP_PKG.TEST_GET1(:1, :2); END;`, []int64{1, 3, 5}, sql.Out{Dest: &cursor})
 		if err != nil {
 			return err
 		}
-		rows, err := go_ora.WrapRefCursor(context.Background(), db, &cursor)
+		rows, err := oracle.WrapRefCursor(context.Background(), db, &cursor)
 		if err != nil {
 			return err
 		}
@@ -171,9 +171,9 @@ func TestArray(t *testing.T) {
 		)
 		// note size here is important and equal to max number of items that array can accommodate
 		_, err := db.Exec(`BEGIN GOORA_TEMP_PKG.TEST_GET2(:1, :2, :3, :4); END;`,
-			[]int{1, 3, 4, 5, 7, 8}, go_ora.Out{Dest: &nameArray, Size: 10},
-			go_ora.Out{Dest: &valArray, Size: 10},
-			go_ora.Out{Dest: &dateArray, Size: 10})
+			[]int{1, 3, 4, 5, 7, 8}, oracle.Out{Dest: &nameArray, Size: 10},
+			oracle.Out{Dest: &valArray, Size: 10},
+			oracle.Out{Dest: &dateArray, Size: 10})
 		if err != nil {
 			return err
 		}
@@ -246,9 +246,9 @@ func TestArray(t *testing.T) {
 		)
 		// note size here is important and equal to max number of items that array can accommodate
 		_, err := db.Exec(`BEGIN GOORA_TEMP_PKG.test_empty_array(:1, :2, :3, :4); END;`,
-			[]int{1, 3, 5}, go_ora.Out{Dest: &nameArray, Size: 10},
-			go_ora.Out{Dest: &valArray, Size: 10},
-			go_ora.Out{Dest: &dateArray, Size: 10})
+			[]int{1, 3, 5}, oracle.Out{Dest: &nameArray, Size: 10},
+			oracle.Out{Dest: &valArray, Size: 10},
+			oracle.Out{Dest: &dateArray, Size: 10})
 		if err != nil {
 			return err
 		}

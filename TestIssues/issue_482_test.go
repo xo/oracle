@@ -3,7 +3,7 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 	"time"
 )
@@ -68,7 +68,7 @@ BEGIN
 END;`, (waitTime / time.Second), arraySize)
 		var nMessages sql.NullInt64
 		var messages []test1
-		_, err := db.Exec(sqlText, go_ora.Out{Dest: &nMessages}, go_ora.Out{Dest: &messages})
+		_, err := db.Exec(sqlText, oracle.Out{Dest: &nMessages}, oracle.Out{Dest: &messages})
 		return messages, err
 	}
 
@@ -94,7 +94,7 @@ END;`, (waitTime / time.Second), arraySize)
 			t.Error(err)
 		}
 	}()
-	err = go_ora.RegisterType(db, "test1", "test1collection", test1{})
+	err = oracle.RegisterType(db, "test1", "test1collection", test1{})
 	if err != nil {
 		t.Error(err)
 		return

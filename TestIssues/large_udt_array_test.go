@@ -3,7 +3,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -30,7 +30,7 @@ func TestLargeUDTArray(t *testing.T) {
 	BEGIN
 		inp := :1;
 		:2 := inp.count;
-	END;`, input, go_ora.Out{Dest: &length})
+	END;`, input, oracle.Out{Dest: &length})
 		return length, err
 	}
 	var outputPars = func(db *sql.DB, length int) ([]StringsType, error) {
@@ -50,7 +50,7 @@ func TestLargeUDTArray(t *testing.T) {
 
 		:2 := outp;
 	end;
-	`, length, go_ora.Out{Dest: &output})
+	`, length, oracle.Out{Dest: &output})
 		return output, err
 	}
 	db, err := getDB(t)
@@ -75,7 +75,7 @@ func TestLargeUDTArray(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	err = go_ora.RegisterType(db, "stringsType", "stringsTypeCol", StringsType{})
+	err = oracle.RegisterType(db, "stringsType", "stringsTypeCol", StringsType{})
 	if err != nil {
 		t.Error(err)
 		return

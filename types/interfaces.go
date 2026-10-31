@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/trace"
 )

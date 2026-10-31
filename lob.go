@@ -1,11 +1,11 @@
-package go_ora
+package oracle
 
 import (
 	"bytes"
 	"context"
 	"errors"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/trace"
 	ora_types "github.com/xo/oracle/types"

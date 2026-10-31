@@ -4,7 +4,7 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -39,14 +39,14 @@ END;`)
 				t.Error(err)
 			}
 		}()
-		_, err = s.Exec(1, 2, go_ora.Out{Dest: &result})
+		_, err = s.Exec(1, 2, oracle.Out{Dest: &result})
 		if err != nil {
 			return err
 		}
 		if result != 3 {
 			return fmt.Errorf("expected 3 but got %d", result)
 		}
-		_, err = s.Exec(4, 5, go_ora.Out{Dest: &result})
+		_, err = s.Exec(4, 5, oracle.Out{Dest: &result})
 		if err != nil {
 			return err
 		}
@@ -67,14 +67,14 @@ END;`)
 				t.Error(err)
 			}
 		}()
-		_, err = s.Exec("hello ", "world", go_ora.Out{Dest: &result, Size: 500})
+		_, err = s.Exec("hello ", "world", oracle.Out{Dest: &result, Size: 500})
 		if err != nil {
 			return err
 		}
 		if result != "hello world" {
 			return fmt.Errorf(`expected "hello world" but got "%s"`, result)
 		}
-		_, err = s.Exec("helloHELLO ", "worldWORLD", go_ora.Out{Dest: &result, Size: 500})
+		_, err = s.Exec("helloHELLO ", "worldWORLD", oracle.Out{Dest: &result, Size: 500})
 		if err != nil {
 			return err
 		}

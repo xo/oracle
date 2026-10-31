@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -59,8 +59,8 @@ func TestCustomBool(t *testing.T) {
 	var query2 = func(db *sql.DB) error {
 		var result string
 		var result2 OracleBool
-		_, err := db.Exec("BEGIN SELECT col1, col1 into :1, :2 FROM TB_420; END;", go_ora.Out{Dest: &result, Size: 10},
-			go_ora.Out{Dest: &result2, Size: 10})
+		_, err := db.Exec("BEGIN SELECT col1, col1 into :1, :2 FROM TB_420; END;", oracle.Out{Dest: &result, Size: 10},
+			oracle.Out{Dest: &result2, Size: 10})
 		if err != nil {
 			return err
 		}

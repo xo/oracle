@@ -2,7 +2,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -43,15 +43,15 @@ func TestCascadeType(t *testing.T) {
 			"drop type HK_GORA_ID_OBJ")
 	}
 	var registerTypes = func(db *sql.DB) error {
-		err := go_ora.RegisterType(db, "HK_GORA_ID_OBJ", "HK_GORA_ID_COLL", HkGoraIdObj{})
+		err := oracle.RegisterType(db, "HK_GORA_ID_OBJ", "HK_GORA_ID_COLL", HkGoraIdObj{})
 		if err != nil {
 			return err
 		}
-		err = go_ora.RegisterType(db, "HK_GORA_TEST_SUB_OBJ", "HK_GORA_TEST_SUB_COLL", HkGoraTestSubObj{})
+		err = oracle.RegisterType(db, "HK_GORA_TEST_SUB_OBJ", "HK_GORA_TEST_SUB_COLL", HkGoraTestSubObj{})
 		if err != nil {
 			return err
 		}
-		err = go_ora.RegisterType(db, "HK_GORA_TEST_OBJ", "HK_GORA_TEST_COLL", HkGoraTestObj{})
+		err = oracle.RegisterType(db, "HK_GORA_TEST_OBJ", "HK_GORA_TEST_COLL", HkGoraTestObj{})
 		if err != nil {
 			return err
 		}

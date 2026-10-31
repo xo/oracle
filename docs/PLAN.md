@@ -16,7 +16,7 @@ conclusion.
 | [D5](#d5-no-upstream-pull-request-is-merged-without-asking-ken) | Decided |
 | [D6](#d6-oracle-is-tested-against-databases-started-by-dbrun) | Decided |
 | [D7](#d7-ci-tests-three-operating-systems-and-every-oracle-release-dbmeta-knows) | Decided |
-| [D8](#d8-the-driver-follows-the-design-of-the-dbimp-drivers) | Proposed, the package name decided |
+| [D8](#d8-the-driver-follows-the-design-of-the-dbimp-drivers) | Proposed, the package name decided and built |
 | [D9](#d9-a-connector-holds-everything-that-belongs-to-one-database) | Proposed |
 | [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Proposed |
 | [D11](#d11-the-dsn-is-an-oracle-url-with-lower-case-keys) | Decided |
@@ -128,6 +128,11 @@ go. The session parameters, the registered types, the TLS configuration and
 the charsets belong to a `Connector` or to one connection. Two databases in one
 process then share nothing, which fixes sijms/go-ora#692.
 
+Step 4 deleted `oracleDriver`, `GetDefaultDriver`, `AddSessionParam`,
+`DelSessionParam`, `AddParameterCoder`, `SetStringConverter`,
+`RegisterConnConfig` and the root `ParseConfig`. Four pieces of state for the
+whole process remain, and `BACKLOG.md` lists them.
+
 ## D10. A context ends a round trip through deadlines and context.AfterFunc
 
 Status: Proposed.
@@ -161,6 +166,8 @@ drivers use `tls=true` with `insecure` or `validateservercertificate`, because
 each speaks HTTP, where TLS is one switch. Ken accepted these keys and values
 on 2026-10-31. `DESIGN.md` names every key. This
 changes what `dburl` sends, so `dburl` changes with it.
+
+Step 4 built `ParseDSN`, `Config` and `Config.DSN` on 2026-10-31.
 
 ## D12. The protocol code moves to internal
 

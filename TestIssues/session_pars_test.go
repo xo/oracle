@@ -2,12 +2,14 @@ package TestIssues
 
 import (
 	"bytes"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
 func TestSessionPars(t *testing.T) {
-	db, err := getDB(t)
+	db, err := getDB(t,
+		oracle.WithSessionParam("cursor_sharing", "force"),
+		oracle.WithSessionParam("nls_language", "arabic"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -18,18 +20,6 @@ func TestSessionPars(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	err = go_ora.AddSessionParam(db, "cursor_sharing", "force")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer go_ora.DelSessionParam(db, "cursor_sharing")
-	err = go_ora.AddSessionParam(db, "nls_language", "arabic")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer go_ora.DelSessionParam(db, "nls_language")
 	_, err = db.Exec("INSERT INTO TEST_S(ID, name) VALUES(1, 's')")
 	if err != nil {
 		expected := []byte{79, 82, 65, 45, 48, 48, 57, 52, 50, 58, 32, 216, 167, 217,

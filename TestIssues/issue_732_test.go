@@ -9,10 +9,7 @@ import (
 // EOF errors on the second (and subsequent) physical connections.
 // See: https://github.com/sijms/go-ora/issues/732
 func TestIssue732(t *testing.T) {
-	// FastLogin is on by default; we explicitly ensure it is not disabled
-	// so this test exercises the cookie-replay path.
-	urlOptions["FAST LOGIN"] = "true"
-	defer delete(urlOptions, "FAST LOGIN")
+	// FastLogin is always on, so this test exercises the cookie-replay path.
 
 	db, err := getDB(t)
 	if err != nil {

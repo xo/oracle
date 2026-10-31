@@ -1,7 +1,7 @@
 package TestIssues
 
 import (
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 	"time"
 )
@@ -31,7 +31,7 @@ func TestIssue307(t *testing.T) {
 	}()
 	var id int
 	_, err = db.Exec("INSERT INTO TTB_MAIN(ID, NAME, LDATE) VALUES(:1, :2, :3) RETURNING ID INTO :4",
-		1, "TEST", time.Now(), go_ora.Out{Dest: &id})
+		1, "TEST", time.Now(), oracle.Out{Dest: &id})
 	if err != nil {
 		t.Error(err)
 		return

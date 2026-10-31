@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 )
 
 type Lob interface {

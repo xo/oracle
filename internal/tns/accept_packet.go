@@ -3,7 +3,7 @@ package tns
 import (
 	"encoding/binary"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 )
 
 // type AcceptPacket Packet

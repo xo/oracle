@@ -2,7 +2,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -57,11 +57,11 @@ end;`)
 	}
 
 	var registerTypes = func(db *sql.DB) error {
-		err := go_ora.RegisterType(db, "HK_GORA_ID_OBJ", "HK_GORA_ID_COLL", HkGoraIdObj{})
+		err := oracle.RegisterType(db, "HK_GORA_ID_OBJ", "HK_GORA_ID_COLL", HkGoraIdObj{})
 		if err != nil {
 			return err
 		}
-		err = go_ora.RegisterType(db, "HK_GORA_TEST_OBJ", "HK_GORA_TEST_COLL", HkGoraTestObj{})
+		err = oracle.RegisterType(db, "HK_GORA_TEST_OBJ", "HK_GORA_TEST_COLL", HkGoraTestObj{})
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ end;`)
 	var executeTest = func(db *sql.DB, anzChars int) error {
 		var res []HkGoraTestObj
 		_, err := db.Exec(`BEGIN :1 := HK_GORA_TEST_PCK.F_GetData(:2, :3); END;`,
-			go_ora.Out{Dest: &res, Size: 2},
+			oracle.Out{Dest: &res, Size: 2},
 			[]HkGoraIdObj{{Id: 1}, {Id: 2}},
 			anzChars)
 		return err

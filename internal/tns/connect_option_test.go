@@ -3,7 +3,7 @@ package tns
 import (
 	"testing"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 )
 
 func TestExtractServers(t *testing.T) {

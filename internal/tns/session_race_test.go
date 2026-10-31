@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/trace"
 )
 

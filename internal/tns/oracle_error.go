@@ -2,9 +2,32 @@ package tns
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 )
 
+// Error is the type of a sentinel error. The root package names it Error too,
+// so that a sentinel compares the same from either package.
+type Error string
+
+// Error satisfies the error interface.
+func (err Error) Error() string {
+	return string(err)
+}
+
+// ErrAuthentication is a server that refused the credential: a wrong user or
+// password, a wrong key or a wrong token. It never matches a refusal for lack
+// of a permission.
+const ErrAuthentication Error = "authentication refused"
+
+// authCodes are the codes of the errors that refuse a credential.
+var authCodes = []int{
+	1005,  // null password given
+	1017,  // invalid username or password
+	28041, // authentication protocol internal error
+}
+
+// OracleError is an error that the server returned, with its ORA code.
 type OracleError struct {
 	ErrCode int
 	ErrMsg  string
@@ -26,6 +49,12 @@ func (err *OracleError) Error() string {
 	}
 	//return err.ErrMsg
 	return output
+}
+
+// Is reports whether target is ErrAuthentication and the server refused the
+// credential.
+func (err *OracleError) Is(target error) bool {
+	return target == ErrAuthentication && slices.Contains(authCodes, err.ErrCode)
 }
 
 // ErrPos return sql error position。

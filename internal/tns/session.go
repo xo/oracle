@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 
 	"github.com/xo/oracle/internal/trace"
 
@@ -314,7 +314,12 @@ func (session *Session) negotiate() {
 	host := connOption.GetActiveServer(false)
 
 	if tlsConfig := connOption.TLSConfig; tlsConfig != nil {
-		tlsConfig.ServerName = host.Addr
+		// a copy, so that the configuration of the caller does not change,
+		// which fixes sijms/go-ora#757
+		tlsConfig = tlsConfig.Clone()
+		if tlsConfig.ServerName == "" {
+			tlsConfig.ServerName = host.Addr
+		}
 		sslConn := tls.Client(session.conn, tlsConfig)
 		session.mu.Lock()
 		session.sslConn = sslConn

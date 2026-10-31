@@ -2,7 +2,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -37,7 +37,7 @@ END GOORA_TEMP_PKG;`,
 	var string_out string
 	var callProc = func(db *sql.DB, string_in []string) (string, error) {
 		_, err := db.Exec("BEGIN GOORA_TEMP_PKG.TEST_PROC(:1, :2); END;", string_in,
-			go_ora.Out{Dest: &string_out, Size: 256})
+			oracle.Out{Dest: &string_out, Size: 256})
 		if err != nil {
 			return "", err
 		}

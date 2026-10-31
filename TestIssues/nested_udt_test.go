@@ -3,7 +3,7 @@ package TestIssues
 import (
 	"database/sql"
 	"fmt"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"strings"
 	"testing"
 	"time"
@@ -197,7 +197,7 @@ END TP_NESTED_UDT;`)
 		v_main := :1;
 		v_main.Num := v_main.Num + 10;
 		:2 := v_main;
-    END;`, input, go_ora.Out{Dest: &output})
+    END;`, input, oracle.Out{Dest: &output})
 		if err != nil {
 			return err
 		}
@@ -220,7 +220,7 @@ END TP_NESTED_UDT;`)
 	}
 	var callProc = func(db *sql.DB) error {
 		var output []mainS
-		_, err := db.Exec(`BEGIN TP_NESTED_UDT(10, :1); END;`, go_ora.Out{Dest: &output, Size: 100})
+		_, err := db.Exec(`BEGIN TP_NESTED_UDT(10, :1); END;`, oracle.Out{Dest: &output, Size: 100})
 		if err != nil {
 			return err
 		}
@@ -254,17 +254,17 @@ END TP_NESTED_UDT;`)
 			t.Error(err)
 		}
 	}()
-	err = go_ora.RegisterType(db, "subType2", "", sub2{})
+	err = oracle.RegisterType(db, "subType2", "", sub2{})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	err = go_ora.RegisterType(db, "subType1", "", sub1{})
+	err = oracle.RegisterType(db, "subType1", "", sub1{})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	err = go_ora.RegisterType(db, "mainType", "mainTypeCol", mainS{})
+	err = oracle.RegisterType(db, "mainType", "mainTypeCol", mainS{})
 	if err != nil {
 		t.Error(err)
 		return

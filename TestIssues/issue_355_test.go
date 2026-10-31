@@ -2,7 +2,7 @@ package TestIssues
 
 import (
 	"database/sql"
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"testing"
 )
 
@@ -62,7 +62,7 @@ END GOORA_TEMP;`)
 	}
 	var call_StringArray = func(db *sql.DB, input []string) error {
 		var output sql.NullInt64
-		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY2(:1, :2); END;", input, go_ora.Out{Dest: &output})
+		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY2(:1, :2); END;", input, oracle.Out{Dest: &output})
 		return err
 	}
 	var call_StringPointerArray = func(db *sql.DB, input []*string) error {

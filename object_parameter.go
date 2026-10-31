@@ -1,4 +1,4 @@
-package go_ora
+package oracle
 
 import (
 	"bytes"
@@ -69,7 +69,10 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, owner, name string)
 		attTypeName sql.NullString
 		length      sql.NullInt64
 	)
-	drv := db.Driver().(*OracleDriver)
+	drv, err := registryOf(db)
+	if err != nil {
+		return err
+	}
 	param.attribs = make(map[string]codec.OracleParameterCoder)
 	for rows.Next() {
 		err = rows.Scan(&attName, &attTypeName, &length, &attOrder)

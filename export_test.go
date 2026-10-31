@@ -1,4 +1,4 @@
-package go_ora
+package oracle
 
 // ResetCookies forgets the fast login cookie of every server. The store is
 // one for the whole process, so a test that compares the packets of a logon

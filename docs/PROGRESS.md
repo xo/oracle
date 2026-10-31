@@ -21,11 +21,16 @@ connection and plays them back over a `net.Pipe`. `exchange_test.go` holds
 five scenarios, recorded under `testdata/exchanges/` against 11g, 18c, 19c,
 21c, 23ai and 26ai. `TestExchanges` plays all 30 back with no server.
 
-Step 3 is done and staged. Every package that a caller does not use moved
-under `internal/`, with only its import path, its package name and the
-qualifiers that name it changed. `DESIGN.md`, under Packages, maps each old
-package to its new place. The 30 exchanges pass after the move.
+Step 3 is done (`eb5e173`). Every package that a caller does not use moved
+under `internal/`, and the 30 exchanges passed after the move.
 
-The next step is step 4: write the root package as `DESIGN.md` says, as the
-package `oracle`, with the `Connector`, the DSN and the errors, and delete the
-package variable.
+Step 4 is done and staged. The package is `oracle`. `ParseDSN`, `Config` and
+`Config.DSN` read and write the DSN of D11. `Driver` holds nothing, and each
+`Connector` holds the state of one database. The package variable and the
+functions that kept state through a `*sql.DB` are gone, except `RegisterType`,
+which now reaches its own database alone. `configurations` moved to
+`internal/configurations`. `Config` still hands its values to the parser of
+`go-ora`, so the 30 exchanges pass with no new recording.
+
+The next step is step 4b: move the TTC code to `internal/ttc`, unexport the
+types that `go-ora` exported, and write the configuration directly.

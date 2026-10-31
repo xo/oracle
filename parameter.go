@@ -1,12 +1,12 @@
-package go_ora
+package oracle
 
 import (
 	"database/sql/driver"
 	"math"
 	"strings"
 
-	"github.com/xo/oracle/configurations"
 	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/configurations"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/types"

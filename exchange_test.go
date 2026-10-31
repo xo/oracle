@@ -1,4 +1,4 @@
-package go_ora_test
+package oracle_test
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"maps"
-	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	go_ora "github.com/xo/oracle"
+	"github.com/xo/oracle"
 	"github.com/xo/oracle/internal/tnstest"
 )
 
@@ -32,14 +31,17 @@ import (
 // See D15 and docs/DESIGN.md, under Testing.
 var record = flag.Bool("record", false, "record the exchanges against ORACLE_DSN into testdata/exchanges/$ORACLE_RELEASE")
 
-// exchangeHost is the address that every recorded connection names. The
-// connect packet holds it, so a fixed one keeps the packets the same on
-// every machine.
-const exchangeHost = "oracle.test:1521"
+// exchangeHost and exchangePort are the address that every recorded
+// connection names. The connect packet holds it, so a fixed one keeps the
+// packets the same on every machine.
+const (
+	exchangeHost = "oracle.test"
+	exchangePort = 1521
+)
 
-// exchangeCID is the client identity that every recorded connection sends,
-// in place of the program, the host and the user of the machine.
-const exchangeCID = "(CID=(PROGRAM=oracle.test)(HOST=oracle.test)(USER=oracle))"
+// exchangeClient is the client identity that every recorded connection
+// sends, in place of the program, the host and the user of the machine.
+var exchangeClient = oracle.Client{Program: "oracle.test", Host: "oracle.test", User: "oracle"}
 
 // scenario runs statements on db and returns one line for each fact that a
 // test compares.
@@ -185,25 +187,20 @@ func scanLines(rows *sql.Rows) ([]string, error) {
 }
 
 // openExchange opens a database whose connections dial through dialer, at
-// the fixed address of a recording.
-func openExchange(t *testing.T, dsn string, dialer interface {
-	DialContext(context.Context, string, string) (net.Conn, error)
-},
-) *sql.DB {
+// the fixed address and with the fixed client identity of a recording.
+func openExchange(t *testing.T, dsn string, dialer oracle.Dialer) *sql.DB {
 	t.Helper()
-	u, err := url.Parse(dsn)
+	cfg, err := oracle.ParseDSN(dsn)
 	if err != nil {
 		t.Fatalf("parsing the dsn: %v", err)
 	}
-	u.Host = exchangeHost
-	q := u.Query()
-	q.Set("CID", exchangeCID)
-	u.RawQuery = q.Encode()
-	conn, ok := go_ora.NewConnector(u.String()).(*go_ora.OracleConnector)
-	if !ok {
-		t.Fatal("NewConnector does not return an *OracleConnector")
+	cfg.Host, cfg.Port = exchangeHost, exchangePort
+	cfg.Client = exchangeClient
+	cfg.Dialer = dialer
+	conn, err := oracle.NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
 	}
-	conn.Dialer(dialer)
 	db := sql.OpenDB(conn)
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -228,7 +225,7 @@ func TestRecordExchanges(t *testing.T) {
 	}
 	for _, name := range slices.Sorted(maps.Keys(scenarios)) {
 		t.Run(name, func(t *testing.T) {
-			go_ora.ResetCookies()
+			oracle.ResetCookies()
 			rec := &tnstest.Recorder{Addr: u.Host}
 			db := openExchange(t, dsn, rec)
 			lines, err := scenarios[name](t.Context(), db)
@@ -291,7 +288,7 @@ func TestExchanges(t *testing.T) {
 				Host:   exchangeHost,
 				Path:   "/" + ex.Note("service"),
 			}).String()
-			go_ora.ResetCookies()
+			oracle.ResetCookies()
 			player := tnstest.NewPlayer(ex)
 			db := openExchange(t, dsn, player)
 			got, err := run(t.Context(), db)

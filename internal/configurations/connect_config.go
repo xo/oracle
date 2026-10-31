@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +53,19 @@ type ConnectionConfig struct {
 	FastLogin           bool
 	TokenFile           string
 	TokenPrivateKeyFile string
+}
+
+// Clone returns a copy of config that shares no slice and no TLS
+// configuration with it, because a connection changes its copy as it
+// connects.
+func (config *ConnectionConfig) Clone() *ConnectionConfig {
+	c := *config
+	c.Servers = slices.Clone(config.Servers)
+	c.AuthService = slices.Clone(config.AuthService)
+	if config.TLSConfig != nil {
+		c.TLSConfig = config.TLSConfig.Clone()
+	}
+	return &c
 }
 
 func (config *ConnectionConfig) ConnectionData() string {

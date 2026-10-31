@@ -1,4 +1,4 @@
-package go_ora
+package oracle
 
 import (
 	"database/sql/driver"
@@ -6,7 +6,7 @@ import (
 	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/types"
 
-	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/internal/configurations"
 )
 
 type RefCursor struct {

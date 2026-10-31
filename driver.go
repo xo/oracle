@@ -1,35 +1,29 @@
-package go_ora
+package oracle
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/xo/oracle/configurations"
-	"github.com/xo/oracle/internal/auth"
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/codec/oson"
-	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/types"
 )
 
-type OracleDriver struct {
+// registry holds the type coders and the registered types of one database.
+// Each Connector has its own, so that two databases share none of it (D9).
+type registry struct {
 	dataCollected   bool
 	oracleTypeCoder map[uint16]codec.OracleParameterCoder
 	goTypeCoder     map[reflect.Type]codec.OracleParameterCoder
 	nameTypeCoder   map[string]codec.OracleParameterCoder
 	jsonEncoder     map[reflect.Type]oson.FieldEncoder
 	cusTyp          map[string]types.Object
-	sessionParam    map[string]string
 	mu              sync.Mutex
-	sStrConv        converters.IStringConverter
-	nStrConv        converters.IStringConverter
 	UserId          string
-	connOption      *configurations.ConnectionConfig
 	// Server    string
 	// Port      int
 	// Instance  string
@@ -40,34 +34,23 @@ type OracleDriver struct {
 	// SerialNum int
 }
 
-func NewDriver() *OracleDriver {
-	drv := &OracleDriver{
+func newRegistry() *registry {
+	drv := &registry{
 		goTypeCoder:     make(map[reflect.Type]codec.OracleParameterCoder),
 		oracleTypeCoder: make(map[uint16]codec.OracleParameterCoder),
 		nameTypeCoder:   make(map[string]codec.OracleParameterCoder),
 		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
-		cusTyp:       map[string]types.Object{},
-		sessionParam: map[string]string{},
+		cusTyp: map[string]types.Object{},
 	}
 	drv.init()
 	return drv
 }
 
-var oracleDriver = NewDriver()
-
-type GetDriverInterface interface {
-	Driver() driver.Driver
-}
-
 func init() {
-	sql.Register("oracle", oracleDriver)
+	sql.Register("oracle", Driver{})
 }
 
-func GetDefaultDriver() *OracleDriver {
-	return oracleDriver
-}
-
-func (driver *OracleDriver) init() {
+func (driver *registry) init() {
 	// add basic type decoders here
 	driver.oracleTypeCoder[types.NCHAR] = &codec.StringParameter{}
 	driver.oracleTypeCoder[types.CHAR] = &codec.StringParameter{}
@@ -176,62 +159,20 @@ func (driver *OracleDriver) init() {
 	}
 }
 
-func (driver *OracleDriver) initFromConn(conn *Connection) error {
+// initFromConn records the user of the first connection, which RegisterType
+// takes as the owner of a type, and sets the session parameters of the
+// connector on conn.
+func (driver *registry) initFromConn(conn *Connection, params []sessionParam) error {
 	driver.mu.Lock()
-	defer driver.mu.Unlock()
 	if !driver.dataCollected {
 		driver.UserId = conn.connOption.UserID
-		if driver.sStrConv == nil {
-			driver.sStrConv = conn.sStrConv.Clone()
-		}
-		if driver.nStrConv == nil {
-			driver.nStrConv = conn.nStrConv.Clone()
-		}
-		if driver.connOption == nil {
-			driver.connOption = new(configurations.ConnectionConfig)
-			*driver.connOption = *conn.connOption
-		}
 		driver.dataCollected = true
 	}
-
-	// update session parameters
-	var err error
-	for key, value := range driver.sessionParam {
-		_, err = conn.Exec(fmt.Sprintf("alter session set %s=%s", key, value))
-		if err != nil {
-			return err
+	driver.mu.Unlock()
+	for _, p := range params {
+		if _, err := conn.Exec(fmt.Sprintf("alter session set %s=%s", p.key, p.value)); err != nil {
+			return fmt.Errorf("setting the session parameter %s: %w", p.key, err)
 		}
-	}
-	return err
-}
-
-// SetStringConverter this function is used to set a custom string converter interface
-// that will be used to encode and decode strings and bytearrays
-// passing nil will use driver string converter for supported langs
-func SetStringConverter(db GetDriverInterface, charset, nCharset converters.IStringConverter) {
-	if drv, ok := db.Driver().(*OracleDriver); ok {
-		drv.sStrConv = charset
-		drv.nStrConv = nCharset
-	}
-}
-
-func DelSessionParam(db *sql.DB, key string) {
-	if drv, ok := db.Driver().(*OracleDriver); ok {
-		drv.mu.Lock()
-		defer drv.mu.Unlock()
-		delete(drv.sessionParam, key)
-	}
-}
-
-func AddSessionParam(db *sql.DB, key, value string) error {
-	_, err := db.Exec(fmt.Sprintf("alter session set %s=%s", key, value))
-	if err != nil {
-		return err
-	}
-	if drv, ok := db.Driver().(*OracleDriver); ok {
-		drv.mu.Lock()
-		defer drv.mu.Unlock()
-		drv.sessionParam[key] = value
 	}
 	return nil
 }
@@ -272,17 +213,6 @@ func AddSessionParam(db *sql.DB, key, value string) error {
 //	}
 //	return errors.New("the driver used is not a go-ora driver type")
 //}
-
-func AddParameterCoder(db *sql.DB, go_type reflect.Type, oracle_type uint16, coder codec.OracleParameterCoder) error {
-	if drv, ok := db.Driver().(*OracleDriver); ok {
-		drv.mu.Lock()
-		drv.oracleTypeCoder[oracle_type] = coder
-		drv.goTypeCoder[go_type] = coder
-		drv.mu.Unlock()
-		return nil
-	}
-	return errors.New("the driver used is not a go-ora driver type")
-}
 
 // func RegisterRegularTypeArray(conn *sql.DB, regularTypeName, arrayTypeName string, itemMaxSize int) error {
 // 	err := conn.Ping()
@@ -370,10 +300,11 @@ func RegisterType(db *sql.DB, typeName, arrayTypeName string, typeObj any) error
 		return err
 	}
 
-	if drv, ok := db.Driver().(*OracleDriver); ok {
-		return RegisterTypeWithOwner(db, drv.UserId, typeName, arrayTypeName, typeObj)
+	drv, err := registryOf(db)
+	if err != nil {
+		return err
 	}
-	return errors.New("the driver used is not a go-ora driver type")
+	return RegisterTypeWithOwner(db, drv.UserId, typeName, arrayTypeName, typeObj)
 }
 
 func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, typeObj any) error {
@@ -382,7 +313,10 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 	}
 	typeName = strings.TrimSpace(typeName)
 	arrayTypeName = strings.TrimSpace(arrayTypeName)
-	drv := db.Driver().(*OracleDriver)
+	drv, err := registryOf(db)
+	if err != nil {
+		return err
+	}
 
 	//if typeObj == nil {
 	//	return errors.New("type object cannot be nil")
@@ -407,8 +341,6 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 		return errors.New("typeName shouldn't be empty")
 	}
 	// process object first
-
-	var err error
 	arrayParam, ok := drv.nameTypeCoder[strings.ToUpper(typeName)]
 	if !ok {
 		// we should add this type as new type
@@ -629,22 +561,11 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 	//return nil
 }
 
-func ParseConfig(dsn string) (*configurations.ConnectionConfig, error) {
-	config, err := configurations.ParseConfig(dsn)
-	if err != nil {
-		return nil, err
+// registryOf returns the registry of the connector of db.
+func registryOf(db *sql.DB) (*registry, error) {
+	d, ok := db.Driver().(Driver)
+	if !ok || d.c == nil {
+		return nil, fmt.Errorf("finding the registry: the database does not use this driver: %w", ErrNotSupported)
 	}
-	if len(config.OSPassword) > 0 {
-		SetNTSAuth(&auth.NTSAuthHash{})
-	}
-	return config, nil
-	// connStr, err := newConnectionStringFromUrl(dsn)
-	//i f err != nil {
-	// 	return nil, err
-	// }
-	// return &connStr.connOption, nil
-}
-
-func RegisterConnConfig(config *configurations.ConnectionConfig) {
-	oracleDriver.connOption = config
+	return d.c.reg, nil
 }
