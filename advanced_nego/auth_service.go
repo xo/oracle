@@ -2,6 +2,8 @@ package advanced_nego
 
 import (
 	"errors"
+
+	"github.com/xo/oracle/configurations"
 )
 
 type authService struct {
@@ -11,13 +13,13 @@ type authService struct {
 	active      bool
 }
 
-func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
+func newAuthService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (*authService, error) {
 	output := &authService{
 		defaultService: defaultService{
-			comm:        comm,
+			ano:         ano,
 			serviceType: 1,
 			level:       -1,
-			version:     0xB200200,
+			version:     version,
 		},
 		status: 0xFCFF,
 	}
@@ -31,7 +33,6 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	//	output.availableServiceIDs = []int{1, 2}
 	//}
 	//str :=  ""
-	connOption := comm.session.Context.ConnOption
 	//for
 	//if connOption != nil {
 	//	snConfig := connOption.SNOConfig
@@ -44,7 +45,7 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 	//	}
 	//}
 	//level := conops.Encryption != null ? conops.Encryption : snoConfig[];
-	err := output.buildServiceList(connOption.AuthService, false, false)
+	err := output.buildServiceList(negoInfo.AuthService, false, false)
 	// output.selectedServ, err = output.validate(strings.Split(str,","), true)
 	if err != nil {
 		return nil, err
@@ -60,7 +61,7 @@ func NewAuthService(comm *AdvancedNegoComm) (*authService, error) {
 
 func (serv *authService) writeServiceData() error {
 	serv.writeHeader(3 + (len(serv.selectedIndices) * 2))
-	comm := serv.comm
+	comm := serv.ano.comm
 	comm.writeVersion(serv.getVersion())
 	comm.writeUB2(0xE0E1)
 	comm.writeStatus(serv.status)
@@ -75,7 +76,7 @@ func (serv *authService) writeServiceData() error {
 func (serv *authService) readServiceData(subPacketNum int) error {
 	// read version
 	var err error
-	comm := serv.comm
+	comm := serv.ano.comm
 	serv.version, err = comm.readVersion()
 	if err != nil {
 		return err

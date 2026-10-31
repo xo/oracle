@@ -1,0 +1,159 @@
+# Tests oracle on every push and pull request. See D7 in docs/PLAN.md.
+#
+# The unit job runs on the three operating systems, because the driver is pure
+# Go and a consumer builds it on each of them. It opens no database connection.
+#
+# The oracle job runs the integration tests against every Oracle release that
+# dbmeta knows about. dbrun, the tool of dbmeta, starts each release as a
+# container, and it is the only thing that does (D6). Containers need Docker
+# with Linux containers, and only the ubuntu runner has it. The macOS and
+# Windows runners cannot start an Oracle server, so they run the unit job only.
+#
+# The list of releases is read from dbrun and is not written here, so this
+# file cannot drift from dbmeta.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # every night, because a release image can change without a push
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "these files are not formatted:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Build without cgo
+        env:
+          CGO_ENABLED: "0"
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        env:
+          CGO_ENABLED: "0"
+        run: go test -count=2 ./...
+
+  releases:
+    name: Read the Oracle releases
+    runs-on: ubuntu-latest
+    outputs:
+      servers: ${{ steps.list.outputs.servers }}
+    steps:
+      - name: Check out dbmeta
+        uses: actions/checkout@v5
+        with:
+          repository: xo/dbmeta
+          path: dbmeta
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: dbmeta/go.mod
+          check-latest: true
+          cache-dependency-path: dbmeta/test/go.sum
+
+      - name: Build dbrun
+        working-directory: dbmeta/test
+        run: |
+          mkdir -p "${{ runner.temp }}/bin"
+          go build -o "${{ runner.temp }}/bin/dbrun" ./cmd/dbrun
+
+      # Every tier, because every release that dbmeta names is tested here.
+      - name: Read the list
+        id: list
+        run: |
+          servers=$("${{ runner.temp }}/bin/dbrun" list --json --names all | jq -c 'map(select(startswith("oracle-")))')
+          echo "servers=$servers" >> "$GITHUB_OUTPUT"
+
+      - name: Upload dbrun
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbrun
+          path: ${{ runner.temp }}/bin/dbrun
+          retention-days: 1
+          if-no-files-found: error
+
+  oracle:
+    name: ${{ matrix.server }}
+    needs: releases
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server: ${{ fromJSON(needs.releases.outputs.servers) }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Download dbrun
+        uses: actions/download-artifact@v4
+        with:
+          name: dbrun
+          path: ${{ runner.temp }}/bin
+
+      - name: Make it executable
+        run: chmod +x "${{ runner.temp }}/bin/dbrun"
+
+      # dbrun waits for a real connection before it returns.
+      - name: Start ${{ matrix.server }}
+        env:
+          DBMETA_RUNNER: docker
+          DBMETA_OWNER_NAME: ci
+        run: |
+          "${{ runner.temp }}/bin/dbrun" start "${{ matrix.server }}"
+          echo "ORACLE_DSN=$("${{ runner.temp }}/bin/dbrun" dsn "${{ matrix.server }}")" >> "$GITHUB_ENV"
+
+      - name: Test against ${{ matrix.server }}
+        run: go test -count=1 ./TestIssues/...
+
+      - name: Show the server log on failure
+        if: failure()
+        env:
+          DBMETA_RUNNER: docker
+        run: '"${{ runner.temp }}/bin/dbrun" logs "${{ matrix.server }}"'
+
+      - name: Remove ${{ matrix.server }}
+        if: always()
+        env:
+          DBMETA_RUNNER: docker
+        run: '"${{ runner.temp }}/bin/dbrun" remove "${{ matrix.server }}"'

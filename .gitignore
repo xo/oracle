@@ -1,5 +1,2 @@
-.vscode
-*.exe
-*.log
-.DS_Store
-.idea/
+coverage.out
+.claude/settings.local.json

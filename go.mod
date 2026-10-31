@@ -1,4 +1,3 @@
-module github.com/sijms/go-ora
+module github.com/xo/oracle
 
-go 1.18
-
+go 1.24

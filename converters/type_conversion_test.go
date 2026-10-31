@@ -82,6 +82,14 @@ func TestEncodeInt64(t *testing.T) {
 	}
 }
 
+func TestEncodeUint64(t *testing.T) {
+	var x uint64 = 0xFFFFFFFFFFFFFFFE
+	intVal := EncodeInt64(int64(x))
+	uintVal := EncodeUint64(x)
+	t.Logf("Enode int64: %#v", intVal)
+	t.Logf("Encode uint64: %#v", uintVal)
+}
+
 func TestEncodeInt(t *testing.T) {
 	for _, tt := range TestFloatValue {
 		// Test only with interger values
@@ -141,3 +149,17 @@ func TestEncodeDouble(t *testing.T) {
 // 		t.Errorf("EncodeDate(%v) = %v, want %v", ti, got, want)
 // 	}
 // }
+
+func TestDecodeDate(t *testing.T) {
+	// 57 3c
+	// 0001
+	// 0101
+	// data := []byte{0x78, 0x7b, 0xb, 0xa, 0x16, 0x31, 0x12, 0x30, 0xb4, 0xa0, 0xc0, 0x17, 0x3c}
+	data := []byte{0x78, 0x7C, 0x01, 0x08, 0x11, 0x23, 0x32, 0x28, 0xE9, 0x6E, 0x70, 0x84, 0x80}
+	date, err := DecodeDate(data)
+	if err != nil {
+		t.Error(err)
+	}
+	// result: 2024-01-08 19:34:49.6863868 +0300 +03
+	t.Log(date)
+}

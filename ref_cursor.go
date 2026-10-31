@@ -1,7 +1,12 @@
 package go_ora
 
 import (
-	"github.com/sijms/go-ora/network"
+	"database/sql/driver"
+
+	"github.com/xo/oracle/network"
+	oraTypes "github.com/xo/oracle/types"
+
+	"github.com/xo/oracle/configurations"
 )
 
 type RefCursor struct {
@@ -9,23 +14,18 @@ type RefCursor struct {
 	len        uint8
 	MaxRowSize int
 	parent     *defaultStmt
-	// ID         int
-	// scnFromExe []int
-	// connection *Connection
-	// noOfRowsToFetch int
-	// hasMoreRows bool
 }
 
-func (cursor *RefCursor) load(session *network.Session) error {
+func (cursor *RefCursor) load() error {
 	// initialize ref cursor object
 	cursor.text = ""
 	cursor._hasLONG = false
 	cursor._hasBLOB = false
 	cursor._hasReturnClause = false
-	cursor.disableCompression = true
 	cursor.arrayBindCount = 1
-	cursor.scnFromExe = make([]int, 2)
+	cursor.scnForSnapshot = make([]int, 2)
 	cursor.stmtType = SELECT
+	session := cursor.connection.session
 	var err error
 	cursor.len, err = session.GetByte()
 	if err != nil {
@@ -46,18 +46,19 @@ func (cursor *RefCursor) load(session *network.Session) error {
 			return err
 		}
 		for x := 0; x < len(cursor.columns); x++ {
-			err = cursor.columns[x].load(session)
+			err = cursor.columns[x].load(cursor.connection)
 			if err != nil {
 				return err
 			}
+			if cursor.columns[x].DataType == oraTypes.OCIClobLocator ||
+				cursor.columns[x].DataType == oraTypes.OCIBlobLocator ||
+				cursor.columns[x].DataType == oraTypes.OCIFileLocator {
+				cursor._hasBLOB = true
+			}
+			if cursor.columns[x].isLongType() {
+				cursor._hasLONG = true
+			}
 		}
-		//for _, col := range cursor.Cols {
-		//	err = col.load(session)
-		//	fmt.Println(col)
-		//	if err != nil {
-		//		return err
-		//	}
-		//}
 	}
 	_, err = session.GetDlc()
 	if err != nil {
@@ -93,24 +94,21 @@ func (cursor *RefCursor) load(session *network.Session) error {
 	if err != nil {
 		return err
 	}
-	_, err = session.GetInt(2, true, true)
-	if err != nil {
-		return err
+	if cursor.cursorID == 0 {
+		return network.NewOracleError(1001)
 	}
 	return nil
 }
 
 func (cursor *RefCursor) getExeOptions() int {
-	return 0x8040
+	if cursor.connection.connOption.Lob == configurations.INLINE {
+		return 0x8050
+	} else {
+		return 0x8040
+	}
 }
 
-func (cursor *RefCursor) Query() (*DataSet, error) {
-	cursor.connection.connOption.Tracer.Printf("Query RefCursor: %d", cursor.cursorID)
-	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
-	cursor._hasMoreRows = true
-	if len(cursor.parent.scnFromExe) > 0 {
-		copy(cursor.scnFromExe, cursor.parent.scnFromExe)
-	}
+func (cursor *RefCursor) _query() (*DataSet, error) {
 	session := cursor.connection.session
 	session.ResetBuffer()
 	err := cursor.write()
@@ -118,33 +116,55 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 		return nil, err
 	}
 	dataSet := new(DataSet)
-	err = cursor.read(dataSet)
+	err = cursor.read(dataSet.currentResultSet())
+	if err != nil {
+		return nil, err
+	}
+	err = cursor.decodePrim(dataSet.currentResultSet())
 	if err != nil {
 		return nil, err
 	}
 	return dataSet, nil
 }
 
+func (cursor *RefCursor) Query() (*DataSet, error) {
+	if cursor.connection.State != Opened {
+		cursor.connection.setBad()
+		return nil, driver.ErrBadConn
+	}
+	tracer := cursor.connection.tracer
+	tracer.Printf("Query RefCursor: %d", cursor.cursorID)
+	cursor._noOfRowsToFetch = cursor.connection.connOption.PrefetchRows
+	cursor._hasMoreRows = true
+	if len(cursor.parent.scnForSnapshot) > 0 {
+		copy(cursor.scnForSnapshot, cursor.parent.scnForSnapshot)
+	}
+
+	dataSet, err := cursor._query()
+	if err != nil {
+		if isBadConn(err) {
+			cursor.connection.setBad()
+			tracer.Print("Error: ", err)
+			return nil, driver.ErrBadConn
+		}
+		return nil, err
+	}
+	return dataSet, nil
+}
+
 func (cursor *RefCursor) write() error {
-	err := cursor.basicWrite(cursor.getExeOptions(), false, false)
+	define := false
+	if cursor.connection.connOption.Lob == configurations.INLINE {
+		define = true
+	}
+	err := cursor.basicWrite(cursor.getExeOptions(), false, define)
 	if err != nil {
 		return err
 	}
 	return cursor.connection.session.Write()
 }
 
-func (cursor *RefCursor) Close() error {
+func (cursor RefCursor) SetDataType(conn *Connection, par *ParameterInfo) error {
+	par.DataType = oraTypes.REFCURSOR
 	return nil
 }
-
-//func (cursor *RefCursor) Exec(args []driver.Value) (driver.Result, error) {
-//	return nil, nil
-//}
-//
-//func (cursor *RefCursor) NumInput() int {
-//	return -1;
-//}
-//func (cursor *RefCursor) readQ() (*DataSet, error) {
-//	dataSet := new(DataSet)
-//	return dataSet, nil
-//}

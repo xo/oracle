@@ -2,73 +2,354 @@ package go_ora
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
-	"github.com/sijms/go-ora/network"
+	"github.com/xo/oracle/configurations"
+	"github.com/xo/oracle/converters"
+	"github.com/xo/oracle/trace"
+	ora_types "github.com/xo/oracle/types"
 )
 
-type Lob struct {
-	sourceLocator []byte
-	destLocator   []byte
+//type Clob struct {
+//	locator []byte
+//	String  string
+//	Valid   bool
+//}
+
+//type NClob Clob
+
+//type lobInterface interface {
+//	getLocator() []byte
+//}
+
+//type Blob struct {
+//	locator []byte
+//	Data    []byte
+//	// deprecated
+//	Valid bool
+//}
+
+var errEmptyLocator = errors.New("call lob operation on an empty locator")
+
+type LobStream struct {
+	conn          *Connection
+	sourceLocator ora_types.Locator
+	destLocator   ora_types.Locator
 	scn           []byte
-	sourceOffset  int
-	destOffset    int
+	sourceOffset  int64
+	destOffset    int64
+	destLen       int
 	charsetID     int
 	size          int64
 	data          bytes.Buffer
+	bNullO2U      bool
+	isNull        bool
+	sendSize      bool
 }
 
-func (lob *Lob) variableWidthChar() bool {
-	if len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&128 == 128 {
-		return true
+//func newLob(connection *Connection) *LobStream {
+//	return &LobStream{
+//		conn: connection,
+//	}
+//}
+
+func (lob *LobStream) initialize() {
+	lob.bNullO2U = false
+	lob.sendSize = false
+	lob.size = 0
+	lob.sourceOffset = 0
+	lob.destOffset = 0
+}
+
+// variableWidthChar if lob has variable width char or not
+//func (lob *LobStream) IsVarWidthChar() bool {
+//	return len(lob.sourceLocator) > 6 && lob.sourceLocator[6]&0x80 == 0x80
+//}
+// IsLittleEndian if Lob is littleEndian or not
+//func (lob *LobStream) IsLittleEndian() bool {
+//	return len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&0x40 == 0x40
+//}
+
+func (lob *LobStream) GetLocator() ora_types.Locator {
+	return lob.sourceLocator
+}
+func (lob *LobStream) SetLocator(locator ora_types.Locator) {
+	lob.sourceLocator = locator
+	if !locator.IsQuasi() && locator.IsTemporary() {
+		lob.conn.appendTemporaryLoc(locator)
 	}
-	return false
+
+}
+func (lob *LobStream) GetTracer() trace.Tracer {
+	return lob.conn.tracer
 }
 
-func (lob *Lob) littleEndianClob() bool {
-	if len(lob.sourceLocator) > 7 && lob.sourceLocator[7]&64 > 0 {
-		return true
+func (lob *LobStream) DatabaseVersionNumber() int {
+	return int(lob.conn.dBVersion.Number)
+}
+
+func (lob *LobStream) GetStringCoder() converters.StringCoder {
+	return lob.conn
+}
+
+// getSize return lob size
+func (lob *LobStream) GetSize() (size int64, err error) {
+	if lob.sourceLocator == nil {
+		return 0, errEmptyLocator
 	}
-	return false
-}
-
-func (lob *Lob) getSize(conn *Connection) (size int64, err error) {
-	session := conn.session
-	tracer := conn.connOption.Tracer
-	tracer.Print("Read Lob Size")
-	err = lob.write(session, 1)
+	lob.initialize()
+	lob.sendSize = true
+	session := lob.conn.session
+	lob.conn.tracer.Print("Read Lob Size")
+	session.ResetBuffer()
+	lob.writeOp(1)
+	err = session.Write()
 	if err != nil {
 		return
 	}
-	err = lob.read(session)
+	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return
 	}
 	size = lob.size
-	tracer.Print("Lob Size: ", size)
+	lob.conn.tracer.Print("Lob Size: ", size)
 	return
 }
 
-func (lob *Lob) getData(conn *Connection) (data []byte, err error) {
-	session := conn.session
-	tracer := conn.connOption.Tracer
-	tracer.Print("Read Lob Data")
-	lob.sourceOffset = 1
-	err = lob.write(session, 2)
+func (lob *LobStream) Read(offset, count int64) (data []byte, err error) {
+	if lob.sourceLocator == nil {
+		return nil, errEmptyLocator
+	}
+	if offset == 0 && count == 0 {
+		lob.conn.tracer.Print("Read Lob Data:")
+	} else {
+		lob.conn.tracer.Printf("Read Lob Data Position: %d, Count: %d\n", offset, count)
+	}
+	lob.initialize()
+	lob.size = count
+	lob.sourceOffset = offset + 1
+	lob.sendSize = true
+	lob.data.Reset()
+	session := lob.conn.session
+	session.ResetBuffer()
+	//done := session.StartContext(ctx)
+	//defer session.EndContext(done)
+	lob.writeOp(2)
+	err = session.Write()
 	if err != nil {
 		return
 	}
-	err = lob.read(session)
+	err = lob.read()
+	err = processReset(err, lob.conn)
 	if err != nil {
 		return
 	}
 	data = lob.data.Bytes()
 	return
 }
+func (lob *LobStream) Write(data []byte) error {
+	if lob.sourceLocator == nil {
+		return errEmptyLocator
+	}
+	lob.conn.tracer.Printf("Write Lob Data: %d bytes", len(data))
+	lob.initialize()
+	//lob.size = int64(len(data))
+	//lob.sendSize = true
+	lob.sourceOffset = 1
+	lob.conn.session.ResetBuffer()
+	lob.writeOp(0x40)
+	lob.conn.session.PutBytes(0xE)
+	lob.conn.session.PutClr(data)
+	err := lob.conn.session.Write()
+	if err != nil {
+		return err
+	}
+	err = lob.read()
+	return processReset(err, lob.conn)
+}
 
-func (lob *Lob) write(session *network.Session, operationID int) error {
+func (lob *LobStream) Exists() (bool, error) {
+	if lob.sourceLocator == nil {
+		return false, errEmptyLocator
+	}
+	lob.initialize()
+	lob.bNullO2U = true
+	session := lob.conn.session
 	session.ResetBuffer()
-	session.PutBytes(3, 0x60, 0)
+	lob.writeOp(0x800)
+	err := session.Write()
+	if err != nil {
+		return false, err
+	}
+	err = lob.read()
+	err = processReset(err, lob.conn)
+	if err != nil {
+		return false, err
+	}
+	return lob.isNull, nil
+}
+
+func (lob *LobStream) GetLobStreamMode() configurations.LobFetch {
+	return lob.conn.connOption.Lob
+}
+func (lob *LobStream) GetLobReadMode() configurations.LobReadMode {
+	return lob.conn.connOption.LobReadMode
+}
+
+// isTemporary: return true if the lob is temporary
+//
+//	func (lob *LobStream) isTemporary() bool {
+//		if len(lob.sourceLocator) > 7 {
+//			if lob.sourceLocator[7]&1 == 1 || lob.sourceLocator[4]&0x40 == 0x40 || lob.isValueBasedLocator() {
+//				return true
+//			}
+//		}
+//		return false
+//	}
+//
+//	func (lob *LobStream) isQuasiLocator() bool {
+//		return lob.sourceLocator.IsQuasi()
+//	}
+//
+//	func (lob *LobStream) isValueBasedLocator() bool {
+//		return lob.sourceLocator[4]&0x20 > 0
+//	}
+func (lob *LobStream) StartContext(ctx context.Context) chan struct{} {
+	return lob.conn.session.StartContext(ctx)
+}
+func (lob *LobStream) EndContext(done chan struct{}) {
+	lob.conn.session.EndContext(done)
+}
+func (lob *LobStream) FreeTemporaryLocator() error {
+	if lob.sourceLocator == nil {
+		return nil
+	}
+	lob.initialize()
+	lob.conn.session.ResetBuffer()
+	lob.writeOp(0x111)
+	err := lob.conn.session.Write()
+	if err != nil {
+		return err
+	}
+	err = lob.read()
+	err = processReset(err, lob.conn)
+	if err != nil {
+		return err
+	}
+	lob.sourceLocator = nil
+	return nil
+}
+func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (ora_types.Locator, error) {
+	lob.initialize()
+	lob.conn.tracer.Print("Create Temporary Lob:")
+	lob.sourceLocator = make([]byte, 0x28)
+	lob.sourceLocator[1] = 0x54
+	//lob.sourceLen = len(lob.sourceLocator)
+	lob.bNullO2U = true
+	lob.scn = make([]byte, 1)
+	// lob.scn[0] = 1 if you need to cache otherwise 0
+	// 0xA is equal to duration
+	lob.destLen = 0xA
+	lob.size = 0xA
+	lob.sendSize = true
+	if charsetForm == 0 {
+		lob.destOffset = 0x71
+		lob.charsetID = 1
+	} else {
+		lob.destOffset = 0x70
+		lob.charsetID = charsetID
+		lob.sourceOffset = int64(charsetForm)
+	}
+	session := lob.conn.session
+	session.ResetBuffer()
+	lob.writeOp(0x110)
+	err := session.Write()
+	if err != nil {
+		return nil, err
+	}
+	err = lob.read()
+	err = processReset(err, lob.conn)
+	if err != nil {
+		return nil, err
+	}
+	lob.conn.appendTemporaryLoc(lob.sourceLocator)
+	return lob.sourceLocator, nil
+}
+
+//func (lob *Lob) createTemporaryClob(charset, charsetForm int) error {
+//	//lob.initialize()
+//	//lob.conn.tracer.Print("Create Temporary CLob")
+//	//lob.sourceLocator = make([]byte, 0x28)
+//	//lob.sourceLocator[1] = 0x54
+//	//lob.bNullO2U = true
+//	//lob.scn = make([]byte, 1)
+//	//lob.destLen = 0xA
+//	//lob.size = 0xA
+//	//lob.sendSize = true
+//	//lob.charsetID = charset
+//	//lob.sourceOffset = int64(charsetForm)
+//	session := lob.conn.session
+//	session.ResetBuffer()
+//	lob.writeOp(0x110)
+//	err := session.Write()
+//	if err != nil {
+//		return err
+//	}
+//	return lob.read()
+//}
+
+func (lob *LobStream) Open(mode, opID int) error {
+	if lob.sourceLocator == nil {
+		return errEmptyLocator
+	}
+	lob.conn.tracer.Printf("Open Lob: Mode= %d   Operation ID= %d", mode, opID)
+	if lob.sourceLocator.IsTemporary() {
+		if lob.sourceLocator[7]&8 == 8 {
+			return errors.New("TTC Error")
+		}
+		if mode == 2 {
+			lob.sourceLocator[7] |= 0x10
+		}
+		return nil
+	}
+
+	lob.initialize()
+	lob.size = int64(mode)
+	lob.sendSize = true
+	//done := lob.conn.session.StartContext(context)
+	//defer lob.conn.session.EndContext(done)
+	lob.conn.session.ResetBuffer()
+	lob.writeOp(opID)
+	err := lob.conn.session.Write()
+	if err != nil {
+		return err
+	}
+	err = lob.read()
+	return processReset(err, lob.conn)
+}
+
+func (lob *LobStream) Close(opID int) error {
+	if lob.sourceLocator == nil {
+		return errEmptyLocator
+	}
+	lob.conn.tracer.Print("Close Lob: ")
+	lob.initialize()
+	lob.conn.session.ResetBuffer()
+	lob.writeOp(opID)
+	err := lob.conn.session.Write()
+	if err != nil {
+		return err
+	}
+	err = lob.read()
+	return processReset(err, lob.conn)
+	//}
+}
+
+func (lob *LobStream) writeOp(operationID int) {
+	session := lob.conn.session
+	session.PutTTCFunc(0x3, 0x60)
 	if len(lob.sourceLocator) == 0 {
 		session.PutBytes(0)
 	} else {
@@ -79,9 +360,10 @@ func (lob *Lob) write(session *network.Session, operationID int) error {
 	if len(lob.destLocator) == 0 {
 		session.PutBytes(0)
 	} else {
+		lob.destLen = len(lob.destLocator)
 		session.PutBytes(1)
 	}
-	session.PutUint(len(lob.destLocator), 4, true, true)
+	session.PutUint(lob.destLen, 4, true, true)
 
 	// put offsets
 	if session.TTCVersion < 3 {
@@ -97,16 +379,17 @@ func (lob *Lob) write(session *network.Session, operationID int) error {
 		session.PutBytes(0)
 	}
 
-	if session.TTCVersion < 3 {
+	if lob.sendSize && session.TTCVersion < 3 {
 		session.PutBytes(1)
 	} else {
 		session.PutBytes(0)
 	}
 
-	// if bNullO2U (false) {
-	// session.PutBytes(1)
-	//} else {
-	session.PutBytes(0)
+	if lob.bNullO2U {
+		session.PutBytes(1)
+	} else {
+		session.PutBytes(0)
+	}
 
 	session.PutInt(operationID, 4, true, true)
 	if len(lob.scn) == 0 {
@@ -119,8 +402,11 @@ func (lob *Lob) write(session *network.Session, operationID int) error {
 	if session.TTCVersion >= 3 {
 		session.PutUint(lob.sourceOffset, 8, true, true)
 		session.PutInt(lob.destOffset, 8, true, true)
-		// sendAmount
-		session.PutBytes(1)
+		if lob.sendSize {
+			session.PutBytes(1)
+		} else {
+			session.PutBytes(0)
+		}
 	}
 	if session.TTCVersion >= 4 {
 		session.PutBytes(0, 0, 0, 0, 0, 0)
@@ -137,52 +423,43 @@ func (lob *Lob) write(session *network.Session, operationID int) error {
 	if lob.charsetID != 0 {
 		session.PutUint(lob.charsetID, 2, true, true)
 	}
-	if session.TTCVersion < 3 {
+	if session.TTCVersion < 3 && lob.sendSize {
 		session.PutUint(lob.size, 4, true, true)
 	}
 	for x := 0; x < len(lob.scn); x++ {
 		session.PutUint(lob.scn[x], 4, true, true)
 	}
-	if session.TTCVersion >= 3 {
+	if session.TTCVersion >= 3 && lob.sendSize {
 		session.PutUint(lob.size, 8, true, true)
 	}
-	return session.Write()
 }
 
-func (lob *Lob) read(session *network.Session) error {
+// read lob response from network session
+func (lob *LobStream) read() error {
 	loop := true
+	session := lob.conn.session
 	for loop {
 		msg, err := session.GetByte()
 		if err != nil {
 			return err
 		}
 		switch msg {
-		case 4:
-			session.Summary, err = network.NewSummary(session)
-			if err != nil {
-				return err
-			}
-			if session.HasError() {
-				if session.Summary.RetCode == 1403 {
-					session.Summary = nil
-				} else {
-					return session.GetError()
-				}
-			}
-			loop = false
 		case 8:
 			// read rpa message
-			if len(lob.sourceLocator) != 0 {
-				_, err = session.GetBytes(len(lob.sourceLocator))
+			if len(lob.sourceLocator) > 0 {
+				lob.sourceLocator, err = session.GetBytes(len(lob.sourceLocator))
 				if err != nil {
 					return err
 				}
 			}
 			if len(lob.destLocator) != 0 {
-				_, err = session.GetBytes(len(lob.destLocator))
+				lob.destLocator, err = session.GetBytes(len(lob.destLocator))
 				if err != nil {
 					return err
 				}
+				lob.destLen = len(lob.destLocator)
+			} else {
+				lob.destLen = 0
 			}
 			if lob.charsetID != 0 {
 				lob.charsetID, err = session.GetInt(2, true, true)
@@ -190,85 +467,212 @@ func (lob *Lob) read(session *network.Session) error {
 					return err
 				}
 			}
-			// get datasize
-			if session.TTCVersion < 3 {
-				lob.size, err = session.GetInt64(4, true, true)
-				if err != nil {
-					return err
-				}
-			} else {
-				lob.size, err = session.GetInt64(8, true, true)
-				if err != nil {
-					return err
-				}
-			}
-		case 9:
-			if session.HasEOSCapability {
-				session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
-				if err != nil {
-					return err
+			if lob.sendSize {
+				// get data size
+				if session.TTCVersion < 3 {
+					lob.size, err = session.GetInt64(4, true, true)
+					if err != nil {
+						return err
+					}
+				} else {
+					lob.size, err = session.GetInt64(8, true, true)
+					if err != nil {
+						return err
+					}
 				}
 			}
-			loop = false
+			if lob.bNullO2U {
+				temp, err := session.GetInt(2, true, true)
+				if err != nil {
+					return err
+				}
+				if temp != 0 {
+					lob.isNull = true
+				}
+			}
 		case 14:
 			// get the data
-			err = lob.readData(session)
+			err = lob.readData()
 			if err != nil {
 				return err
 			}
 		default:
-			return errors.New("TTC error")
+			err = lob.conn.ProcessTCCResponse(msg)
+			if err != nil {
+				return err
+			}
+			if msg == 4 || msg == 9 {
+				loop = false
+			}
 		}
 	}
 	return nil
 }
 
-func (lob *Lob) readData(session *network.Session) error {
-	num1 := 0 // data readed in the call of this function
-	var chunkSize byte = 0
-	var err error
-	// num3 := offset // the data readed from the start of read operation
-	num4 := 0
-	for num4 != 4 {
-		switch num4 {
-		case 0:
-			chunkSize, err = session.GetByte()
-			if err != nil {
-				return err
-			}
-			if chunkSize == 0xFE {
-				num4 = 2
-			} else {
-				num4 = 1
-			}
-		case 1:
-			chunk, err := session.GetBytes(int(chunkSize))
-			if err != nil {
-				return err
-			}
-			lob.data.Write(chunk)
-			num1 += int(chunkSize)
-			num4 = 4
-		case 2:
-			chunkSize, err = session.GetByte()
-			if err != nil {
-				return err
-			}
-			if chunkSize <= 0 {
-				num4 = 4
-			} else {
-				num4 = 3
-			}
-		case 3:
-			chunk, err := session.GetBytes(int(chunkSize))
-			if err != nil {
-				return err
-			}
-			lob.data.Write(chunk)
-			num1 += int(chunkSize)
-			// num3 += chunkSize
-			num4 = 2
-		}
+// read lob data chunks from network session
+func (lob *LobStream) readData() error {
+	session := lob.conn.session
+	tempBytes, err := session.GetClr()
+	if err != nil {
+		return err
 	}
+	lob.data.Write(tempBytes)
 	return nil
 }
+
+func (lob *LobStream) GetLobId() []byte {
+	// BitConverter.ToString(lobLocator, 10, 10);
+	if lob.sourceLocator == nil {
+		return nil
+	}
+	return lob.sourceLocator[10 : 10+10]
+}
+
+func (lob *LobStream) append(dest []byte) error {
+	if lob.sourceLocator == nil {
+		return errEmptyLocator
+	}
+	lob.initialize()
+	lob.destLocator = dest
+	lob.destLen = len(dest)
+	lob.conn.session.ResetBuffer()
+	lob.writeOp(0x80)
+	err := lob.conn.session.Write()
+	if err != nil {
+		return err
+	}
+	err = lob.read()
+	return processReset(err, lob.conn)
+}
+
+func (lob *LobStream) copy(srcLocator, dstLocator []byte, srcOffset, dstOffset, length int64) error {
+	lob.initialize()
+	lob.sourceLocator = srcLocator
+	lob.destLocator = dstLocator
+	lob.destLen = len(dstLocator)
+	lob.sourceOffset = srcOffset
+	lob.destOffset = dstOffset
+	lob.size = length
+	lob.sendSize = true
+	lob.conn.session.ResetBuffer()
+	lob.writeOp(4)
+	err := lob.conn.session.Write()
+	if err != nil {
+		return err
+	}
+	err = lob.read()
+	return processReset(err, lob.conn)
+}
+
+//func (val *Clob) Scan(value interface{}) error {
+//	val.Valid = true
+//	if value == nil {
+//		val.Valid = false
+//		val.String = ""
+//		return nil
+//	}
+//	switch temp := value.(type) {
+//	case Clob:
+//		*val = temp
+//	case *Clob:
+//		*val = *temp
+//	case NClob:
+//		*val = Clob(temp)
+//	case *NClob:
+//		*val = Clob(*temp)
+//	case string:
+//		val.String = temp
+//	case types.Nil:
+//		val.String = ""
+//		val.Valid = false
+//	default:
+//		return errors.New("go-ora: Clob column type require Clob or string values")
+//	}
+//	return nil
+//}
+
+//func (val *Blob) Scan(value interface{}) error {
+//	// val.Valid = true
+//	if value == nil {
+//		// val.Valid = false
+//		val.Data = nil
+//		return nil
+//	}
+//	switch temp := value.(type) {
+//	case Blob:
+//		*val = temp
+//	case *Blob:
+//		*val = *temp
+//	case []byte:
+//		val.Data = temp
+//	case types.Nil:
+//		val.Data = nil
+//	default:
+//		return errors.New("go-ora: Blob column type require Blob or []byte values")
+//	}
+//	return nil
+//}
+
+//func (val *NClob) Scan(value interface{}) error {
+//	val.Valid = true
+//	if value == nil {
+//		val.Valid = false
+//		val.String = ""
+//		return nil
+//	}
+//	switch temp := value.(type) {
+//	case Clob:
+//		*val = NClob(temp)
+//	case *Clob:
+//		*val = NClob(*temp)
+//	case NClob:
+//		*val = temp
+//	case *NClob:
+//		*val = *temp
+//	case string:
+//		val.String = temp
+//	case types.Nil:
+//		val.String = ""
+//		val.Valid = false
+//	default:
+//		return errors.New("go-ora: Clob column type require Clob or string values")
+//	}
+//	return nil
+//}
+//
+//func (val Blob) getLocator() []byte {
+//	return val.locator
+//}
+//
+//func (val Clob) getLocator() []byte {
+//	return val.locator
+//}
+//
+//func (val NClob) getLocator() []byte {
+//	return val.locator
+//}
+
+//func (val Clob) Value() (driver.Value, error) {
+//	if val.Valid {
+//		return val.String, nil
+//	} else {
+//		return nil, nil
+//	}
+//}
+
+//
+//func (val *NClob) Value() (driver.Value, error) {
+//	if val.Valid {
+//		return val.String, nil
+//	} else {
+//		return nil, nil
+//	}
+//}
+//
+//func (val *Blob) Value() (driver.Value, error) {
+//	if val.Valid {
+//		return val.Data, nil
+//	} else {
+//		return nil, nil
+//	}
+//}

@@ -3,16 +3,16 @@ package advanced_nego
 import (
 	"errors"
 
-	"github.com/sijms/go-ora/network"
+	"github.com/xo/oracle/network"
 )
 
 type AdvancedNegoComm struct {
 	session *network.Session
 }
 
-func newComm(session *network.Session) *AdvancedNegoComm {
-	return &AdvancedNegoComm{session: session}
-}
+// func newComm(session *network.Session) *AdvancedNegoComm {
+// 	return &AdvancedNegoComm{session: session}
+// }
 
 func (comm *AdvancedNegoComm) writePacketHeader(length, _type int) {
 	comm.session.PutInt(length, 2, true, false)
@@ -47,15 +47,11 @@ func (comm *AdvancedNegoComm) validatePacketHeader(length, _type int) error {
 		if length > 1 {
 			return errors.New("advanced negotiation error: cannot validate packet header")
 		}
-	case 3:
-		fallthrough
-	case 6:
+	case 3, 6:
 		if length > 2 {
 			return errors.New("advanced negotiation error: cannot validate packet header")
 		}
-	case 4:
-		fallthrough
-	case 5:
+	case 4, 5:
 		if length > 4 {
 			return errors.New("advanced negotiation error: cannot validate packet header")
 		}
@@ -71,6 +67,9 @@ func (comm *AdvancedNegoComm) validatePacketHeader(length, _type int) error {
 
 func (comm *AdvancedNegoComm) readUB1() (number uint8, err error) {
 	_, err = comm.readPacketHeader(2)
+	if err != nil {
+		return
+	}
 	number, err = comm.session.GetByte()
 	return
 }

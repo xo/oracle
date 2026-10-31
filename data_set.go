@@ -2,11 +2,10 @@ package go_ora
 
 import (
 	"database/sql/driver"
+	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/trace"
 	"io"
-
-	"github.com/sijms/go-ora/trace"
-
-	"github.com/sijms/go-ora/network"
+	"reflect"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -15,196 +14,133 @@ var (
 	_ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
 	_ = driver.RowsColumnTypeLength((*DataSet)(nil))
 	_ = driver.RowsColumnTypeNullable((*DataSet)(nil))
+	_ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
 )
 
-// var _ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
 // var _ = driver.RowsColumnTypeScanType((*DataSet)(nil))
 // var _ = driver.RowsNextResultSet((*DataSet)(nil))
 
-type Row []driver.Value
-
 type DataSet struct {
-	ColumnCount     int
-	RowCount        int
-	UACBufferLength int
-	MaxRowSize      int
-	Cols            []ParameterInfo
-	Rows            []Row
-	// currentRow      Row
-	index  int
-	parent StmtInterface
+	resultSets []ResultSet
+	index      int
+	//columnCount     int
+	//rowCount        int
+	//uACBufferLength int
+	//maxRowSize      int
+	//cols            *[]ParameterInfo
+	//rows            []Row
+	//currentRow      Row
+
+	//index           int
+	//parent          StmtInterface
 }
 
+func (dataSet *DataSet) currentResultSet() *ResultSet {
+	if dataSet.resultSets == nil {
+		dataSet.resultSets = make([]ResultSet, 0)
+		dataSet.resultSets = append(dataSet.resultSets, ResultSet{})
+		dataSet.index = 0
+	}
+	return &dataSet.resultSets[dataSet.index]
+}
+
+func (dataSet *DataSet) clear() {
+	dataSet.resultSets = nil
+	dataSet.index = 0
+}
+
+// load Loading dataset information from network session
 func (dataSet *DataSet) load(session *network.Session) error {
-	_, err := session.GetByte()
-	if err != nil {
-		return err
-	}
-	columnCount, err := session.GetInt(2, true, true)
-	if err != nil {
-		return err
-	}
-	num, err := session.GetInt(4, true, true)
-	if err != nil {
-		return err
-	}
-	columnCount += num * 0x100
-	if columnCount > dataSet.ColumnCount {
-		dataSet.ColumnCount = columnCount
-	}
-	//if len(dataSet.currentRow) != dataSet.columnCount {
-	//	dataSet.currentRow = make(Row, dataSet.columnCount)
-	//}
-	dataSet.RowCount, err = session.GetInt(4, true, true)
-	if err != nil {
-		return err
-	}
-	dataSet.UACBufferLength, err = session.GetInt(2, true, true)
-	if err != nil {
-		return err
-	}
-	bitVector, err := session.GetDlc()
-	if err != nil {
-		return err
-	}
-	dataSet.setBitVector(bitVector)
-	_, err = session.GetDlc()
-	return nil
-}
-
-func (dataSet *DataSet) setBitVector(bitVector []byte) {
-	index := dataSet.ColumnCount / 8
-	if dataSet.ColumnCount%8 > 0 {
-		index++
-	}
-	if len(bitVector) > 0 {
-		for x := 0; x < len(bitVector); x++ {
-			for i := 0; i < 8; i++ {
-				if (x*8)+i < dataSet.ColumnCount {
-					dataSet.Cols[(x*8)+i].getDataFromServer = bitVector[x]&(1<<i) > 0
-				}
-			}
-		}
-	} else {
-		for x := 0; x < len(dataSet.Cols); x++ {
-			dataSet.Cols[x].getDataFromServer = true
-		}
-	}
+	return dataSet.currentResultSet().load(session)
 }
 
 func (dataSet *DataSet) Close() error {
-	return nil
-}
-
-func (dataSet *DataSet) Next(dest []driver.Value) error {
-	//fmt.Println("has more row: ", dataSet.parent.hasMoreRows)
-	//fmt.Println("row length: ", len(dataSet.rows))
-	//fmt.Println("cursor id: ", dataSet.parent.cursorID)
-	//if dataSet.parent.hasMoreRows && dataSet.index == len(dataSet.rows) && len(dataSet.rows) < dataSet.parent.noOfRowsToFetch {
-	//	fmt.Println("inside first fetch")
-	//	oldFetchCount := dataSet.parent.noOfRowsToFetch;
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount - len(dataSet.rows)
-	//	err := dataSet.parent.fetch(dataSet)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	dataSet.parent.noOfRowsToFetch = oldFetchCount
-	//	fmt.Println("row count after first fetch: ", len(dataSet.rows))
-	//}
-	hasMoreRows := dataSet.parent.hasMoreRows()
-	noOfRowsToFetch := len(dataSet.Rows) // dataSet.parent.noOfRowsToFetch()
-	hasBLOB := dataSet.parent.hasBLOB()
-	hasLONG := dataSet.parent.hasLONG()
-	if !hasMoreRows && noOfRowsToFetch == 0 {
-		return io.EOF
-	}
-	if dataSet.index > 0 && dataSet.index%len(dataSet.Rows) == 0 {
-		if hasMoreRows {
-			dataSet.Rows = make([]Row, 0, dataSet.parent.noOfRowsToFetch())
-			err := dataSet.parent.fetch(dataSet)
-			if err != nil {
-				return err
-			}
-			noOfRowsToFetch = len(dataSet.Rows)
-			hasMoreRows = dataSet.parent.hasMoreRows()
-			dataSet.index = 0
-			if !hasMoreRows && noOfRowsToFetch == 0 {
-				return io.EOF
-			}
-		} else {
-			return io.EOF
-		}
-	}
-	//if hasMoreRows && dataSet.index != 0 && dataSet.index%noOfRowsToFetch == 0 {
-	//
-	//}
-	if hasMoreRows && (hasBLOB || hasLONG) && dataSet.index == 0 {
-		if err := dataSet.parent.fetch(dataSet); err != nil {
+	var err error
+	for _, resultSet := range dataSet.resultSets {
+		err = resultSet.Close()
+		if err != nil {
 			return err
 		}
 	}
-	if dataSet.index%noOfRowsToFetch < len(dataSet.Rows) {
-		for x := 0; x < len(dataSet.Rows[dataSet.index%noOfRowsToFetch]); x++ {
-			dest[x] = dataSet.Rows[dataSet.index%noOfRowsToFetch][x]
-		}
+	dataSet.clear()
+	return nil
+}
+
+// Next_ act like Next in sql package return false if no other rows in dataset
+func (dataSet *DataSet) Next_() bool {
+	return dataSet.currentResultSet().Next_()
+}
+
+// Scan act like scan in sql package return row values to dest variable pointers
+func (dataSet *DataSet) Scan(dest ...interface{}) error {
+	return dataSet.currentResultSet().Scan(dest...)
+}
+
+// set object value using currentRow[colIndex] return true if succeed or false
+// for non-supported type
+// error means error occur during operation
+func (dataSet *DataSet) setObjectValue(obj reflect.Value, colIndex int) error {
+	return dataSet.currentResultSet().setObjectValue(obj, colIndex)
+}
+
+func (dataSet *DataSet) Err() error {
+	return dataSet.currentResultSet().Err()
+}
+
+//func (dataSet *DataSet) setParent(parent StmtInterface) {
+//	dataSet.currentResultSet().parent = parent
+//}
+//
+//func (dataSet *DataSet) setColumn(cols  *[]ParameterInfo) {
+//	dataSet.currentResultSet().cols = cols
+//}
+
+// Next implement method need for sql.Rows interface
+func (dataSet *DataSet) Next(dest []driver.Value) error {
+	return dataSet.currentResultSet().Next(dest)
+}
+
+// Columns return a string array that represent columns names
+func (dataSet *DataSet) Columns() []string {
+	return dataSet.currentResultSet().Columns()
+}
+
+func (dataSet *DataSet) Trace(t trace.Tracer) {
+	dataSet.currentResultSet().Trace(t)
+}
+
+// ColumnTypeDatabaseTypeName return Col DataType name
+func (dataSet *DataSet) ColumnTypeDatabaseTypeName(index int) string {
+	return dataSet.currentResultSet().ColumnTypeDatabaseTypeName(index)
+}
+
+// ColumnTypeLength return length of column type
+func (dataSet *DataSet) ColumnTypeLength(index int) (int64, bool) {
+	return dataSet.currentResultSet().ColumnTypeLength(index)
+}
+
+// ColumnTypeNullable return if column allow null or not
+func (dataSet *DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
+	return dataSet.currentResultSet().ColumnTypeNullable(index)
+}
+
+// ColumnTypePrecisionScale return the precision and scale for numeric types
+func (dataSet *DataSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
+	return dataSet.currentResultSet().ColumnTypePrecisionScale(index)
+}
+
+func (dataSet *DataSet) ColumnTypeScanType(index int) reflect.Type {
+	return dataSet.currentResultSet().ColumnTypeScanType(index)
+}
+
+func (dataSet *DataSet) NextResultSet() error {
+	if dataSet.HasNextResultSet() {
 		dataSet.index++
 		return nil
 	}
 	return io.EOF
 }
 
-//func (dataSet *DataSet) NextRow(args... interface{}) error {
-//	var values = make([]driver.Value, len(args))
-//	err := dataSet.Next(values)
-//	if err != nil {
-//		return err
-//	}
-//	for index, arg := range args {
-//		*arg = values[index]
-//		//if val, ok := values[index].(t); !ok {
-//		//
-//		//}
-//	}
-//	return nil
-//}
-
-func (dataSet *DataSet) Columns() []string {
-	if len(dataSet.Cols) == 0 {
-		return nil
-	}
-	ret := make([]string, len(dataSet.Cols))
-	for x := 0; x < len(dataSet.Cols); x++ {
-		ret[x] = dataSet.Cols[x].Name
-	}
-	return ret
-}
-
-func (dataSet DataSet) Trace(t trace.Tracer) {
-	for r, row := range dataSet.Rows {
-		if r > 25 {
-			break
-		}
-		t.Printf("Row %d", r)
-		for c, col := range dataSet.Cols {
-			t.Printf("  %-20s: %v", col.Name, row[c])
-		}
-	}
-}
-
-func (dataSet DataSet) ColumnTypeDatabaseTypeName(index int) string {
-	return dataSet.Cols[index].DataType.String()
-}
-
-func (dataSet DataSet) ColumnTypeLength(index int) (length int64, ok bool) {
-	switch dataSet.Cols[index].DataType {
-	case NCHAR, CHAR:
-		return int64(dataSet.Cols[index].MaxCharLen), true
-	case NUMBER:
-		return int64(dataSet.Cols[index].Precision), true
-	}
-	return int64(0), false
-}
-
-func (dataSet DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
-	return dataSet.Cols[index].AllowNull, true
+func (dataSet *DataSet) HasNextResultSet() bool {
+	return dataSet.index < len(dataSet.resultSets)-1
 }

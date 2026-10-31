@@ -5,32 +5,26 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	go_ora "github.com/xo/oracle/lazy_init"
 )
 
 type RefusePacket struct {
-	packet Packet
-	// dataOffset uint16
-	// Len uint16
-	// packetType PacketType
-	// Flag uint8
-	Err          OracleError
+	Packet
+	Err          *OracleError
 	SystemReason uint8
 	UserReason   uint8
 	message      string
 }
 
 func (pck *RefusePacket) bytes() []byte {
-	output := pck.packet.bytes()
+	output := pck.Packet.bytes()
 	output[8] = pck.SystemReason
 	output[9] = pck.UserReason
 	data := []byte(pck.message)
 	binary.BigEndian.PutUint16(output[10:], uint16(len(data)))
 	output = append(output, data...)
 	return output
-}
-
-func (pck *RefusePacket) getPacketType() PacketType {
-	return pck.packet.packetType
 }
 
 func newRefusePacketFromData(packetData []byte) *RefusePacket {
@@ -44,7 +38,7 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 
 	return &RefusePacket{
-		packet: Packet{
+		Packet: Packet{
 			dataOffset: 12,
 			length:     uint32(binary.BigEndian.Uint16(packetData)),
 			packetType: PacketType(packetData[4]),
@@ -56,50 +50,70 @@ func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	}
 }
 
-func (rf *RefusePacket) extractErrCode() {
-	rf.Err.ErrCode = 12564
-	rf.Err.ErrMsg = "ORA-12564: TNS connection refused"
-	if len(rf.message) == 0 {
+var errExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
+})
+
+var errorExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=()]+)`)
+})
+
+var codeExtractRegexp = go_ora.NewLazyInit(func() (interface{}, error) {
+	return regexp.Compile(`CODE\s*=\s*([0-9]+)`)
+})
+
+func (pck *RefusePacket) extractErrCode() {
+	var err error
+	pck.Err = NewOracleError(12564)
+	if len(pck.message) == 0 {
 		return
 	}
-	r, err := regexp.Compile(`\(\s*ERR\s*=\s*([0-9]+)\s*\)`)
+
+	var errExtractRegexpAny interface{}
+	errExtractRegexpAny, err = errExtractRegexp.GetValue()
 	if err != nil {
 		return
 	}
-	msg := strings.ToUpper(rf.message)
-	matches := r.FindStringSubmatch(msg)
+
+	msg := strings.ToUpper(pck.message)
+	matches := errExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
 	}
+
 	strErrCode := matches[1]
 	errCode, err := strconv.ParseInt(strErrCode, 10, 32)
 	if err == nil {
-		rf.Err.ErrCode = int(errCode)
-		rf.Err.translate()
+		pck.Err = NewOracleError(int(errCode))
 		return
 	}
-	r, err = regexp.Compile(`\(\s*ERROR\s*=([A-Z0-9=\(\)]+)`)
+
+	var errorExtractRegexpAny interface{}
+	errorExtractRegexpAny, err = errorExtractRegexp.GetValue()
 	if err != nil {
 		return
 	}
-	matches = r.FindStringSubmatch(msg)
+
+	matches = errorExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(msg)
 	if len(matches) != 2 {
 		return
 	}
 	codeStr := matches[1]
-	r, err = regexp.Compile(`CODE\s*=\s*([0-9]+)`)
+
+	var codeExtractRegexpAny interface{}
+	codeExtractRegexpAny, err = codeExtractRegexp.GetValue()
 	if err != nil {
 		return
 	}
-	matches = r.FindStringSubmatch(codeStr)
+
+	matches = codeExtractRegexpAny.(*regexp.Regexp).FindStringSubmatch(codeStr)
 	if len(matches) != 2 {
 		return
 	}
+
 	strErrCode = matches[1]
 	errCode, err = strconv.ParseInt(strErrCode, 10, 32)
 	if err == nil {
-		rf.Err.ErrCode = int(errCode)
-		rf.Err.translate()
+		pck.Err = NewOracleError(int(errCode))
 	}
-	// str := "(DESCRIPTION=(TMP=)(VSNNUM=186647552)(ERR=12514)(ERROR_STACK=(ERROR=(CODE=12514)(EMFI=4))))"
 }

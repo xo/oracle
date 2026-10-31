@@ -1,10 +1,10 @@
 package go_ora
 
 import (
+	"database/sql/driver"
 	"errors"
-	"fmt"
 
-	"github.com/sijms/go-ora/network"
+	"github.com/xo/oracle/network"
 )
 
 type simpleObject struct {
@@ -17,80 +17,74 @@ type simpleObject struct {
 
 func (obj *simpleObject) write() *simpleObject {
 	// obj.session.ResetBuffer()
-	if obj.connection.dBVersion.Number >= 10102 {
-		session := obj.connection.session
-		session.PutBytes(3, obj.operationID, 0)
-		if obj.data != nil {
-			session.PutBytes(obj.data...)
-		}
-		obj.err = session.Write()
+	session := obj.connection.session
+	session.PutTTCFunc(0x3, obj.operationID)
+	if obj.data != nil {
+		session.PutBytes(obj.data...)
 	}
+	obj.err = session.Write()
 	return obj
 }
 
 func (obj *simpleObject) read() error {
-	if obj.connection.dBVersion.Number >= 10102 {
-		session := obj.connection.session
-		if obj.err != nil {
-			return obj.err
+	if obj.err != nil {
+		return obj.err
+	}
+	return obj.connection.read()
+	// loop := true
+	// for loop {
+	// 	msg, err := session.GetByte()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	err = obj.connection.processTCCResponse(msg)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if msg == 4 || msg == 9 {
+	// 		loop = false
+	// 	}
+	// }
+	// if session.HasError() {
+	// 	return session.GetError()
+	// }
+	// return nil
+}
+
+func (obj *simpleObject) exec() error {
+	conn := obj.connection
+	tracer := conn.tracer
+	obj.write()
+	if obj.err != nil {
+		return obj.err
+	}
+	err := conn.read()
+	if errors.Is(err, network.ErrConnReset) {
+		err = conn.read()
+	}
+	if err != nil {
+		if isBadConn(err) {
+			obj.connection.setBad()
+			tracer.Print("Error: ", err)
+			return driver.ErrBadConn
 		}
-		loop := true
-		for loop {
-			msg, err := session.GetByte()
-			if err != nil {
-				return err
-			}
-			switch msg {
-			case 4:
-				session.Summary, err = network.NewSummary(session)
-				if err != nil {
-					return err
-				}
-				loop = false
-			case 9:
-				if session.HasEOSCapability {
-					if session.Summary == nil {
-						session.Summary = new(network.SummaryObject)
-					}
-					session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
-					if err != nil {
-						return err
-					}
-				}
-				if session.HasFSAPCapability {
-					if session.Summary == nil {
-						session.Summary = new(network.SummaryObject)
-					}
-					session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
-					if err != nil {
-						return err
-					}
-				}
-				loop = false
-			case 15:
-				warning, err := network.NewWarningObject(session)
-				if err != nil {
-					return err
-				}
-				if warning != nil {
-					fmt.Println(warning)
-				}
-			case 23:
-				//opCode, err := session.GetByte()
-				//if err != nil {
-				//	return err
-				//}
-				//err = obj.connection.getServerNetworkInformation(opCode)
-				//if err != nil {
-				//	return err
-				//}
-			default:
-				return errors.New(fmt.Sprintf("TTC error: received code %d during simple object read", msg))
-			}
-		}
-		if session.HasError() {
-			return session.GetError()
-		}
+		return err
 	}
 	return nil
+	// var reconnect bool
+	// for writeTrials := 0; writeTrials < failOver; writeTrials++ {
+	// 	reconnect, err = obj.connection.reConnect(err, writeTrials)
+	// 	if err != nil {
+	// 		tracer.Print("Error: ", err)
+	// 		if !reconnect {
+	// 			return err
+	// 		}
+	// 		continue
+	// 	}
+	// 	break
+	// }
+	// if reconnect {
+	// 	return &network.OracleError{ErrCode: 3135}
+	// }
+	// return err
 }

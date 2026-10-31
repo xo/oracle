@@ -1,6 +1,9 @@
 package go_ora
 
-import "context"
+import (
+	"context"
+	"database/sql/driver"
+)
 
 type Transaction struct {
 	conn *Connection
@@ -8,17 +11,23 @@ type Transaction struct {
 }
 
 func (tx *Transaction) Commit() error {
+	if tx.conn.State != Opened {
+		return driver.ErrBadConn
+	}
 	tx.conn.autoCommit = true
 	tx.conn.session.ResetBuffer()
-	tx.conn.session.StartContext(tx.ctx)
-	defer tx.conn.session.EndContext()
-	return (&simpleObject{connection: tx.conn, operationID: 0xE}).write().read()
+	done := tx.conn.session.StartContext(tx.ctx)
+	defer tx.conn.session.EndContext(done)
+	return (&simpleObject{connection: tx.conn, operationID: 0xE}).exec()
 }
 
 func (tx *Transaction) Rollback() error {
+	if tx.conn.State != Opened {
+		return driver.ErrBadConn
+	}
 	tx.conn.autoCommit = true
 	tx.conn.session.ResetBuffer()
-	tx.conn.session.StartContext(tx.ctx)
-	defer tx.conn.session.EndContext()
-	return (&simpleObject{connection: tx.conn, operationID: 0xF}).write().read()
+	done := tx.conn.session.StartContext(tx.ctx)
+	defer tx.conn.session.EndContext(done)
+	return (&simpleObject{connection: tx.conn, operationID: 0xF}).exec()
 }
