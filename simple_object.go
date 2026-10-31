@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 )
 
 type simpleObject struct {
@@ -59,7 +59,7 @@ func (obj *simpleObject) exec() error {
 		return obj.err
 	}
 	err := conn.read()
-	if errors.Is(err, network.ErrConnReset) {
+	if errors.Is(err, tns.ErrConnReset) {
 		err = conn.read()
 	}
 	if err != nil {

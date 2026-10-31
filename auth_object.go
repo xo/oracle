@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/network/security"
+	"github.com/xo/oracle/internal/auth/security"
+	"github.com/xo/oracle/internal/tns"
 )
 
 // E infront of the variable means encrypted
@@ -85,14 +85,14 @@ func (obj *AuthObject) read() error {
 					if len(obj.pbkdf2ChkSalt) == 0 {
 						obj.pbkdf2ChkSalt = string(val)
 						if len(obj.pbkdf2ChkSalt) != 32 {
-							return network.NewOracleError(28041)
+							return tns.NewOracleError(28041)
 						}
 					}
 				} else if bytes.Equal(key, []byte("AUTH_PBKDF2_VGEN_COUNT")) {
 					if obj.pbkdf2VgenCount == 0 {
 						obj.pbkdf2VgenCount, err = strconv.Atoi(string(val))
 						if err != nil {
-							return network.NewOracleError(28041)
+							return tns.NewOracleError(28041)
 						}
 						if obj.pbkdf2VgenCount < 4096 || obj.pbkdf2VgenCount > 100000000 {
 							obj.pbkdf2VgenCount = 4096
@@ -102,7 +102,7 @@ func (obj *AuthObject) read() error {
 					obj.pbkdf2SderCount, err = strconv.Atoi(string(val))
 					if obj.pbkdf2SderCount == 0 {
 						if err != nil {
-							return network.NewOracleError(28041)
+							return tns.NewOracleError(28041)
 						}
 						if obj.pbkdf2SderCount < 3 || obj.pbkdf2SderCount > 100000000 {
 							obj.pbkdf2SderCount = 3

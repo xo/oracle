@@ -16,12 +16,16 @@ Step 1 of the design is done (`7bc994c`). `go.mod` requires Go 1.27.1, `go
 fix` ran over both modules, and every package vets and passes its unit tests
 with no server.
 
-Step 2 is done and staged. `internal/tnstest` records the TNS packets of a
+Step 2 is done (`5e1e3a8`). `internal/tnstest` records the TNS packets of a
 connection and plays them back over a `net.Pipe`. `exchange_test.go` holds
-five scenarios, `ping`, `query`, `error`, `dml` and `clob`, and
-`testdata/exchanges/` holds them recorded against every release that `dbrun`
-starts: 11g, 18c, 19c, 21c, 23ai and 26ai. `TestExchanges` plays them all back
-with no server.
+five scenarios, recorded under `testdata/exchanges/` against 11g, 18c, 19c,
+21c, 23ai and 26ai. `TestExchanges` plays all 30 back with no server.
 
-The next step is step 3: move the protocol code to `internal/`, with no change
-of behavior. The exchanges prove that nothing changed.
+Step 3 is done and staged. Every package that a caller does not use moved
+under `internal/`, with only its import path, its package name and the
+qualifiers that name it changed. `DESIGN.md`, under Packages, maps each old
+package to its new place. The 30 exchanges pass after the move.
+
+The next step is step 4: write the root package as `DESIGN.md` says, as the
+package `oracle`, with the `Connector`, the DSN and the errors, and delete the
+package variable.

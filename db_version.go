@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 )
 
 type DBVersion struct {
@@ -20,7 +20,7 @@ type DBVersion struct {
 
 // GetDBVersion write a request to get database version the read
 // database version from network session
-func GetDBVersion(session *network.Session) (*DBVersion, error) {
+func GetDBVersion(session *tns.Session) (*DBVersion, error) {
 	session.ResetBuffer()
 	session.PutTTCFunc(0x3, 0x3B)
 	session.PutBytes(1)

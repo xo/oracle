@@ -9,19 +9,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xo/oracle/advanced_nego"
 	"github.com/xo/oracle/configurations"
-	"github.com/xo/oracle/converters"
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/auth"
+	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/codec/oson"
+	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/types"
-	"github.com/xo/oracle/types/oson"
 )
 
 type OracleDriver struct {
 	dataCollected   bool
-	oracleTypeCoder map[uint16]parameter_coder.OracleParameterCoder
-	goTypeCoder     map[reflect.Type]parameter_coder.OracleParameterCoder
-	nameTypeCoder   map[string]parameter_coder.OracleParameterCoder
+	oracleTypeCoder map[uint16]codec.OracleParameterCoder
+	goTypeCoder     map[reflect.Type]codec.OracleParameterCoder
+	nameTypeCoder   map[string]codec.OracleParameterCoder
 	jsonEncoder     map[reflect.Type]oson.FieldEncoder
 	cusTyp          map[string]types.Object
 	sessionParam    map[string]string
@@ -42,9 +42,9 @@ type OracleDriver struct {
 
 func NewDriver() *OracleDriver {
 	drv := &OracleDriver{
-		goTypeCoder:     make(map[reflect.Type]parameter_coder.OracleParameterCoder),
-		oracleTypeCoder: make(map[uint16]parameter_coder.OracleParameterCoder),
-		nameTypeCoder:   make(map[string]parameter_coder.OracleParameterCoder),
+		goTypeCoder:     make(map[reflect.Type]codec.OracleParameterCoder),
+		oracleTypeCoder: make(map[uint16]codec.OracleParameterCoder),
+		nameTypeCoder:   make(map[string]codec.OracleParameterCoder),
 		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
 		cusTyp:       map[string]types.Object{},
 		sessionParam: map[string]string{},
@@ -69,98 +69,98 @@ func GetDefaultDriver() *OracleDriver {
 
 func (driver *OracleDriver) init() {
 	// add basic type decoders here
-	driver.oracleTypeCoder[types.NCHAR] = &parameter_coder.StringParameter{}
-	driver.oracleTypeCoder[types.CHAR] = &parameter_coder.StringParameter{}
-	driver.oracleTypeCoder[types.LONG] = &parameter_coder.StringParameter{}
-	driver.oracleTypeCoder[types.LongVarChar] = &parameter_coder.StringParameter{}
+	driver.oracleTypeCoder[types.NCHAR] = &codec.StringParameter{}
+	driver.oracleTypeCoder[types.CHAR] = &codec.StringParameter{}
+	driver.oracleTypeCoder[types.LONG] = &codec.StringParameter{}
+	driver.oracleTypeCoder[types.LongVarChar] = &codec.StringParameter{}
 
-	driver.oracleTypeCoder[types.RAW] = &parameter_coder.RawParameter{}
-	driver.oracleTypeCoder[types.LongRaw] = &parameter_coder.RawParameter{}
+	driver.oracleTypeCoder[types.RAW] = &codec.RawParameter{}
+	driver.oracleTypeCoder[types.LongRaw] = &codec.RawParameter{}
 
-	driver.oracleTypeCoder[types.NUMBER] = &parameter_coder.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
-	driver.oracleTypeCoder[types.IBFLOAT] = &parameter_coder.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
-	driver.oracleTypeCoder[types.IBDOUBLE] = &parameter_coder.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
+	driver.oracleTypeCoder[types.NUMBER] = &codec.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
+	driver.oracleTypeCoder[types.IBFLOAT] = &codec.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
+	driver.oracleTypeCoder[types.IBDOUBLE] = &codec.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
 
-	driver.oracleTypeCoder[types.DATE] = &parameter_coder.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
-	driver.oracleTypeCoder[types.TIMESTAMP] = &parameter_coder.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStamp}
-	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &parameter_coder.DateParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampDTY] = &parameter_coder.DateParameter{DataType: types.TimeStampDTY, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &parameter_coder.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampLTZ] = &parameter_coder.DateParameter{DataType: types.TimeStampLTZ, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &parameter_coder.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.DATE] = &codec.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
+	driver.oracleTypeCoder[types.TIMESTAMP] = &codec.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStamp}
+	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &codec.DateParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampDTY] = &codec.DateParameter{DataType: types.TimeStampDTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &codec.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampLTZ] = &codec.DateParameter{DataType: types.TimeStampLTZ, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &codec.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
 
-	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &parameter_coder.IntervalParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}
-	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &parameter_coder.IntervalParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}
+	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &codec.IntervalParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}
+	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &codec.IntervalParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}
 
-	driver.oracleTypeCoder[types.VECTOR] = &parameter_coder.VectorParameter{}
-	driver.oracleTypeCoder[types.JSON] = &parameter_coder.JsonParameter{}
-	driver.oracleTypeCoder[types.OCIBlobLocator] = &parameter_coder.BlobParameter{}
-	driver.oracleTypeCoder[types.OCIClobLocator] = &parameter_coder.ClobParameter{}
-	driver.oracleTypeCoder[types.OCIFileLocator] = &parameter_coder.BFileParameter{}
+	driver.oracleTypeCoder[types.VECTOR] = &codec.VectorParameter{}
+	driver.oracleTypeCoder[types.JSON] = &codec.JsonParameter{}
+	driver.oracleTypeCoder[types.OCIBlobLocator] = &codec.BlobParameter{}
+	driver.oracleTypeCoder[types.OCIClobLocator] = &codec.ClobParameter{}
+	driver.oracleTypeCoder[types.OCIFileLocator] = &codec.BFileParameter{}
 
-	driver.oracleTypeCoder[types.ROWID] = &parameter_coder.RowIDParameter{}
-	driver.oracleTypeCoder[types.UROWID] = &parameter_coder.RowIDParameter{}
+	driver.oracleTypeCoder[types.ROWID] = &codec.RowIDParameter{}
+	driver.oracleTypeCoder[types.UROWID] = &codec.RowIDParameter{}
 
-	driver.oracleTypeCoder[types.BOOLEAN] = &parameter_coder.BoolParameter{}
+	driver.oracleTypeCoder[types.BOOLEAN] = &codec.BoolParameter{}
 
-	driver.oracleTypeCoder[types.REFCURSOR] = &parameter_coder.CursorParameter{}
+	driver.oracleTypeCoder[types.REFCURSOR] = &codec.CursorParameter{}
 
-	driver.goTypeCoder[types.TyString] = &parameter_coder.StringParameter{}
-	driver.goTypeCoder[types.TyNullString] = &parameter_coder.StringParameter{}
-	driver.goTypeCoder[types.TyVarchar] = &parameter_coder.StringParameter{}
+	driver.goTypeCoder[types.TyString] = &codec.StringParameter{}
+	driver.goTypeCoder[types.TyNullString] = &codec.StringParameter{}
+	driver.goTypeCoder[types.TyVarchar] = &codec.StringParameter{}
 
-	driver.goTypeCoder[types.TyBytes] = &parameter_coder.RawParameter{}
-	driver.goTypeCoder[types.TyRaw] = &parameter_coder.RawParameter{}
+	driver.goTypeCoder[types.TyBytes] = &codec.RawParameter{}
+	driver.goTypeCoder[types.TyRaw] = &codec.RawParameter{}
 
-	driver.goTypeCoder[types.TyInt] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyInt8] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyInt16] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyInt32] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyInt64] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyUint] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyUint8] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyUint16] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyUint32] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyUint64] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyFloat32] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyFloat64] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyNullByte] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyNullInt16] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyNullInt32] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyNullInt64] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyNullFloat64] = &parameter_coder.NumberParameter{}
-	driver.goTypeCoder[types.TyNumber] = &parameter_coder.NumberParameter{}
+	driver.goTypeCoder[types.TyInt] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyInt8] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyInt16] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyInt32] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyInt64] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyUint] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyUint8] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyUint16] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyUint32] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyUint64] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyFloat32] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyFloat64] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyNullByte] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyNullInt16] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyNullInt32] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyNullInt64] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyNullFloat64] = &codec.NumberParameter{}
+	driver.goTypeCoder[types.TyNumber] = &codec.NumberParameter{}
 
-	driver.goTypeCoder[types.TyBoolean] = &parameter_coder.BoolParameter{}
+	driver.goTypeCoder[types.TyBoolean] = &codec.BoolParameter{}
 
-	driver.goTypeCoder[types.TyTime] = &parameter_coder.DateParameter{}
-	driver.goTypeCoder[types.TyNullTime] = &parameter_coder.DateParameter{}
-	driver.goTypeCoder[types.TyDate] = &parameter_coder.DateParameter{}
+	driver.goTypeCoder[types.TyTime] = &codec.DateParameter{}
+	driver.goTypeCoder[types.TyNullTime] = &codec.DateParameter{}
+	driver.goTypeCoder[types.TyDate] = &codec.DateParameter{}
 
-	driver.goTypeCoder[types.TyInterval] = &parameter_coder.IntervalParameter{}
+	driver.goTypeCoder[types.TyInterval] = &codec.IntervalParameter{}
 
-	driver.goTypeCoder[types.TyVector] = &parameter_coder.VectorParameter{}
-	driver.goTypeCoder[types.TyJson] = &parameter_coder.JsonParameter{}
+	driver.goTypeCoder[types.TyVector] = &codec.VectorParameter{}
+	driver.goTypeCoder[types.TyJson] = &codec.JsonParameter{}
 
-	driver.goTypeCoder[types.TyClob] = &parameter_coder.ClobParameter{}
-	driver.goTypeCoder[types.TyBlob] = &parameter_coder.BlobParameter{}
-	driver.goTypeCoder[types.TyBFile] = &parameter_coder.BFileParameter{}
+	driver.goTypeCoder[types.TyClob] = &codec.ClobParameter{}
+	driver.goTypeCoder[types.TyBlob] = &codec.BlobParameter{}
+	driver.goTypeCoder[types.TyBFile] = &codec.BFileParameter{}
 
-	driver.goTypeCoder[reflect.TypeFor[RefCursor]()] = &parameter_coder.CursorParameter{}
+	driver.goTypeCoder[reflect.TypeFor[RefCursor]()] = &codec.CursorParameter{}
 
 	// name type coder
-	driver.nameTypeCoder["NUMBER"] = &parameter_coder.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
-	driver.nameTypeCoder["IBFLOAT"] = &parameter_coder.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
-	driver.nameTypeCoder["IBDOUBLE"] = &parameter_coder.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
-	driver.nameTypeCoder["VARCHAR2"] = &parameter_coder.StringParameter{}
-	driver.nameTypeCoder["NVARCHAR2"] = &parameter_coder.StringParameter{CharsetForm: 2}
-	driver.nameTypeCoder["TIMESTAMP"] = &parameter_coder.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStampTZ}
-	driver.nameTypeCoder["DATE"] = &parameter_coder.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
-	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &parameter_coder.DateParameter{DataType: types.TimeStampLTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
-	driver.nameTypeCoder["RAW"] = &parameter_coder.RawParameter{}
-	driver.nameTypeCoder["BLOB"] = &parameter_coder.BlobParameter{}
-	driver.nameTypeCoder["CLOB"] = &parameter_coder.ClobParameter{}
-	tempClob := &parameter_coder.ClobParameter{}
+	driver.nameTypeCoder["NUMBER"] = &codec.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
+	driver.nameTypeCoder["IBFLOAT"] = &codec.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
+	driver.nameTypeCoder["IBDOUBLE"] = &codec.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
+	driver.nameTypeCoder["VARCHAR2"] = &codec.StringParameter{}
+	driver.nameTypeCoder["NVARCHAR2"] = &codec.StringParameter{CharsetForm: 2}
+	driver.nameTypeCoder["TIMESTAMP"] = &codec.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStampTZ}
+	driver.nameTypeCoder["DATE"] = &codec.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
+	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &codec.DateParameter{DataType: types.TimeStampLTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.nameTypeCoder["RAW"] = &codec.RawParameter{}
+	driver.nameTypeCoder["BLOB"] = &codec.BlobParameter{}
+	driver.nameTypeCoder["CLOB"] = &codec.ClobParameter{}
+	tempClob := &codec.ClobParameter{}
 	tempClob.CharsetForm = 2
 	driver.nameTypeCoder["NCLOB"] = tempClob
 
@@ -273,7 +273,7 @@ func AddSessionParam(db *sql.DB, key, value string) error {
 //	return errors.New("the driver used is not a go-ora driver type")
 //}
 
-func AddParameterCoder(db *sql.DB, go_type reflect.Type, oracle_type uint16, coder parameter_coder.OracleParameterCoder) error {
+func AddParameterCoder(db *sql.DB, go_type reflect.Type, oracle_type uint16, coder codec.OracleParameterCoder) error {
 	if drv, ok := db.Driver().(*OracleDriver); ok {
 		drv.mu.Lock()
 		drv.oracleTypeCoder[oracle_type] = coder
@@ -439,7 +439,7 @@ func RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTypeName string, ty
 			arrayCoder.typ = reflect.SliceOf(typ)
 		}
 		arrayCoder.TypeName = arrayTypeName
-		arrayCoder.attribs = make(map[string]parameter_coder.OracleParameterCoder)
+		arrayCoder.attribs = make(map[string]codec.OracleParameterCoder)
 		arrayParam.SetAsArrayPar()
 		arrayCoder.attribs[""] = arrayParam
 		arrayCoder.ToID, err = getTOID2(db, owner, arrayTypeName)
@@ -635,7 +635,7 @@ func ParseConfig(dsn string) (*configurations.ConnectionConfig, error) {
 		return nil, err
 	}
 	if len(config.OSPassword) > 0 {
-		SetNTSAuth(&advanced_nego.NTSAuthHash{})
+		SetNTSAuth(&auth.NTSAuthHash{})
 	}
 	return config, nil
 	// connStr, err := newConnectionStringFromUrl(dsn)

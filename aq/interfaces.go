@@ -3,22 +3,22 @@ package aq
 import (
 	"time"
 
-	"github.com/xo/oracle/converters"
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/types"
 )
 
 type (
 	IConnection interface {
 		converters.StringCoder
-		GetSession() network.SessionReadWriter
+		GetSession() tns.SessionReadWriter
 		NewLobStreamer() types.LobStreamer
 		ProcessTCCResponse(msgCode uint8) error
 		//GetGoParameterCoder(goType reflect.Type) OracleParameterCoder
 		//GetOracleParameterCoder(oracleType uint16) OracleParameterCoder
 		//GetNameParameterCoder(nameType string) OracleParameterCoder
-		GetParameterCoder(input any) (parameter_coder.OracleParameterCoder, error)
+		GetParameterCoder(input any) (codec.OracleParameterCoder, error)
 		SendTimeAsUTC() bool
 		GetDBTimeZone() *time.Location
 		GetDBServerTimeZone() *time.Location

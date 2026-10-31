@@ -5,7 +5,7 @@ package go_ora
 //	"database/sql/driver"
 //	"encoding/json"
 //	"errors"
-//	"github.com/xo/oracle/converters"
+//	"github.com/xo/oracle/internal/converters"
 //	oraTypes "github.com/xo/oracle/types"
 //	"time"
 //)

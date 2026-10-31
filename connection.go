@@ -19,14 +19,14 @@ import (
 
 	"github.com/xo/oracle/aq"
 	"github.com/xo/oracle/configurations"
-	"github.com/xo/oracle/lazy_init"
-	"github.com/xo/oracle/parameter_coder"
-	"github.com/xo/oracle/trace"
+	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/lazyinit"
+	"github.com/xo/oracle/internal/trace"
 	"github.com/xo/oracle/types"
 
-	"github.com/xo/oracle/advanced_nego"
-	"github.com/xo/oracle/converters"
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/auth"
+	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/tns"
 )
 
 type ConnectionState int
@@ -99,7 +99,7 @@ type Connection struct {
 	autoCommit        bool
 	tracer            trace.Tracer
 	connOption        *configurations.ConnectionConfig
-	session           *network.Session
+	session           *tns.Session
 	tcpNego           *TCPNego
 	dataNego          *DataTypeNego
 	authObject        *AuthObject
@@ -112,9 +112,9 @@ type Connection struct {
 	nStrConv          converters.IStringConverter
 	cStrConv          converters.IStringConverter
 	NLSData           NLSData
-	goTypeCoder       map[reflect.Type]parameter_coder.OracleParameterCoder
-	oracleTypeCoder   map[uint16]parameter_coder.OracleParameterCoder
-	nameTypeCoder     map[string]parameter_coder.OracleParameterCoder
+	goTypeCoder       map[reflect.Type]codec.OracleParameterCoder
+	oracleTypeCoder   map[uint16]codec.OracleParameterCoder
+	nameTypeCoder     map[string]codec.OracleParameterCoder
 	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
 	cusTyp map[string]types.Object
 	maxLen struct {
@@ -581,7 +581,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		conn.LogonMode = 0
 	}
 	conn.connOption.ResetServerIndex()
-	conn.session = network.NewSession(conn.connOption, conn.tracer)
+	conn.session = tns.NewSession(conn.connOption, conn.tracer)
 	W := conn.connOption.Wallet
 	if conn.connOption.SSL && W != nil {
 		err := conn.session.LoadSSLData(W.Certificates, W.PrivateKeys, W.CertificateRequests)
@@ -598,10 +598,10 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 		return err
 	}
 	// advanced negotiation
-	var ano *advanced_nego.AdvNego = nil
+	var ano *auth.AdvNego = nil
 	if session.Context.ACFL0&1 != 0 && session.Context.ACFL0&4 == 0 && session.Context.ACFL1&8 == 0 {
 		tracer.Print("Advance Negotiation")
-		ano, err = advanced_nego.NewAdvNego(session, conn.tracer, conn.connOption)
+		ano, err = auth.NewAdvNego(session, conn.tracer, conn.connOption)
 		if err != nil {
 			return err
 		}
@@ -681,7 +681,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 
 	err = conn.doAuth()
-	if errors.Is(err, network.ErrConnReset) {
+	if errors.Is(err, tns.ErrConnReset) {
 		if conn.isFastLoginEnabled() {
 			err = conn.tcpNego.readMessage()
 			if err != nil {
@@ -1280,11 +1280,11 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 	return stmt.Exec(args)
 }
 
-func SetNTSAuth(newNTSManager advanced_nego.NTSAuthInterface) {
-	advanced_nego.NTSAuth = newNTSManager
+func SetNTSAuth(newNTSManager auth.NTSAuthInterface) {
+	auth.NTSAuth = newNTSManager
 }
 
-var insertQueryBracketsRegexp = lazy_init.NewLazyInit(func() (any, error) {
+var insertQueryBracketsRegexp = lazyinit.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`\((.*?)\)`)
 })
 
@@ -1567,7 +1567,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		//	}
 		//	conn.session.ResetBreak()
 		// }
-		conn.session.Summary, err = network.NewSummary(session)
+		conn.session.Summary, err = tns.NewSummary(session)
 		if err != nil {
 			return err
 		}
@@ -1655,7 +1655,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		}
 		if session.HasFSAPCapability {
 			if session.Summary == nil {
-				session.Summary = new(network.SummaryObject)
+				session.Summary = new(tns.SummaryObject)
 			}
 			session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
 			if err != nil {
@@ -1663,7 +1663,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			}
 		}
 	case 15:
-		warning, err := network.NewWarningObject(session)
+		warning, err := tns.NewWarningObject(session)
 		if err != nil {
 			return err
 		}
@@ -1755,7 +1755,7 @@ func (conn *Connection) appendTemporaryLoc(loc types.Locator) {
 	conn.temporaryLocs = append(conn.temporaryLocs, loc)
 }
 
-func (conn *Connection) GetSession() network.SessionReadWriter {
+func (conn *Connection) GetSession() tns.SessionReadWriter {
 	return conn.session
 }
 
@@ -1763,7 +1763,7 @@ func (conn *Connection) NewLobStreamer() types.LobStreamer {
 	return &LobStream{conn: conn}
 }
 
-func (conn *Connection) GetParameterCoder(input any) (parameter_coder.OracleParameterCoder, error) {
+func (conn *Connection) GetParameterCoder(input any) (codec.OracleParameterCoder, error) {
 	switch input := input.(type) {
 	case reflect.Type:
 		if coder, ok := conn.goTypeCoder[input]; ok {

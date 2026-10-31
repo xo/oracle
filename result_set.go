@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/trace"
+	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/trace"
+	"github.com/xo/oracle/internal/utils"
 	types "github.com/xo/oracle/types"
-	"github.com/xo/oracle/utils"
 
 	"io"
 	"reflect"
@@ -29,7 +29,7 @@ type ResultSet struct {
 	lastErr         error
 }
 
-func (resultSet *ResultSet) load(session *network.Session) error {
+func (resultSet *ResultSet) load(session *tns.Session) error {
 	var err error
 	_, err = session.GetByte()
 	if err != nil {

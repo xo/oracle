@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/xo/oracle/converters"
+	"github.com/xo/oracle/internal/converters"
 )
 
 type String struct {

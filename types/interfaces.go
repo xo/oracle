@@ -6,8 +6,8 @@ import (
 	"database/sql/driver"
 
 	"github.com/xo/oracle/configurations"
-	"github.com/xo/oracle/converters"
-	"github.com/xo/oracle/trace"
+	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/trace"
 )
 
 type LobStreamer interface {

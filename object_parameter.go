@@ -10,16 +10,16 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/utils"
 	"github.com/xo/oracle/types"
-	"github.com/xo/oracle/utils"
 )
 
 type ObjectParameter struct {
-	parameter_coder.BasicParameter
+	codec.BasicParameter
 	fields       []string
-	attribs      map[string]parameter_coder.OracleParameterCoder
+	attribs      map[string]codec.OracleParameterCoder
 	isArray      bool
 	activeFields map[string]int
 	typ          reflect.Type
@@ -70,7 +70,7 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, owner, name string)
 		length      sql.NullInt64
 	)
 	drv := db.Driver().(*OracleDriver)
-	param.attribs = make(map[string]parameter_coder.OracleParameterCoder)
+	param.attribs = make(map[string]codec.OracleParameterCoder)
 	for rows.Next() {
 		err = rows.Scan(&attName, &attTypeName, &length, &attOrder)
 		if err != nil {
@@ -93,7 +93,7 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, owner, name string)
 	return
 }
 
-func (param *ObjectParameter) Copy() parameter_coder.OracleParameterCoder {
+func (param *ObjectParameter) Copy() codec.OracleParameterCoder {
 	ret := new(ObjectParameter)
 	*ret = *param
 	return ret
@@ -114,9 +114,9 @@ func (param *ObjectParameter) Init() {
 // func (param *ObjectParameter) encodeArray(input interface{}, conn parameter_coder.IConnection) (err error) {
 //
 // }
-func (param *ObjectParameter) Encode(input any, conn parameter_coder.IConnection) (err error) {
+func (param *ObjectParameter) Encode(input any, conn codec.IConnection) (err error) {
 	param.Init()
-	session := network.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
+	session := tns.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
 	inputType := getType(input)
 	rValue := reflect.ValueOf(input)
 	if input == nil {
@@ -227,7 +227,7 @@ func (param *ObjectParameter) encapsulate() (err error) {
 	return
 }
 
-func (param *ObjectParameter) Write(session network.SessionWriter) error {
+func (param *ObjectParameter) Write(session tns.SessionWriter) error {
 	if param.PSession == nil {
 		if param.BValue == nil {
 			if param.isArray {
@@ -267,12 +267,12 @@ func (param *ObjectParameter) Write(session network.SessionWriter) error {
 	return nil
 }
 
-func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (any, error) {
+func (param *ObjectParameter) Decode(conn codec.IConnection) (any, error) {
 	// need main session to get its properties
 	var objectType uint8
 	var err error
 	if param.PSession == nil {
-		param.PSession = network.NewMemorySession(param.BValue, nil, conn.GetSession().GetProperties())
+		param.PSession = tns.NewMemorySession(param.BValue, nil, conn.GetSession().GetProperties())
 		objectType, err = param.PSession.GetByte()
 		if err != nil {
 			return nil, err
@@ -375,7 +375,7 @@ func (param *ObjectParameter) Decode(conn parameter_coder.IConnection) (any, err
 
 }
 
-func (param *ObjectParameter) Read(session network.SessionReader) error {
+func (param *ObjectParameter) Read(session tns.SessionReader) error {
 	var err error
 	if param.IsArrayPar {
 		param.BValue, err = session.GetFixedClr()

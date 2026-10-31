@@ -66,7 +66,7 @@ Step 9 of `DESIGN.md` writes a test for each again, on the new API:
 Step 1 also deleted the unit tests of functions that `v3` removed:
 `parameter_encode_test.go`, `bulkcopy_test.go`, the tests of `setString`,
 `setFieldValue` and `setNull`, and `TestCreateNewType` with the dead function
-that it tested. The vectors of `converters/other_types_test.go` moved to
+that it tested. The vectors of `converters/other_types_test.go`, now under `internal/`, moved to
 `types/vectors_test.go`.
 
 ### Make 11g to 19c pass
@@ -89,7 +89,8 @@ or to leave 19c out of CI.
 ### Shrink the charset tables
 
 An earlier analysis of the upstream `v3` code found that 88 percent of it, 11.3
-of 12.7 MB, was one generated file, `converters/string_conversion_new.go`. It is
+of 12.7 MB, was one generated file, `converters/string_conversion_new.go`, now
+`internal/converters/string_conversion_new.go`. It is
 a `switch` over 236 Oracle charset IDs that returns a converter with inline
 `[]int` and `map[int]int` literals. A minimal program that imports the driver
 built to 23.6 MB, or 20.2 MB stripped.
@@ -116,7 +117,7 @@ EUC style charset, such as 0x35C and 0x35F, decodes wrongly. Add a test.
 
 ### Fix the root level leftovers
 
-Only `./types/oson/...` and a few other unit tests run with no server. Most
+Only `./internal/codec/oson/...` and a few other unit tests run with no server. Most
 tests need a live database.
 
 ### Tell dburl when the parser lands

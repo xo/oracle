@@ -122,7 +122,7 @@ var m map[string]interface{}
 js.CopyTo(&m)
 ```
 
-Oracle Binary JSON (OSON) encoding is supported via the `types/oson` package.
+The driver encodes and decodes Oracle Binary JSON (OSON) itself.
 
 ### BOOLEAN (Oracle 23c+)
 
@@ -191,17 +191,16 @@ Implement the `OracleParameterCoder` interface to add support for any Oracle typ
 
 ```
 oracle/
-├── advanced_nego/     # NTS, Kerberos authentication
 ├── aq/                # Advanced Queuing
 ├── configurations/    # Connection string parsing
-├── converters/        # String and data converters
-├── network/           # TTC protocol, packets, session
-│   └── security/      # Network security utilities
-├── parameter_coder/   # Type encoding/decoding
-├── trace/             # Logging and tracing
 ├── types/             # Oracle type implementations
-│   └── oson/          # Oracle Binary JSON (OSON)
-├── utils/             # General utilities
+├── internal/
+│   ├── auth/          # Encryption, checksums, Kerberos, NTS, NTLM
+│   ├── codec/         # Type encoding and decoding, and OSON
+│   ├── converters/    # Charsets, NUMBER, dates
+│   ├── tns/           # TNS packets and the session
+│   └── tnstest/       # Recorded exchanges for the tests
+├── testdata/exchanges # Exchanges recorded against each release
 ├── connection.go      # Connection implementation
 ├── driver.go          # Driver registration
 ├── command.go         # Statement execution

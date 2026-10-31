@@ -19,7 +19,7 @@ holds the fix. Each needs a test against an old release before it is closed.
 
 | Issue | Fault | What the code shows |
 | --- | --- | --- |
-| sijms/go-ora#759 | panic on connect to 11g, reading bytes 41 to 45 of a 32 byte ACCEPT packet | `network/accept_packet.go` reads them only when the packet is 45 bytes or longer. Checked |
+| sijms/go-ora#759 | panic on connect to 11g, reading bytes 41 to 45 of a 32 byte ACCEPT packet | `internal/tns/accept_packet.go` reads them only when the packet is 45 bytes or longer. Checked |
 | sijms/go-ora#774 | ORA-01017 for a password longer than 30 characters | `data_type_nego.go` sends 234 as the logon types byte, which holds `O9LOGON_LONG_PASSWORD`. The fault is in `v2` only. Checked |
 | sijms/go-ora#686 | `isEqualLoc` is always true | `types/utils.go` compares the zone name and offset. Checked |
 | sijms/go-ora#764 | v3.0.1 cannot log in, fixed by commit `1f57ed4` | `1f57ed4` is in this history. Checked |
@@ -34,8 +34,8 @@ blocks a connection, P2 is a fault with a workaround.
 | sijms/go-ora#767 | P0 | A cancelled transaction can commit. `Rollback` runs under the cancelled context, and `breakConn` is read without the lock | Roll back under `context.WithoutCancel`, and read `breakConn` under the lock | `transaction.go` passes `tx.ctx`. Checked |
 | sijms/go-ora#776 | P1 | `SELECT NULL a FROM dual` returns no row and no error. sijms/go-ora#755 is the same family in `v2` | Do not end the row loop on a row whose columns are all zero length | Open |
 | sijms/go-ora#769 | P1 | A CLOB over about 8K UTF-16 units with characters outside the BMP reads back as U+FFFD with `LOB FETCH=INLINE` | Fetch inline CLOB text as AL16UTF16. sijms/go-ora#768 does this | Open |
-| sijms/go-ora#765 | P1 | After a RAC SCAN redirect, TLS checks the certificate against the redirect address | Keep the host of the connect string as `ServerName`. sijms/go-ora#766 does this | `network/session.go` sets `ServerName` to the active server. Checked |
-| sijms/go-ora#757 | P1 | `negotiate` writes `ServerName` into the caller's `*tls.Config` on every dial | Clone the configuration before writing to it. Fix with sijms/go-ora#765 | `network/session.go` writes it. Checked |
+| sijms/go-ora#765 | P1 | After a RAC SCAN redirect, TLS checks the certificate against the redirect address | Keep the host of the connect string as `ServerName`. sijms/go-ora#766 does this | `internal/tns/session.go` sets `ServerName` to the active server. Checked |
+| sijms/go-ora#757 | P1 | `negotiate` writes `ServerName` into the caller's `*tls.Config` on every dial | Clone the configuration before writing to it. Fix with sijms/go-ora#765 | `internal/tns/session.go` writes it. Checked |
 | sijms/go-ora#771 | P1 | XMLType is NULL on Autonomous Database, whose flag word is 0x8014, and a value over about 254 bytes hangs | Test the flag bits, not equality. sijms/go-ora#770 does this in `v2` | Not located in `v3` yet |
 | sijms/go-ora#692 | P1 | Two databases with different `NLS_CHARACTERSET` in one process garble text | Keep the charset per connection | Open |
 | sijms/go-ora#702 | P1 | The context deadline is not kept in `PrepareContext` and `ExecContext` | Set a deadline on the network connection | Open |

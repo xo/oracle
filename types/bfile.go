@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/xo/oracle/converters"
+	"github.com/xo/oracle/internal/converters"
 )
 
 type BFile struct {

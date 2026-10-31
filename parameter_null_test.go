@@ -3,7 +3,7 @@ package go_ora
 import (
 	"testing"
 
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 )
 
 // TestDecodePrimValueUntypedNull verifies that decodePrimValue handles
@@ -14,7 +14,7 @@ func TestDecodePrimValueUntypedNull(t *testing.T) {
 	// Simulate a stream containing a null value: GetClr reads one byte (0x00)
 	// which means null
 	inputBuffer := []byte{0x00}
-	session := network.NewMemorySession(inputBuffer, nil, network.SessionProperties{})
+	session := tns.NewMemorySession(inputBuffer, nil, tns.SessionProperties{})
 
 	par := &ParameterInfo{}
 	par.DataType = 0 // untyped NULL

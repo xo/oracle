@@ -3,7 +3,7 @@ package aq
 import (
 	"time"
 
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/types"
 	//"github.com/xo/oracle/type_coder"
 )
@@ -304,7 +304,7 @@ func (message *Message) readData(conn IConnection, messageType MessageType, udtN
 	if err != nil {
 		return err
 	}
-	var decoder parameter_coder.OracleParameterDecoder
+	var decoder codec.OracleParameterDecoder
 	switch messageType {
 	case RAW:
 		decoder, err = conn.GetParameterCoder(types.RAW)

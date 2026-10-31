@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"reflect"
 
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/codec"
 	oraTypes "github.com/xo/oracle/types"
 )
 
@@ -691,7 +691,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 							par.MaxLen = 1
 						}
 						// if item is not xml type go for arrays
-						par.encoder = &parameter_coder.ArrayParameter{}
+						par.encoder = &codec.ArrayParameter{}
 					}
 				} else {
 					return err

@@ -19,10 +19,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xo/oracle/lazy_init"
+	"github.com/xo/oracle/internal/lazyinit"
 	oraTypes "github.com/xo/oracle/types"
 
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 )
 
 var (
@@ -133,7 +133,7 @@ func refineSqlText(text string) string {
 	return strings.TrimSpace(string(textBuffer))
 }
 
-var parameterNameRegexp = lazy_init.NewLazyInit(func() (any, error) {
+var parameterNameRegexp = lazyinit.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`:(\w+)`)
 })
 
@@ -261,7 +261,7 @@ func tFloat(input reflect.Type) bool {
 //}
 
 func processReset(err error, conn *Connection) error {
-	if errors.Is(err, network.ErrConnReset) {
+	if errors.Is(err, tns.ErrConnReset) {
 		err = conn.read()
 	}
 	if err != nil && isBadConn(err) {
@@ -272,7 +272,7 @@ func processReset(err error, conn *Connection) error {
 
 func isBadConn(err error) bool {
 	var opError *net.OpError
-	var oraError *network.OracleError
+	var oraError *tns.OracleError
 	switch {
 	case errors.Is(err, io.EOF):
 		return true

@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xo/oracle/lazy_init"
+	"github.com/xo/oracle/internal/lazyinit"
+	"github.com/xo/oracle/internal/utils"
 	oraTypes "github.com/xo/oracle/types"
-	"github.com/xo/oracle/utils"
 
 	"github.com/xo/oracle/configurations"
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 )
 
 type StmtType int
@@ -304,7 +304,7 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 	return rs.rowsAffected, nil
 }
 
-var sqlQueryReturnStatementRegexp = lazy_init.NewLazyInit(func() (any, error) {
+var sqlQueryReturnStatementRegexp = lazyinit.NewLazyInit(func() (any, error) {
 	return regexp.Compile(`(\bRETURNING\b|\bRETURN\b)\s+.*\s+\bINTO\b`)
 })
 
@@ -356,7 +356,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 
 func (stmt *Stmt) writePars() error {
 	session := stmt.connection.session
-	ms := network.NewMemorySession(nil, nil, session.SessionProperties)
+	ms := tns.NewMemorySession(nil, nil, session.SessionProperties)
 	//buffer := bytes.Buffer{}
 	for _, par := range stmt.Pars {
 		if par.Flag == 0x80 {
@@ -649,7 +649,7 @@ func (stmt *defaultStmt) fetch(resultSet *ResultSet) error {
 
 	tracer := stmt.connection.tracer
 	err := stmt._fetch(resultSet)
-	if errors.Is(err, network.ErrConnReset) {
+	if errors.Is(err, tns.ErrConnReset) {
 		err = stmt.connection.read()
 		session := stmt.connection.session
 		if session.Summary != nil {
@@ -1217,11 +1217,11 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	go func() {
 		result, err := stmt._exec(args)
 
-		if errors.Is(err, network.ErrConnReset) {
+		if errors.Is(err, tns.ErrConnReset) {
 			if stmt._hasReturnClause {
 				dataSet := &DataSet{}
 				err = stmt.read(dataSet.currentResultSet())
-				if !errors.Is(err, network.ErrConnReset) {
+				if !errors.Is(err, tns.ErrConnReset) {
 					execDone <- execResult{result: nil, err: err}
 					return
 				}
@@ -1935,7 +1935,7 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		result, err = stmt._exec(namedArgs)
 	}
-	if errors.Is(err, network.ErrConnReset) {
+	if errors.Is(err, tns.ErrConnReset) {
 		err = stmt.connection.read()
 		session := stmt.connection.session
 		if session.Summary != nil {
@@ -2051,7 +2051,7 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	}
 
 	dataSet, err := stmt._query()
-	if errors.Is(err, network.ErrConnReset) {
+	if errors.Is(err, tns.ErrConnReset) {
 		err = stmt.connection.read()
 		session := stmt.connection.session
 		if session.Summary != nil {

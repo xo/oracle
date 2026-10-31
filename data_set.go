@@ -2,8 +2,8 @@ package go_ora
 
 import (
 	"database/sql/driver"
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/trace"
+	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/trace"
 	"io"
 	"reflect"
 )
@@ -50,7 +50,7 @@ func (dataSet *DataSet) clear() {
 }
 
 // load Loading dataset information from network session
-func (dataSet *DataSet) load(session *network.Session) error {
+func (dataSet *DataSet) load(session *tns.Session) error {
 	return dataSet.currentResultSet().load(session)
 }
 

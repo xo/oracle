@@ -3,7 +3,7 @@ package go_ora
 import (
 	"database/sql/driver"
 
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/types"
 
 	"github.com/xo/oracle/configurations"
@@ -95,7 +95,7 @@ func (cursor *RefCursor) load() error {
 		return err
 	}
 	if cursor.cursorID == 0 {
-		return network.NewOracleError(1001)
+		return tns.NewOracleError(1001)
 	}
 	return nil
 }

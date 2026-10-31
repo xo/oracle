@@ -62,10 +62,12 @@ yourself and do not write it as though it were settled.
 
 ## Layout
 
-- `/` is the driver, in package `go_ora` until the rename in the open
-  question in `docs/PLAN.md` is settled.
-- `advanced_nego`, `network`, `converters`, `configurations`, `types`, `aq`,
-  `parameter_coder`, `trace` and `utils` are internal pieces of the driver.
+- `/` is the driver, in package `go_ora` until step 4 of `docs/DESIGN.md`
+  renames it `oracle` (D8).
+- `configurations`, `types` and `aq` are public. Step 4 moves the first two
+  into the root package.
+- `internal/` holds everything that a caller does not use, and the table in
+  `docs/DESIGN.md`, under Packages, says what each package holds (D12).
 - `internal/repotest` holds the tests of the repository setup.
 - `internal/tnstest` records the TNS packets of a connection and plays them
   back with no server. `testdata/exchanges/<release>/` holds the recordings,

@@ -60,20 +60,35 @@ dbimp hard rule 1 asks. A consumer imports it as `_ "github.com/xo/oracle"` or
 calls it as `oracle.NewConnector`.
 
 Everything that a caller does not use goes under `internal/`, so that it can
-change without a new major version. Today every package is public.
+change without a new major version. `go-ora` made every package public.
 
-| Path | Holds | Today |
+Step 3 moved each package of `go-ora` that a caller does not use under
+`internal/`, and changed nothing else. The third column says where each one
+was. The 30 recorded exchanges passed before and after the move, so the driver
+sent the same packets.
+
+| Path | Holds | In `go-ora` |
 | --- | --- | --- |
-| `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package, `configurations` and `types` |
+| `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package. Step 4 moves `configurations` and `types` here |
 | `aq/` | Advanced Queuing | `aq` |
 | `internal/tns/` | Packets, the session, TLS, the redirect, out of band breaks | `network` |
-| `internal/ttc/` | Messages, the negotiation of protocol and data types, cursors, LOB calls | the root package, `network` |
-| `internal/auth/` | O5LOGON, Kerberos, NTS and NTLM, tokens, wallets | `advanced_nego`, `auth_object.go`, `configurations/wallet*.go` |
-| `internal/charset/` | The Oracle charsets, compacted | `converters` |
-| `internal/codec/` | The encoders and decoders of each Oracle type, NUMBER, dates, intervals, OSON, VECTOR | `parameter_coder`, `converters`, `types/oson` |
+| `internal/auth/` | The advanced negotiation of Oracle Net: encryption, checksums, Kerberos and NTS | `advanced_nego` |
+| `internal/auth/security/` | DES and RC4, and the padding that O5LOGON uses | `network/security` |
+| `internal/auth/ntlmssp/` | NTLM, with the MD4 hash that it needs | `advanced_nego/ntlmssp`, `network/security/md4` |
+| `internal/codec/` | The encoders and decoders of each Oracle type | `parameter_coder` |
+| `internal/codec/oson/` | OSON, the binary JSON of Oracle | `types/oson` |
+| `internal/converters/` | The charsets, NUMBER, dates and floats | `converters` |
+| `internal/trace/`, `internal/lazyinit/`, `internal/utils/` | Helpers | `trace`, `lazy_init`, `utils` |
 
-`lazy_init`, `trace` and `utils` are deleted. Their contents move to the package
-that uses them or go away.
+Later steps finish the layout:
+
+- Step 4 moves the TTC messages of the root package, such as cursors, LOB
+  calls and the negotiation of data types, to `internal/ttc/`, and O5LOGON and
+  the wallets to `internal/auth/`.
+- Step 8 splits `internal/converters` into `internal/charset`, the compacted
+  charsets, and `internal/codec`, the number and date encoders.
+- `internal/trace` goes with D14, and the code of `internal/lazyinit` and
+  `internal/utils` moves to the package that uses it.
 
 ## The root package
 

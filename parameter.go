@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/xo/oracle/configurations"
-	"github.com/xo/oracle/converters"
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/converters"
+	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/types"
 )
 
@@ -65,7 +65,7 @@ type ParameterInfo struct {
 	//MaxNoOfArrayElements int
 
 	Value             driver.Value
-	encoder           parameter_coder.OracleParameterEncoder
+	encoder           codec.OracleParameterEncoder
 	iPrimValue        driver.Value
 	oPrimValue        driver.Value
 	getDataFromServer bool
@@ -73,7 +73,7 @@ type ParameterInfo struct {
 	cusType           *oraTypes.Object
 	parent            *ParameterInfo
 	Annotations       map[string]string
-	parameter_coder.BasicParameter
+	codec.BasicParameter
 }
 
 // load get parameter information form network session
@@ -326,7 +326,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 }
 
 // write parameter information to network session
-func (par *ParameterInfo) write(session *network.Session) error {
+func (par *ParameterInfo) write(session *tns.Session) error {
 	session.PutBytes(uint8(par.DataType), par.Flag, par.Precision, par.Scale)
 	session.PutUint(par.MaxLen, 4, true, true)
 	// MaxNoOfArrayElements should be 0 in case of XML type
@@ -422,9 +422,9 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 	var err error
 	par.oPrimValue = nil
 	par.BValue = nil
-	var decoder parameter_coder.OracleParameterCoder
+	var decoder codec.OracleParameterCoder
 	if par.ArraySize > 0 {
-		decoder = &parameter_coder.ArrayParameter{}
+		decoder = &codec.ArrayParameter{}
 	} else if par.DataType == 0 {
 		// untyped NULL column (e.g. SELECT NULL FROM dual): read the
 		// null value from the stream without needing a registered coder

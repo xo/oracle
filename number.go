@@ -6,7 +6,7 @@ package go_ora
 //	"errors"
 //	"fmt"
 //
-//	"github.com/xo/oracle/converters"
+//	"github.com/xo/oracle/internal/converters"
 //	oraTypes "github.com/xo/oracle/types"
 //
 //	"math"

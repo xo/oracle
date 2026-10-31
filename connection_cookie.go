@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"sync"
 
-	"github.com/xo/oracle/network"
+	"github.com/xo/oracle/internal/tns"
 )
 
 type ConnectionCookie struct {
@@ -79,7 +79,7 @@ func saveCookie(conn *Connection) {
 	cookieMu.Unlock()
 }
 
-func (c *ConnectionCookie) writeTTICookie(session *network.Session) {
+func (c *ConnectionCookie) writeTTICookie(session *tns.Session) {
 	session.PutBytes(30, 1)
 	session.PutBytes(uint8(c.OracleVersion))
 	session.PutUint(c.ServerCharset, 2, false, false)

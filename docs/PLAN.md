@@ -170,6 +170,9 @@ TNS, TTC, authentication, charsets and the type codecs move under `internal/`,
 so that they can change with no new major version. The root package, `aq/`,
 and the value types that a caller passes or scans stay public.
 
+Step 3 of `DESIGN.md` moved the packages of `go-ora` on 2026-10-31, and
+changed nothing else. The recorded exchanges passed before and after.
+
 ## D13. The module requires Go 1.27.1
 
 Status: Decided. Amends the `go 1.24` line of `go.mod`.

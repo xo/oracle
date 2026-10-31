@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xo/oracle/network"
-	"github.com/xo/oracle/parameter_coder"
+	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/tns"
+	"github.com/xo/oracle/internal/utils"
 	"github.com/xo/oracle/types"
-	"github.com/xo/oracle/utils"
 )
 
 type Queue interface {
@@ -92,7 +92,7 @@ func (qu *queue) NewMessage(data any) (*Message, error) {
 		Payload:          data,
 		extensions:       nil,
 	}
-	var encoder parameter_coder.OracleParameterCoder
+	var encoder codec.OracleParameterCoder
 	switch qu.messageType {
 	case RAW:
 		encoder, err = qu.conn.GetParameterCoder(types.RAW)
@@ -114,7 +114,7 @@ func (qu *queue) NewMessage(data any) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	ms := network.NewMemorySession(nil, nil, qu.conn.GetSession().GetProperties())
+	ms := tns.NewMemorySession(nil, nil, qu.conn.GetSession().GetProperties())
 	err = encoder.Write(ms)
 	message.bValue = ms.GetWriteBuffer()
 	return message, err
