@@ -11,8 +11,8 @@ import (
 )
 
 type LobStreamer interface {
-	StartContext(ctx context.Context) chan struct{}
-	EndContext(done chan struct{})
+	StartContext(ctx context.Context) func()
+	EndContext(end func())
 	GetLocator() Locator
 	SetLocator(locator Locator)
 	DatabaseVersionNumber() int

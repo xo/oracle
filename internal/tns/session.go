@@ -16,6 +16,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xo/oracle/internal/configurations"
@@ -41,7 +42,13 @@ type SessionState struct {
 }
 
 type Session struct {
-	mu                sync.Mutex
+	mu sync.Mutex
+	// breakMu is held while a context breaks a call, so that EndContext can
+	// wait for the break to end
+	breakMu sync.Mutex
+	// breakDeadline is the end of the grace of a break, in Unix nanoseconds,
+	// or zero
+	breakDeadline     atomic.Int64
 	conn              net.Conn
 	sslConn           *tls.Conn
 	reader            *bufio.Reader
@@ -184,56 +191,81 @@ func (session *Session) SetConnected() {
 	session.Connected = true
 }
 
-func (session *Session) StartContext(ctx context.Context) chan struct{} {
-	//session.oldCtx = session.ctx
-	//session.ctx = ctx
-	done := make(chan struct{})
-	//session.doneContext = append(session.doneContext, done)
-	go func(idone chan struct{}, mu *sync.Mutex) {
-		var err error
-		mu.Lock()
-		tracer := session.tracer
-		mu.Unlock()
-		select {
-		case <-idone:
-			return
-		case <-ctx.Done():
-			select {
-			case <-done:
-				return
-			default:
-				mu.Lock()
-				connected := session.Connected
-				mu.Unlock()
-				if connected {
-					if err = session.BreakConnection(); err != nil {
-						tracer.Print("Connection Break Error: ", err)
-					}
-				} else {
-					err = session.WriteFinalPacket()
-					if err != nil {
-						tracer.Print("Write Final Packet With Error: ", err)
-					}
-					session.Disconnect()
-				}
-			}
+// breakGrace is how long the session waits for the server to answer a break
+// that a context sent. A server that does not answer in that time fails the
+// read, and the connection is broken.
+const breakGrace = 10 * time.Second
+
+// StartContext watches ctx while one call runs on the session, and returns
+// the function that ends the watch, which the caller passes to EndContext.
+// When ctx ends before that, the session breaks the call: it sends the break
+// of Oracle Net, by out of band data where the server supports it and by a
+// marker packet where not, and the server answers with ORA-01013.
+//
+// It starts no goroutine. context.AfterFunc runs the break only when ctx ends
+// (D10). A nil ctx, and a ctx that never ends, watch nothing.
+func (session *Session) StartContext(ctx context.Context) func() {
+	if ctx == nil || ctx.Done() == nil {
+		return func() {}
+	}
+	stop := context.AfterFunc(ctx, session.breakForContext)
+	return func() {
+		if !stop() {
+			// the break started, so wait for it to end before the session
+			// takes the next call
+			session.breakMu.Lock()
+			session.breakMu.Unlock()
 		}
-	}(done, &session.mu)
-	return done
+	}
 }
 
-func (session *Session) EndContext(done chan struct{}) {
-	if done != nil {
-		close(done)
+// EndContext ends the watch that StartContext began.
+func (session *Session) EndContext(end func()) {
+	if end != nil {
+		end()
 	}
+}
+
+// breakForContext breaks the call that runs when its context ends. Before the
+// logon the session has no call to break, so it closes the connection.
+func (session *Session) breakForContext() {
+	session.breakMu.Lock()
+	defer session.breakMu.Unlock()
+	session.mu.Lock()
+	connected := session.Connected
+	tracer := session.tracer
+	session.mu.Unlock()
+	if !connected {
+		if err := session.WriteFinalPacket(); err != nil {
+			tracer.Print("Write Final Packet With Error: ", err)
+		}
+		session.Disconnect()
+		return
+	}
+	session.breakDeadline.Store(time.Now().Add(breakGrace).UnixNano())
+	if err := session.BreakConnection(); err != nil {
+		tracer.Print("Connection Break Error: ", err)
+	}
+}
+
+// deadline returns the deadline of the next read or write: the timeout of the
+// configuration, or the end of the grace of a break, whichever is first.
+func (session *Session) deadline() time.Time {
+	var t time.Time
+	if session.Context.connConfig.Timeout > 0 {
+		t = time.Now().Add(session.Context.connConfig.Timeout)
+	}
+	if bd := session.breakDeadline.Load(); bd != 0 {
+		if b := time.Unix(0, bd); t.IsZero() || b.Before(t) {
+			t = b
+		}
+	}
+	return t
 }
 
 func (session *Session) initRead() error {
 	var err error
-	timeout := time.Time{}
-	if session.Context.connConfig.Timeout > 0 {
-		timeout = time.Now().Add(session.Context.connConfig.Timeout)
-	}
+	timeout := session.deadline()
 	// if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
 	// 	timeout = deadline
 	// }
@@ -249,10 +281,7 @@ func (session *Session) initRead() error {
 
 func (session *Session) initWrite() error {
 	var err error
-	timeout := time.Time{}
-	if session.Context.connConfig.Timeout > 0 {
-		timeout = time.Now().Add(session.Context.connConfig.Timeout)
-	}
+	timeout := session.deadline()
 	// if deadline, ok := session.ctx.Deadline(); ok && !session.IsBreak() {
 	// 	timeout = deadline
 	// }
@@ -355,10 +384,13 @@ func (session *Session) ResetBreak() {
 	session.mu.Lock()
 	session.breakConn = false
 	session.mu.Unlock()
+	session.breakDeadline.Store(0)
 }
 
 // IsBreak tell if the connection break elicit
 func (session *Session) IsBreak() bool {
+	session.mu.Lock()
+	defer session.mu.Unlock()
 	return session.breakConn
 }
 

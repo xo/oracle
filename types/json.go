@@ -145,6 +145,13 @@ func (js *Json) CopyTo(dest driver.Value) error {
 	return nil
 }
 
+// Load reads the whole value and watches no context. See Lob.
+func (js *Json) Load() error {
+	var err error
+	js.bValue, err = js.load()
+	return err
+}
+
 func (js *Json) Read(ctx context.Context) error {
 	var err error
 	js.bValue, err = js.ReadFromPos(ctx, 0)

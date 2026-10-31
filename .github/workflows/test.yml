@@ -143,8 +143,10 @@ jobs:
           "${{ runner.temp }}/bin/dbrun" start "${{ matrix.server }}"
           echo "ORACLE_DSN=$("${{ runner.temp }}/bin/dbrun" dsn --json "${{ matrix.server }}" | jq -r '.[0].url')" >> "$GITHUB_ENV"
 
+      # every package, so that the integration tests of the root package,
+      # such as context_test.go, run too
       - name: Test against ${{ matrix.server }}
-        run: go test -count=1 ./TestIssues/...
+        run: go test -race -count=1 ./...
 
       - name: Show the server log on failure
         if: failure()

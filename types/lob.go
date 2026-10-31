@@ -13,6 +13,10 @@ type Lob interface {
 	Free() error
 	GetLength() (int64, error)
 	Read(ctx context.Context) error
+	// Load reads the whole value with no context of its own. The driver
+	// calls it inside a call whose context it watches already, and while it
+	// fetches rows, where database/sql gives it no context.
+	Load() error
 	GetReadMode() configurations.LobReadMode
 	sql.Scanner
 }
@@ -21,14 +25,13 @@ var errEmptyLocator = errors.New("calling Lob function: on nil or non allocated 
 var errNilStreamer = errors.New("calling Lob function: nil streamer")
 
 type lobBase struct {
-	stream    LobStreamer
-	UploadCtx context.Context
+	stream LobStreamer
 }
 
-func (l *lobBase) createStreamer(db *sql.DB) error {
+func (l *lobBase) createStreamer(ctx context.Context, db *sql.DB) error {
 	var err error
 	if l.stream == nil {
-		_, err = db.ExecContext(context.Background(), "--CREATE-LOB-STREAM--", &l.stream)
+		_, err = db.ExecContext(ctx, "--CREATE-LOB-STREAM--", &l.stream)
 	}
 	return err
 }
@@ -63,11 +66,8 @@ func (lob *lobBase) uploadData(data []byte, charsetID, charsetForm int) error {
 	}
 	var err error
 	if !lob.IsDataUploaded() && lob.stream != nil {
-		if lob.UploadCtx == nil {
-			lob.UploadCtx = context.Background()
-		}
-		done := lob.stream.StartContext(lob.UploadCtx)
-		defer lob.stream.EndContext(done)
+		// the upload runs inside the call that binds the LOB, which watches
+		// the context of that call
 
 		_, err = lob.stream.CreateTemporaryLocator(charsetID, charsetForm)
 		if err != nil {
@@ -124,6 +124,14 @@ func (l *lobBase) ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byt
 		return l.stream.Read(pos, count)
 	}
 	return nil, nil
+}
+
+// load reads the whole value and watches no context.
+func (l *lobBase) load() ([]byte, error) {
+	if l.IsQuasi() {
+		return nil, nil
+	}
+	return l.stream.Read(0, 0)
 }
 
 //func (l *lobBase) copyFrom(input *lobBase) error {

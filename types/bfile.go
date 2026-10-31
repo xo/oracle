@@ -22,12 +22,14 @@ type BFile struct {
 	isOpened bool
 }
 
-func CreateBFile(db *sql.DB, dirName, fileName string) (*BFile, error) {
+// CreateBFile returns a BFILE for the file fileName in the Oracle directory
+// dirName, with a streamer from db.
+func CreateBFile(ctx context.Context, db *sql.DB, dirName, fileName string) (*BFile, error) {
 	var err error
 	ret := &BFile{}
 	//ret.dirName = dirName
 	//ret.fileName = fileName
-	err = ret.createStreamer(db)
+	err = ret.createStreamer(ctx, db)
 	if err != nil {
 		return nil, err
 	}

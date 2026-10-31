@@ -1208,56 +1208,27 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	done := stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext(done)
 
-	type execResult struct {
-		result driver.Result
-		err    error
-	}
-	execDone := make(chan execResult, 1)
-
-	go func() {
-		result, err := stmt._exec(args)
-
-		if errors.Is(err, tns.ErrConnReset) {
-			if stmt._hasReturnClause {
-				dataSet := &DataSet{}
-				err = stmt.read(dataSet.currentResultSet())
-				if !errors.Is(err, tns.ErrConnReset) {
-					execDone <- execResult{result: nil, err: err}
-					return
-				}
-			}
-			err = stmt.connection.read()
-			session := stmt.connection.session
-			if session.Summary != nil {
-				stmt.cursorID = session.Summary.CursorID
+	// the call runs here, and the watch of StartContext breaks it when ctx
+	// ends, so no goroutine waits for it (D10)
+	result, err := stmt._exec(args)
+	if errors.Is(err, tns.ErrConnReset) {
+		if stmt._hasReturnClause {
+			dataSet := &DataSet{}
+			err = stmt.read(dataSet.currentResultSet())
+			if !errors.Is(err, tns.ErrConnReset) {
+				return nil, stmt.execError(ctx, err)
 			}
 		}
-
-		execDone <- execResult{result: result, err: err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		<-execDone
-		return nil, ctx.Err()
-
-	case res := <-execDone:
+		err = stmt.connection.read()
 		session := stmt.connection.session
-		if res.err != nil && session.HasError() {
-			err := session.GetError()
-			if isBadConn(err) {
-				stmt.connection.setBad()
-			}
-			return nil, err
+		if session.Summary != nil {
+			stmt.cursorID = session.Summary.CursorID
 		}
-		if res.err != nil {
-			if isBadConn(res.err) {
-				stmt.connection.setBad()
-			}
-			return nil, res.err
-		}
-		return res.result, nil
 	}
+	if err != nil {
+		return nil, stmt.execError(ctx, err)
+	}
+	return result, nil
 	//result, err := stmt._exec(args)
 	//if errors.Is(err, network.ErrConnReset) {
 	//	if stmt._hasReturnClause {
@@ -1816,7 +1787,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				// check if LobReadMode is auto so auto read all lobs
 				if stmt.connection.connOption.LobReadMode == configurations.LobReadMode_AUTO {
 					if lob, ok := par.oPrimValue.(oraTypes.Lob); ok {
-						err = lob.Read(context.Background())
+						err = lob.Load()
 						if err != nil {
 							return nil, err
 						}
@@ -2072,6 +2043,24 @@ func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
 	return dataSet, nil
 }
 
+// execError returns the error of a call that failed. When ctx ended, it is
+// the error of ctx, because the server answered the break with ORA-01013.
+// Otherwise it is the error of the server, when there is one, and it marks
+// the connection bad when the error says so.
+func (stmt *Stmt) execError(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	session := stmt.connection.session
+	if session.HasError() {
+		err = session.GetError()
+	}
+	if isBadConn(err) {
+		stmt.connection.setBad()
+	}
+	return err
+}
+
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
@@ -2084,39 +2073,11 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	defer stmt.connection.session.EndContext(done)
 	//return stmt.Query_(namedArgs)
 
-	type queryResult struct {
-		rows driver.Rows
-		err  error
+	rows, err := stmt.Query_(namedArgs)
+	if err != nil {
+		return nil, stmt.execError(ctx, err)
 	}
-	queryDone := make(chan queryResult, 1)
-
-	go func() {
-		rows, err := stmt.Query_(namedArgs)
-		queryDone <- queryResult{rows: rows, err: err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		<-queryDone
-		return nil, ctx.Err()
-
-	case res := <-queryDone:
-		session := stmt.connection.session
-		if res.err != nil && session.HasError() {
-			err := session.GetError()
-			if isBadConn(err) {
-				stmt.connection.setBad()
-			}
-			return nil, err
-		}
-		if res.err != nil {
-			if isBadConn(res.err) {
-				stmt.connection.setBad()
-			}
-			return nil, res.err
-		}
-		return res.rows, nil
-	}
+	return rows, nil
 }
 
 // func (stmt *Stmt) reset() {
@@ -2206,7 +2167,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					}
 				} else {
 					if val.GetReadMode() == configurations.LobReadMode_AUTO {
-						err = val.Read(context.Background())
+						err = val.Load()
 						if err != nil {
 							return err
 						}
@@ -2218,7 +2179,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 				}
 			case *oraTypes.Clob:
 				if val.GetReadMode() == configurations.LobReadMode_AUTO {
-					err = val.Read(context.Background())
+					err = val.Load()
 					if err != nil {
 						return err
 					}
@@ -2238,7 +2199,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 				}
 			case *oraTypes.Blob:
 				if val.GetReadMode() == configurations.LobReadMode_AUTO {
-					err = val.Read(context.Background())
+					err = val.Load()
 					if err != nil {
 						return err
 					}

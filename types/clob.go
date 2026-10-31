@@ -24,11 +24,8 @@ func (clob *Clob) Upload() error {
 	}
 	var err error
 	if !clob.IsDataUploaded() && clob.stream != nil {
-		if clob.UploadCtx == nil {
-			clob.UploadCtx = context.Background()
-		}
-		done := clob.stream.StartContext(clob.UploadCtx)
-		defer clob.stream.EndContext(done)
+		// the upload runs inside the call that binds the CLOB, which
+		// watches the context of that call
 		_, err = clob.stream.CreateTemporaryLocator(clob.Conv.GetLangID(), charsetForm)
 		if err != nil {
 			return err
@@ -183,12 +180,14 @@ func (clob *Clob) SetValue(input any) error {
 //		return err
 //	}
 
-func CreateClob(db *sql.DB, uploadCtx context.Context, input any, useNClob bool) (*Clob, error) {
+// CreateClob returns a CLOB, or an NCLOB when useNClob is true, that holds
+// input, with a streamer from db. The value goes to the server when the CLOB
+// is bound to a statement.
+func CreateClob(ctx context.Context, db *sql.DB, input any, useNClob bool) (*Clob, error) {
 	var err error
 	ret := &Clob{}
 	ret.UseNCharset = useNClob
-	ret.UploadCtx = uploadCtx
-	err = ret.createStreamer(db)
+	err = ret.createStreamer(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +286,13 @@ func (clob *Clob) Scan(value any) error {
 //	//}
 //	return sql.NullString{String: l.String, Valid: l.Valid}
 //}
+
+// Load reads the whole value and watches no context. See Lob.
+func (clob *Clob) Load() error {
+	var err error
+	clob.bValue, err = clob.load()
+	return err
+}
 
 func (clob *Clob) Read(ctx context.Context) error {
 	var err error

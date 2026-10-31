@@ -414,9 +414,6 @@ func (conn *Connection) read() error {
 }
 
 // Open the connection = bring it online
-func (conn *Connection) Open() error {
-	return conn.OpenWithContext(context.Background())
-}
 
 // func (conn *Connection) restore() error {
 //	tracer := conn.tracer
@@ -648,11 +645,11 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 			tracer.Print("Error getting NLS: ", err)
 		}
 	}
-	conn.getDBServerTimeZone()
+	conn.getDBServerTimeZone(ctx)
 	return nil
 }
 
-func (conn *Connection) getDBServerTimeZone() {
+func (conn *Connection) getDBServerTimeZone(ctx context.Context) {
 
 	if conn.connOption.DatabaseInfo.Location != "" {
 		loc, err := time.LoadLocation(conn.connOption.DatabaseInfo.Location)
@@ -669,16 +666,16 @@ func (conn *Connection) getDBServerTimeZone() {
 	}
 
 	var current time.Time
-	err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
+	err := conn.QueryRowContext(ctx, "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
 	if err != nil {
 		conn.dbServerTimeZone = time.UTC
 	}
 	conn.dbServerTimeZone = current.Location()
 }
 
-func (conn *Connection) getDBTimeZone() error {
+func (conn *Connection) getDBTimeZone(ctx context.Context) error {
 	var result string
-	err := conn.QueryRowContext(context.Background(), "SELECT DBTIMEZONE FROM DUAL", nil).Scan(&result)
+	err := conn.QueryRowContext(ctx, "SELECT DBTIMEZONE FROM DUAL", nil).Scan(&result)
 	// var current time.Time
 	// err := conn.QueryRowContext(context.Background(), "SELECT SYSTIMESTAMP FROM DUAL", nil).Scan(&current)
 	if err != nil {
@@ -694,23 +691,40 @@ func (conn *Connection) getDBTimeZone() error {
 	return nil
 }
 
-// Begin a transaction
+// Begin is the form of BeginTx with no context, which database/sql does not
+// call, because Connection implements driver.ConnBeginTx.
 func (conn *Connection) Begin() (driver.Tx, error) {
-	conn.tracer.Print("Begin transaction")
-	conn.autoCommit = false
-	return &Transaction{conn: conn, ctx: context.Background()}, nil
+	return nil, fmt.Errorf("beginning a transaction without a context: %w", tns.ErrNotSupported)
 }
 
+// BeginTx begins a transaction. Oracle has read committed, its default, and
+// serializable, and a read only transaction. Any other isolation level fails
+// with an error that wraps ErrNotSupported. A read only transaction is read
+// committed, because Oracle has no read only serializable transaction.
 func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	if opts.ReadOnly {
-		return nil, errors.New("readonly transaction is not supported")
-	}
-	if opts.Isolation != 0 {
-		return nil, errors.New("only support default value for isolation")
+	var stmt string
+	switch sql.IsolationLevel(opts.Isolation) {
+	case sql.LevelDefault, sql.LevelReadCommitted:
+		if opts.ReadOnly {
+			stmt = "SET TRANSACTION READ ONLY"
+		}
+	case sql.LevelSerializable:
+		if opts.ReadOnly {
+			return nil, fmt.Errorf("beginning a read only serializable transaction: %w", tns.ErrNotSupported)
+		}
+		stmt = "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE"
+	default:
+		return nil, fmt.Errorf("beginning a transaction with the isolation level %v: %w", sql.IsolationLevel(opts.Isolation), tns.ErrNotSupported)
 	}
 	conn.tracer.Print("Begin transaction with context")
 	conn.autoCommit = false
-	return &Transaction{conn: conn, ctx: ctx}, nil
+	if stmt != "" {
+		if _, err := conn.ExecContext(ctx, stmt, nil); err != nil {
+			conn.autoCommit = true
+			return nil, fmt.Errorf("beginning a transaction: %w", err)
+		}
+	}
+	return &Transaction{conn: conn}, nil
 }
 
 // NewConnection create a new connection from databaseURL string or configuration

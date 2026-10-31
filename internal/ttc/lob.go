@@ -216,11 +216,11 @@ func (lob *LobStream) GetLobReadMode() configurations.LobReadMode {
 //	func (lob *LobStream) isValueBasedLocator() bool {
 //		return lob.sourceLocator[4]&0x20 > 0
 //	}
-func (lob *LobStream) StartContext(ctx context.Context) chan struct{} {
+func (lob *LobStream) StartContext(ctx context.Context) func() {
 	return lob.conn.session.StartContext(ctx)
 }
-func (lob *LobStream) EndContext(done chan struct{}) {
-	lob.conn.session.EndContext(done)
+func (lob *LobStream) EndContext(end func()) {
+	lob.conn.session.EndContext(end)
 }
 func (lob *LobStream) FreeTemporaryLocator() error {
 	if lob.sourceLocator == nil {

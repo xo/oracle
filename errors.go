@@ -18,7 +18,7 @@ const (
 	ErrInvalidValue Error = "invalid value"
 	// ErrNotSupported is a feature that the driver or the server does not
 	// have.
-	ErrNotSupported Error = "not supported"
+	ErrNotSupported = tns.ErrNotSupported
 	// ErrConnectorClosed is a Connect after Close.
 	ErrConnectorClosed Error = "the connector is closed"
 	// ErrAuthentication is a server that refused the credential. A

@@ -25,14 +25,10 @@ type Driver struct {
 	c *Connector
 }
 
-// Open returns a new connection to the database that dsn names. database/sql
-// does not call Open, because Driver implements driver.DriverContext.
-func (d Driver) Open(dsn string) (driver.Conn, error) {
-	c, err := d.OpenConnector(dsn)
-	if err != nil {
-		return nil, err
-	}
-	return c.(*Connector).open()
+// Open fails, because it has no context. database/sql does not call it,
+// because Driver implements driver.DriverContext, and sql.Open works.
+func (Driver) Open(string) (driver.Conn, error) {
+	return nil, fmt.Errorf("opening a connection without a context: use sql.Open or sql.OpenDB: %w", ErrNotSupported)
 }
 
 // OpenConnector parses dsn with ParseDSN and returns a Connector for it. It
@@ -113,22 +109,6 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	if err := conn.OpenWithContext(ctx); err != nil {
-		return nil, err
-	}
-	if err := c.reg.InitFromConn(conn, c.params); err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	return conn, nil
-}
-
-// open is Connect for Driver.Open, which has no context.
-func (c *Connector) open() (driver.Conn, error) {
-	conn, err := c.newConnection()
-	if err != nil {
-		return nil, err
-	}
-	if err := conn.Open(); err != nil {
 		return nil, err
 	}
 	if err := c.reg.InitFromConn(conn, c.params); err != nil {

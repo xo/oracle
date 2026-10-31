@@ -10,7 +10,6 @@ import (
 type Blob struct {
 	Raw
 	lobBase
-	UploadCtx context.Context
 }
 
 func (blob *Blob) Upload() error {
@@ -48,20 +47,20 @@ func (blob *Blob) SetValue(input any) error {
 //	UploadCtx context.Context
 //}
 
-func CreateBlob(db *sql.DB, uploadCtx context.Context, input any) (*Blob, error) {
+// CreateBlob returns a BLOB that holds input, with a streamer from db. The
+// value goes to the server when the BLOB is bound to a statement.
+func CreateBlob(ctx context.Context, db *sql.DB, input any) (*Blob, error) {
 	var err error
 	ret := &Blob{}
-	ret.UploadCtx = uploadCtx
-	err = ret.createStreamer(db)
+	err = ret.createStreamer(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	return ret, ret.SetValue(input)
 }
 
-func NewBlob(stream LobStreamer, uploadCtx context.Context, input any) (*Blob, error) {
+func NewBlob(stream LobStreamer, input any) (*Blob, error) {
 	ret := &Blob{}
-	ret.UploadCtx = uploadCtx
 	ret.stream = stream
 	return ret, ret.SetValue(input)
 }
@@ -83,6 +82,14 @@ func NewBlob(stream LobStreamer, uploadCtx context.Context, input any) (*Blob, e
 //		err = blob.stream.Write(blob.bValue)
 //		return err
 //	}
+//
+// Load reads the whole value and watches no context. See Lob.
+func (blob *Blob) Load() error {
+	var err error
+	blob.bValue, err = blob.load()
+	return err
+}
+
 func (blob *Blob) Read(ctx context.Context) error {
 	var err error
 	blob.bValue, err = blob.ReadFromPos(ctx, 0)

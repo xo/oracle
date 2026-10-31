@@ -18,7 +18,7 @@ conclusion.
 | [D7](#d7-ci-tests-three-operating-systems-and-every-oracle-release-dbmeta-knows) | Decided |
 | [D8](#d8-the-driver-follows-the-design-of-the-dbimp-drivers) | Proposed, the package name decided and built |
 | [D9](#d9-a-connector-holds-everything-that-belongs-to-one-database) | Proposed |
-| [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Proposed |
+| [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Proposed, built in step 5 |
 | [D11](#d11-the-dsn-is-an-oracle-url-with-lower-case-keys) | Decided |
 | [D12](#d12-the-protocol-code-moves-to-internal) | Proposed |
 | [D13](#d13-the-module-requires-go-1271) | Decided |
@@ -148,6 +148,11 @@ becomes the deadline of the connection, and `context.AfterFunc` sends the break.
 A transaction keeps no context, so a rollback is never cancelled, which fixes
 sijms/go-ora#767. The library never calls `context.Background()` or
 `context.TODO()`.
+
+Step 5 built it on 2026-10-31, with one change. The deadline of the context is
+not the deadline of the connection, because a read that fails at a deadline
+loses the connection, and a break keeps it. `DESIGN.md`, under Context, says
+how. The tests of `context_test.go` pass on 11g, 21c and 26ai.
 
 ## D11. The DSN is an oracle URL with lower case keys
 

@@ -180,14 +180,34 @@ connections. That fixes sijms/go-ora#692.
 The context comes first, is named `ctx`, and is never stored in a struct. The
 library never calls `context.Background()` or `context.TODO()`.
 
-Each round trip takes its context. The deadline of the context becomes the
-deadline of the `net.Conn`, with `SetDeadline`, before the call writes. A
-context that ends early is watched with `context.AfterFunc`, which sends the
-Oracle break, by out of band data where the server supports it and by a marker
-packet where it does not. The call then reads to the reset and returns the
-error of the context. There is no goroutine for each call. `context.AfterFunc`
-runs a function only when the context ends, and the stop function that it
-returns is called when the round trip ends.
+Each call takes its context. `Session.StartContext` watches it with
+`context.AfterFunc`, and returns the function that ends the watch, which
+`EndContext` calls. When the context ends first, the watch sends the break of
+Oracle Net, by out of band data where the server supports it and by a marker
+packet where it does not. The server answers with ORA-01013, the call reads to
+the reset, and the call returns the error of the context. A call that ends
+with no error returns its result, even when its context ends at the same
+moment. There is no goroutine for each call: `context.AfterFunc` runs a
+function only when the context ends. `go-ora` started two for each statement,
+one that watched the context and one that ran the call.
+
+The deadline of the context is not the deadline of the `net.Conn`. A read that
+fails at a deadline leaves the stream in the middle of a packet, and the
+connection is lost. A break leaves it usable, and the tests show that on 11g,
+21c and 26ai. After a break, the next read has a deadline of 10 seconds, so a
+server that does not answer the break fails the read, and the connection is
+broken. `EndContext` waits for a break that started, so that the next call
+never meets it halfway. The flag of the break is read under the lock of the
+session, which was a data race in `go-ora`.
+
+A LOB that the driver reads while it fetches rows, or uploads while it binds a
+statement, runs inside a call that is watched already, or under `Next`, where
+`database/sql` gives no context. It reads with `Lob.Load`, which watches
+nothing, so one call never has two watches. `CreateBlob`, `CreateClob` and
+`CreateBFile` take the context first, and the LOB types keep none.
+
+`Driver.Open` and `Connection.Begin`, the forms with no context, fail with an
+error that wraps `ErrNotSupported`. `database/sql` calls neither, as in dbimp.
 
 When the break fails, or the read after it fails, the connection is broken. The
 next call returns `driver.ErrBadConn`, and `ResetSession` and `IsValid` say so,
@@ -202,6 +222,8 @@ context, and the two calls run with the read and write deadline of the
 connection, not with the context of `BeginTx`. A context that ends while a
 transaction is open makes `database/sql` call `Rollback`. The rollback then
 runs to the end, because nothing cancels it, and that fixes sijms/go-ora#767.
+`TestCancelledTransactionDoesNotCommit` fails on the code before step 5 and
+passes after it.
 The isolation levels that Oracle has, read committed and serializable, are
 accepted. A read only transaction is `SET TRANSACTION READ ONLY`. Any other
 level fails with an error that wraps `ErrNotSupported`.

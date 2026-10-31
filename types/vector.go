@@ -465,6 +465,13 @@ func CreateVector(array any) (*Vector, error) {
 //	return v.data
 //}
 
+// Load reads the whole value and watches no context. See Lob.
+func (vector *Vector) Load() error {
+	var err error
+	vector.bValue, err = vector.load()
+	return err
+}
+
 func (vector *Vector) Read(ctx context.Context) error {
 	var err error
 	vector.bValue, err = vector.ReadFromPos(ctx, 0)

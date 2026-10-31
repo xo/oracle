@@ -28,11 +28,16 @@ Step 4 is done (`c825f8d`). The package is `oracle`, with `ParseDSN`,
 `Config`, `Driver`, `Connector` and the sentinel errors, and no package
 variable.
 
-Step 4b is done and staged. The TTC code moved to `internal/ttc`, and the root
-package exports 31 names. `Config.connectionConfig` writes the configuration
-directly, and the parser of `go-ora` is gone. `RegisterType` stays (see
-`DESIGN.md`). The 30 exchanges pass, and `TestIssues` on 26ai gives the same
-42 passes and 3 failures as before.
+Step 4b is done (`cbc4d30`). The TTC code is in `internal/ttc`, and the root
+package exports 31 names.
 
-The next step is step 5: replace `StartContext` with deadlines and
-`context.AfterFunc`.
+Step 5 is done and staged. `context.AfterFunc` sends the break when a context
+ends, and no goroutine starts for each call. A transaction keeps no context,
+which fixes sijms/go-ora#767. The library calls neither
+`context.Background()` nor `context.TODO()`. `context_test.go` holds five
+integration tests, and they pass on 11g, 21c and 26ai with `-race`. The 30
+exchanges pass, and `TestIssues` on 26ai gives the same 42 passes and 3
+failures as before, with no data race.
+
+The next step is step 6: change the values to the table in `DESIGN.md`, and
+add `RowsColumnScanner`.
