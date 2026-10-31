@@ -102,3 +102,11 @@ func TestAssign(t *testing.T) {
 		t.Error("a NULL in a *string gives no error, and database/sql gives one")
 	}
 }
+
+// TestNilDataSetClose is sijms/go-ora#762: Close on a nil *DataSet panicked.
+func TestNilDataSetClose(t *testing.T) {
+	var ds *DataSet
+	if err := ds.Close(); err != nil {
+		t.Errorf("Close of a nil DataSet: %v", err)
+	}
+}

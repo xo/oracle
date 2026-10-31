@@ -101,14 +101,21 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		// character, so the length must be that many bytes for each
 		// character. go-ora left this unreachable, and a string OUT of size
 		// 10 could not hold 'abc' on AL32UTF8, which was sijms/go-ora#703.
-		if par.MaxCharLen < size {
-			par.MaxCharLen = size
-		}
 		conv, err := connection.StringCoder(par.CharsetID, par.CharsetForm)
 		if err != nil {
 			return err
 		}
-		par.MaxLen = par.MaxCharLen * int64(charset.MaxBytesPerChar(conv.LangID))
+		perChar := int64(charset.MaxBytesPerChar(conv.LangID))
+		if size <= 0 {
+			// an OUT string with no size takes the longest string of the
+			// server, where a buffer of the length of its input silently
+			// cut a RETURNING value of 8 characters to 4
+			size = connection.MaxStringLength() / perChar
+		}
+		if par.MaxCharLen < size {
+			par.MaxCharLen = size
+		}
+		par.MaxLen = par.MaxCharLen * perChar
 	}
 
 	//else {

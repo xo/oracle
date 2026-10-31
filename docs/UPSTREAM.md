@@ -32,19 +32,19 @@ blocks a connection, P2 is a fault with a workaround.
 | Issue | Priority | Fault | Fix | Status |
 | --- | --- | --- | --- | --- |
 | sijms/go-ora#767 | P0 | A cancelled transaction can commit. `Rollback` runs under the cancelled context, and `breakConn` is read without the lock | Roll back under `context.WithoutCancel`, and read `breakConn` under the lock | Fixed in step 5. `TestCancelledTransactionDoesNotCommit` fails before and passes after, on 11g, 21c and 26ai |
-| sijms/go-ora#776 | P1 | `SELECT NULL a FROM dual` returns no row and no error. sijms/go-ora#755 is the same family in `v2` | Do not end the row loop on a row whose columns are all zero length | Open |
+| sijms/go-ora#776 | P1 | `SELECT NULL a FROM dual` returns no row and no error. sijms/go-ora#755 is the same family in `v2` | Do not end the row loop on a row whose columns are all zero length | Fixed in step 9. A NULL of no type has a zero `MaxLen`, and `BasicRead` read it as a column that sends nothing. It reads the length now, and `Next` fetches when the execute brought no row. `TestUntypedNullRow` holds it, on 26ai |
 | sijms/go-ora#769 | P1 | A CLOB over about 8K UTF-16 units with characters outside the BMP reads back as U+FFFD with `LOB FETCH=INLINE` | Fetch inline CLOB text as AL16UTF16. sijms/go-ora#768 does this | Open |
 | sijms/go-ora#765 | P1 | After a RAC SCAN redirect, TLS checks the certificate against the redirect address | Keep the host of the connect string as `ServerName`. sijms/go-ora#766 does this | Fixed in step 4. The configuration names the host of the DSN, and `negotiate` keeps it. No test with a redirect yet |
 | sijms/go-ora#757 | P1 | `negotiate` writes `ServerName` into the caller's `*tls.Config` on every dial | Clone the configuration before writing to it. Fix with sijms/go-ora#765 | Fixed in step 4. `negotiate` clones the configuration. No test with TLS yet |
 | sijms/go-ora#771 | P1 | XMLType is NULL on Autonomous Database, whose flag word is 0x8014, and a value over about 254 bytes hangs | Test the flag bits, not equality. sijms/go-ora#770 does this in `v2` | Not located in `v3` yet |
 | sijms/go-ora#692 | P1 | Two databases with different `NLS_CHARACTERSET` in one process garble text | Keep the charset per connection | Open |
 | sijms/go-ora#702 | P1 | The context deadline is not kept in `PrepareContext` and `ExecContext` | Set a deadline on the network connection | Fixed in step 5, unless the reporter saw another cause. The deadline breaks a query and an exec in about one second, on 11g, 21c and 26ai |
-| sijms/go-ora#703 | P1 | `INSERT ... RETURNING` into a string through `sql.Out` with no size breaks the connection | Give a default size, or return an error that does not break the connection | Fixed. An OUT string gets a buffer of its size in characters. `TestNullOutArguments` holds it, and the logon NLS query of 11g no longer fails |
-| sijms/go-ora#762 | P2 | `DataSet.Close` on a nil `*DataSet` panics | Return early on a nil receiver | Open |
+| sijms/go-ora#703 | P1 | `INSERT ... RETURNING` into a string through `sql.Out` with no size breaks the connection | Give a default size, or return an error that does not break the connection | Fixed. An OUT string gets a buffer of its size in characters. `TestNullOutArguments` holds it, and the logon NLS query of 11g no longer fails. In step 9 an NCHAR OUT with no size gets the longest string, and its byte length counts the bytes of a character, so `RETURNING` no longer cuts the value. `TestReturningStringWithNoSize` holds it, on 26ai |
+| sijms/go-ora#762 | P2 | `DataSet.Close` on a nil `*DataSet` panics | Return early on a nil receiver | Fixed in step 9. `TestNilDataSetClose` holds it |
 | sijms/go-ora#624 | P2 | Panic, slice bounds out of range in `Session.GetInt64` | Check the length before slicing | Open |
 | sijms/go-ora#695 | P2 | Index out of range in a batch insert | Check that every parameter array has the batch length | Open |
-| sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Fixed for numbers. `Number.SetValue` reads the kind of a value, so a named integer type binds |
-| sijms/go-ora#671 | P2 | `RefCursor.Query` on a cursor the procedure never opened breaks the connection | Return an error before the round trip | Open |
+| sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Fixed in step 9. `CheckNamedValue` returns `driver.ErrSkip` for a named type of a basic kind that the driver does not know, so `database/sql` converts it by its kind. `time.Duration` still binds as an interval. `TestNamedTypes` holds it, on 26ai, without sijms/go-ora#747 |
+| sijms/go-ora#671 | P2 | `RefCursor.Query` on a cursor the procedure never opened breaks the connection | Return an error before the round trip | Not reproduced. The execute returns ORA-01001, and the connection stays usable. `TestUnopenedRefCursor` holds it, on 26ai |
 | sijms/go-ora#698 | P2 | A `MERGE` that violates a key returns a timeout and not ORA-00001 | Needs a trace | Open |
 | sijms/go-ora#729 | P2 | A server that requires native network encryption or checksums refuses the client with ORA-12269 | Implement the negotiation | Open |
 
@@ -89,7 +89,7 @@ None is applied. Each waits for Ken (D5).
 | --- | --- | --- |
 | sijms/go-ora#768 | Fetches inline CLOB text as AL16UTF16, for sijms/go-ora#769 | Apply the `v3` half, with a test |
 | sijms/go-ora#766 | Checks the certificate against the original host, for sijms/go-ora#765 | Apply the `v3` half, with sijms/go-ora#757 |
-| sijms/go-ora#747 | Accepts named types through `reflect.Kind`, for sijms/go-ora#699 | Apply the `v3` half |
+| sijms/go-ora#747 | Accepts named types through `reflect.Kind`, for sijms/go-ora#699 | Not needed. Step 9 fixed sijms/go-ora#699 through `driver.ErrSkip` |
 | sijms/go-ora#734 | Stops `putString` writing UTF-16BE into an AL32UTF8 CLOB, for sijms/go-ora#733 | Apply the `v3` half |
 | sijms/go-ora#721 | Encodes a NULL or large VARRAY and a NULL object, as in `SDO_GEOMETRY` | Apply after a test against a real server |
 | sijms/go-ora#775 | Sends 234 as the logon types byte | Skip. `v2` only, and `v3` already sends 234 |

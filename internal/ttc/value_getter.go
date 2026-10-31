@@ -278,6 +278,27 @@ func getBytes(col any) ([]byte, error) {
 //	return nil, nil
 //}
 
+// namedBasic reports whether v is a value of a named type of a basic kind,
+// such as type ID string, that the driver does not know. database/sql
+// converts such a value to its basic kind, which was sijms/go-ora#699. A
+// named type that the driver knows, such as time.Duration, keeps its coder.
+func namedBasic(v any) bool {
+	if v == nil || builtinCoder(v) != nil {
+		return false
+	}
+	t := reflect.TypeOf(v)
+	if t.PkgPath() == "" {
+		return false
+	}
+	switch t.Kind() {
+	case reflect.Bool, reflect.String, reflect.Float32, reflect.Float64,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return true
+	}
+	return false
+}
+
 // ownValue reports whether v is a value that the driver binds itself, which
 // database/sql must not convert first.
 func ownValue(v any) bool {

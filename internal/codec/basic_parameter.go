@@ -41,11 +41,15 @@ func (basic *BasicParameter) Write(session tns.SessionWriter) error {
 	return nil
 }
 func (basic *BasicParameter) BasicRead(session tns.SessionReader) ([]byte, error) {
-	if (basic.DataType == types.NCHAR || basic.DataType == types.CHAR) && basic.MaxLen == 0 {
-		return nil, nil
-	}
-	if basic.DataType == types.RAW && basic.MaxLen == 0 {
-		return nil, nil
+	// a scalar column of length 0 can hold nothing but NULL, and the server
+	// sends no bytes for it. A NUMBER of length 0, as CASE WHEN 1=0 THEN 0
+	// END gives, was read as a value, which put the stream out of step.
+	// sijms/go-ora#776.
+	if basic.MaxLen == 0 {
+		switch basic.DataType {
+		case types.NCHAR, types.CHAR, types.RAW, types.NUMBER, types.IBFLOAT, types.IBDOUBLE:
+			return nil, nil
+		}
 	}
 	var err error
 	var bValue []byte

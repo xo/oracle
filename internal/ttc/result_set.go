@@ -281,7 +281,10 @@ func (resultSet *ResultSet) Next(dest []driver.Value) error {
 	if !hasMoreRows && noOfRowsToFetch == 0 {
 		return io.EOF
 	}
-	if hasMoreRows && (hasBLOB || hasLONG) && resultSet.index == 0 {
+	// fetch at the first row when the execute brought none, as it does for a
+	// LOB, a LONG, and a row whose columns are all untyped NULLs, which was
+	// sijms/go-ora#776
+	if hasMoreRows && resultSet.index == 0 && (hasBLOB || hasLONG || len(resultSet.rows) == 0) {
 		if err := resultSet.parent.fetch(resultSet); err != nil {
 			return err
 		}

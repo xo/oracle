@@ -1609,6 +1609,9 @@ func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
 	if _, ok := nv.Value.(driver.Valuer); ok && !ownValue(nv.Value) {
 		return driver.ErrSkip
 	}
+	if namedBasic(nv.Value) {
+		return driver.ErrSkip
+	}
 	return nil
 }
 

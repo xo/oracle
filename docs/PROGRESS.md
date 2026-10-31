@@ -61,4 +61,11 @@ Step 8 is done and staged. The charsets are a compressed blob of 2.0 MB in
 imports the driver is 12.5 MB, 9.2 MB stripped, where it was 22.6 MB and 19.3
 MB. The integration tests on 26ai give the same 42 passes and 3 failures.
 
-The next step is step 9: fix the upstream faults in `UPSTREAM.md`.
+Step 8 is done (`073dd07`).
+
+Step 9 is staged. It fixes sijms/go-ora#776, #703 for NCHAR, #699 for every
+basic kind and #762, finds #671 does not break the connection here, and
+`upstream_test.go` holds each against a live server. `TestIssue543` makes its
+own index, and `integration` on 26ai gives 43 passes and 2 failures. On 11g the root package passes, and `integration` gives 40 passes and 3 failures, which `BACKLOG.md` lists. Left in
+`UPSTREAM.md`: #769, #771, #692, #624, #695, #698 and #729, and the pull
+requests, which wait for Ken.

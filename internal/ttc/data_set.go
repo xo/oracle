@@ -54,7 +54,12 @@ func (dataSet *DataSet) load(session *tns.Session) error {
 	return dataSet.currentResultSet().load(session)
 }
 
+// Close closes each result set. A nil DataSet has nothing to close, where it
+// panicked, which was sijms/go-ora#762.
 func (dataSet *DataSet) Close() error {
+	if dataSet == nil {
+		return nil
+	}
 	var err error
 	for _, resultSet := range dataSet.resultSets {
 		err = resultSet.Close()
