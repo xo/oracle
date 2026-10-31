@@ -1,7 +1,9 @@
 package oracle_test
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 	"testing"
@@ -198,5 +200,71 @@ func TestNullOutArguments(t *testing.T) {
 	}
 	if !d.Valid || !d.V.Equal(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("sql.Null[time.Time]: got %+v", d)
+	}
+}
+
+// TestJSON reads and binds the JSON type of Oracle 21c and later, through
+// OSON and encoding/json/v2.
+func TestJSON(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	const doc = `{"a":1,"b":[1,2.5,"x"],"big":12345678901234567890.12,"n":null}`
+	var v any
+	if err := db.QueryRowContext(ctx, "SELECT JSON('"+doc+"') FROM dual").Scan(&v); err != nil {
+		if strings.Contains(err.Error(), "ORA-00904") || strings.Contains(err.Error(), "ORA-00902") {
+			t.Skip("the release has no JSON type")
+		}
+		t.Fatal(err)
+	}
+	if got := fmt.Sprintf("%T %s", v, v); got != "jsontext.Value "+doc {
+		t.Errorf("*any: got %s", got)
+	}
+	var s string
+	if err := db.QueryRowContext(ctx, "SELECT JSON('"+doc+"') FROM dual").Scan(&s); err != nil || s != doc {
+		t.Errorf("*string: got %s, %v", s, err)
+	}
+	var m map[string]any
+	if err := db.QueryRowContext(ctx, "SELECT JSON('"+doc+"') FROM dual").Scan(&m); err != nil || m["a"] != float64(1) {
+		t.Errorf("map: got %v, %v", m, err)
+	}
+	type rec struct {
+		Name  string   `json:"name"`
+		Tags  []string `json:"tags"`
+		Count int      `json:"count"`
+	}
+	in := rec{Name: "x", Tags: []string{"a", "b"}, Count: 3}
+	js, err := oracle.NewJSON(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a table and not SELECT CAST(:1 AS JSON) FROM dual, which fails inside
+	// 21c with ORA-00600 and works on 26ai. A JSON column is a SecureFile,
+	// which the tablespace SYSTEM of 21c XE cannot hold, so it goes in USERS.
+	const table = "xo_oracle_json"
+	if _, err := db.ExecContext(ctx, "BEGIN EXECUTE IMMEDIATE 'DROP TABLE "+table+" PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "CREATE TABLE "+table+" (id NUMBER(10), j JSON) TABLESPACE users"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.WithoutCancel(ctx), "DROP TABLE "+table+" PURGE")
+	})
+	if _, err := db.ExecContext(ctx, "INSERT INTO "+table+" (id, j) VALUES (1, :1)", js); err != nil {
+		t.Fatalf("binding a struct as JSON: %v", err)
+	}
+	var out rec
+	if err := db.QueryRowContext(ctx, "SELECT j FROM "+table+" WHERE id = 1").Scan(&out); err != nil {
+		t.Fatalf("reading the struct back: %v", err)
+	}
+	if out.Name != in.Name || out.Count != in.Count || strings.Join(out.Tags, ",") != "a,b" {
+		t.Errorf("struct round trip: got %+v, want %+v", out, in)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT JSON_VALUE(JSON('"+doc+"'), '$.big' RETURNING NUMBER) FROM dual").Scan(&s); err == nil && s != "12345678901234567890.12" {
+		t.Errorf("a NUMBER in JSON lost digits: %s", s)
+	}
+	var raw jsontext.Value
+	if err := db.QueryRowContext(ctx, "SELECT JSON('"+doc+"') FROM dual").Scan(&raw); err != nil || !strings.Contains(string(raw), "12345678901234567890.12") {
+		t.Errorf("jsontext.Value: got %s, %v", raw, err)
 	}
 }

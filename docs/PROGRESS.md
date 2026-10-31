@@ -53,5 +53,9 @@ breaks an import cycle. `DESIGN.md`, under Where the cleanup stands, lists
 what is left. The tests pass, and `integration` on 26ai gives the same 42
 passes and 3 failures.
 
-The next step is step 7: move JSON and OSON to `encoding/json/v2`, which also
-removes the JSON coder interfaces.
+Step 11 is done (`ba43353`). Step 7 is done and staged: JSON binds and scans
+through `encoding/json/v2`, and OSON converts JSON text to and from its bytes.
+`TestJSON` passes on 21c and 26ai, inline and streamed, and the integration
+tests on 26ai give the same 42 passes and 3 failures.
+
+The next step is step 8: compact the charsets, and split `internal/converters`.

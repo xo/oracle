@@ -329,6 +329,9 @@ func (message *Message) readData(conn Conn, messageType MessageType, udtName str
 	}
 	if messageType == JSON {
 		if temp, ok := message.Payload.(*types.JSON); ok {
+			if err = codec.DecodeOSON(temp); err != nil {
+				return err
+			}
 			message.Payload, err = temp.Value()
 			if err != nil {
 				return err

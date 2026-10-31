@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xo/oracle/internal/codec"
 	oraTypes "github.com/xo/oracle/internal/types"
 
 	"github.com/xo/oracle/internal/config"
@@ -1836,6 +1837,24 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 							return err
 						}
 					}
+				}
+			case *oraTypes.JSON:
+				// a JSON row is its JSON text. Inline, the row holds the OSON,
+				// and streamed, it holds a locator that a load reads
+				if stmt.connection.connOption.Lob != config.INLINE {
+					if val.ReadMode() != config.LobReadModeAuto {
+						continue
+					}
+					if err = val.Load(); err != nil {
+						return err
+					}
+				}
+				if err = codec.DecodeOSON(val); err != nil {
+					return err
+				}
+				resultSet.rows[rowIndex][colIndex], err = val.Value()
+				if err != nil {
+					return err
 				}
 			case *oraTypes.Clob:
 				if val.ReadMode() == config.LobReadModeAuto {

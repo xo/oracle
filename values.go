@@ -59,8 +59,17 @@ type BFile = types.BFile
 // Vector is a VECTOR of Oracle 23ai and later.
 type Vector = types.Vector
 
-// JSON is a JSON value of Oracle 21c and later.
+// JSON is a JSON value of Oracle 21c and later. A JSON column scans as a
+// jsontext.Value, and into any destination that encoding/json/v2 decodes
+// into. NewJSON makes one to bind.
 type JSON = types.JSON
+
+// NewJSON returns the JSON of v. A string, a []byte and a jsontext.Value are
+// JSON text already, and any other value goes through json.Marshal of
+// encoding/json/v2.
+func NewJSON(v any) (*JSON, error) {
+	return types.NewJSON(v)
+}
 
 // Bool is a BOOLEAN of Oracle 23ai and later, or of PL/SQL.
 type Bool = types.Bool

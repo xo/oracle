@@ -599,8 +599,34 @@ Then, with Ken's agreement on the names:
   names `negoService`, `Negotiator`, `terminalReader` and `ValueWriter`, and
   `ValueStreamReader` and `ValueStreamer` had no user and are gone.
 
-Left: the JSON coder interfaces, which step 7 removes, `internal/converters`
-until step 8 splits it, and one file of integration tests for each area.
+Left: `internal/converters` until step 8 splits it, and one file of
+integration tests for each area.
+
+### JSON
+
+Step 7 built JSON on `encoding/json/v2`. OSON is the binary JSON of Oracle on
+the wire, so the driver keeps a codec for it, and that codec deals in JSON text
+and nothing else:
+
+- `oson.EncodeText` reads JSON text with a `jsontext.Decoder` into a tree of
+  maps, slices, strings, numbers as text, booleans and nil, and writes OSON.
+- `oson.DecodeText` writes the OSON as JSON text with a `jsontext.Encoder`,
+  with a number as its exact digits and a date as RFC 3339.
+- `types.JSON` holds the JSON text. `NewJSON` and `SetValue` take JSON text,
+  or any Go value through `json.Marshal`. `codec.JSONParameter` turns the text
+  into OSON to bind it, and `ttc` turns the OSON of a row into text, after a
+  load when the server streams it.
+- A JSON column scans into `*any` as a `jsontext.Value`, into a `*string`, a
+  `*[]byte` or a `*jsontext.Value` as text, and into any other destination
+  through `json.Unmarshal`.
+
+The interfaces `JSONCoder`, `JSONEncoder` and `JSONDecoder`, the `Coder`
+field, the type `Oson`, the global map of field encoders and the `reflect`
+of OSON are gone. `types.JSON` cannot import `oson`, which imports `types` for
+NUMBER and dates, so `codec` and `ttc` make the conversions. Step 8 can move
+NUMBER and dates below both. Binding JSON never worked in `go-ora`: it sent a
+NULL, because the coder was set after the value. `TestJSON` binds and reads it
+on 21c and 26ai.
 
 ## The order of the work
 

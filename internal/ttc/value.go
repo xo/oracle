@@ -1,8 +1,11 @@
 package ttc
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"strconv"
@@ -103,8 +106,35 @@ func assign(scanCtx driver.ScanContext, dest, src any) error {
 	if d, ok := src.(*apd.Decimal); ok {
 		src = d.Text('f')
 	}
+	if v, ok := src.(jsontext.Value); ok {
+		return assignJSON(dest, v)
+	}
 	if err := sql.ConvertAssign(scanCtx, dest, src); err != nil {
 		return fmt.Errorf("assigning %T to %T: %w", src, dest, err)
+	}
+	return nil
+}
+
+// assignJSON stores the JSON text v in dest. A string, a []byte and a
+// jsontext.Value take the text, a scanner takes it as a string, and any other
+// destination, such as a struct or a map, takes it through json.Unmarshal of
+// encoding/json/v2.
+func assignJSON(dest any, v jsontext.Value) error {
+	switch d := dest.(type) {
+	case *jsontext.Value:
+		*d = bytes.Clone(v)
+	case *string:
+		*d = string(v)
+	case *[]byte:
+		*d = bytes.Clone(v)
+	case *oraTypes.JSON:
+		return d.SetValue(v)
+	case sql.Scanner:
+		return d.Scan(string(v))
+	default:
+		if err := json.Unmarshal(v, dest); err != nil {
+			return fmt.Errorf("unmarshaling JSON into %T: %w", dest, err)
+		}
 	}
 	return nil
 }

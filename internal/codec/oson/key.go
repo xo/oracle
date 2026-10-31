@@ -2,7 +2,6 @@ package oson
 
 import (
 	"bytes"
-	"reflect"
 	"sort"
 	"strconv"
 )
@@ -89,22 +88,15 @@ func (collection *keyCollection) Add(input *key) {
 	*collection = append(*collection, *input)
 }
 func (collection *keyCollection) extractKeys(obj any) {
-	rValue := reflect.ValueOf(obj)
-	switch rValue.Kind() {
-	case reflect.Map:
-		if temp, ok := obj.(map[string]any); ok {
-			for key, value := range temp {
-				collection.Add(NewKey(key))
-				collection.extractKeys(value)
-			}
+	switch v := obj.(type) {
+	case map[string]any:
+		for key, value := range v {
+			collection.Add(NewKey(key))
+			collection.extractKeys(value)
 		}
-	case reflect.Slice:
-		fallthrough
-	case reflect.Array:
-		for index := 0; index < rValue.Len(); index++ {
-			if rValue.Index(index).CanInterface() {
-				collection.extractKeys(rValue.Index(index).Interface())
-			}
+	case []any:
+		for _, item := range v {
+			collection.extractKeys(item)
 		}
 	}
 }

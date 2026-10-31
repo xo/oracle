@@ -160,17 +160,22 @@ Formats: `INT8` (`[]uint8`), `FLOAT32`, `FLOAT64` -- dense and sparse.
 ### JSON (Oracle 21c+)
 
 ```go
-var js oracle.JSON
-js.SetValue(`{"key": "value"}`)
+// bind any Go value, through encoding/json/v2
+js, err := oracle.NewJSON(Order{ID: 7, Items: []string{"a", "b"}})
+_, err = db.ExecContext(ctx, "INSERT INTO orders (doc) VALUES (:1)", js)
 
-var s string
-js.CopyTo(&s)
+// scan into any type that encoding/json/v2 decodes into
+var order Order
+err = db.QueryRowContext(ctx, "SELECT doc FROM orders").Scan(&order)
 
-var m map[string]interface{}
-js.CopyTo(&m)
+// or as the JSON text
+var text jsontext.Value
+err = db.QueryRowContext(ctx, "SELECT doc FROM orders").Scan(&text)
 ```
 
-The driver encodes and decodes Oracle Binary JSON (OSON) itself.
+A JSON column scans into `*any` as a `jsontext.Value`. The driver turns JSON
+text into OSON, the binary JSON of Oracle, and back, and `encoding/json/v2`
+maps it to Go values, so a number keeps every digit.
 
 ### BOOLEAN (Oracle 23c+)
 

@@ -1,32 +1,49 @@
 package types
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
-	"strings"
-	//"github.com/xo/oracle/oson"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"fmt"
 )
 
-type JSONCoder interface {
-	JSONEncoder
-	JSONDecoder
-}
-
-type JSONDecoder interface {
-	DecodeJSON(data []byte) (any, error)
-}
-type JSONEncoder interface {
-	EncodeJSON(input any) ([]byte, error)
-}
+// JSON is a JSON value, of the type JSON of Oracle 21c and later. It holds
+// the JSON text, and the driver turns it into OSON, the binary JSON of Oracle,
+// when it binds it, and back when it reads it. encoding/json/v2 maps a Go
+// value to the text and back, so the driver maps no Go type itself.
+//
+// A JSON column scans as a jsontext.Value, and into any destination that
+// encoding/json/v2 decodes into, such as a struct or a map.
 type JSON struct {
 	Basic
-	Coder JSONCoder
-	loc   Locator
+	text jsontext.Value
+	loc  Locator
 	lobBase
 }
 
-var jsonTypeError = errors.New("unexpected data for json type")
+// NewJSON returns the JSON of v. A string, a []byte and a jsontext.Value
+// are JSON text already, and any other value goes through json.Marshal.
+func NewJSON(v any) (*JSON, error) {
+	js := &JSON{}
+	return js, js.SetValue(v)
+}
+
+// Text returns the JSON text.
+func (js *JSON) Text() jsontext.Value {
+	return js.text
+}
+
+// SetOSON sets the OSON bytes that the driver sends, and the locator that
+// says they are inline.
+func (js *JSON) SetOSON(b []byte) {
+	js.bValue = b
+	if len(b) > 0 {
+		js.loc = NewInlineLocator(uint64(len(b)))
+	} else {
+		js.loc = nil
+	}
+}
 
 func (js *JSON) Locator() Locator {
 	if js.lobBase.Locator() != nil {
@@ -34,69 +51,51 @@ func (js *JSON) Locator() Locator {
 	}
 	return js.loc
 }
+
 func (js *JSON) Upload() error {
 	return js.uploadData(js.bValue, 0, 0)
 }
 
-func (js *JSON) SetValue(input any) error {
-	if input == nil {
-		js.bValue = nil
+// SetValue sets the JSON text from v, as NewJSON does.
+func (js *JSON) SetValue(v any) error {
+	var text []byte
+	switch v := v.(type) {
+	case nil:
+		js.text, js.bValue = nil, nil
 		return nil
-	}
-	var err error
-	switch value := input.(type) {
 	case JSON:
-		currentCoder := js.Coder
-		*js = value
-		if currentCoder != nil && js.Coder == nil {
-			js.Coder = currentCoder
-		}
+		*js = v
+		return nil
 	case *JSON:
-		currentCoder := js.Coder
-		*js = *value
-		if currentCoder != nil && js.Coder == nil {
-			js.Coder = currentCoder
-		}
+		*js = *v
+		return nil
+	case jsontext.Value:
+		text = v
+	case []byte:
+		text = v
 	case string:
-		value = strings.TrimSpace(value)
-		if len(value) == 0 {
-			js.bValue = nil
-			return nil
-		}
-		if strings.HasPrefix(value, "[") {
-			var temp []any
-			err = json.Unmarshal([]byte(value), &temp)
-			if err != nil {
-				return err
-			}
-			return js.SetValue(temp)
-		}
-
-		var temp = make(map[string]any)
-		err = json.Unmarshal([]byte(value), &temp)
-		if err != nil {
-			return err
-		}
-		return js.SetValue(temp)
+		text = []byte(v)
 	default:
-		if js.Coder != nil {
-			js.bValue, err = js.Coder.EncodeJSON(input)
+		b, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("marshaling %T as JSON: %w", v, err)
 		}
-
+		text = b
 	}
-	if err == nil {
-		dataLen := uint64(len(js.bValue))
-		if dataLen > 0 {
-			js.loc = NewInlineLocator(dataLen)
-		} else {
-			js.loc = nil
-		}
+	val := jsontext.Value(bytes.Clone(text))
+	if err := val.Compact(); err != nil {
+		return fmt.Errorf("reading JSON text: %w", err)
 	}
-	return err
+	js.text = val
+	return nil
 }
 
+// Value returns the JSON text, or nil for NULL.
 func (js *JSON) Value() (any, error) {
-	return js.Coder.DecodeJSON(js.bValue)
+	if js.text == nil {
+		return nil, nil
+	}
+	return js.text, nil
 }
 
 func (js *JSON) Scan(input any) error {

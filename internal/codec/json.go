@@ -1,6 +1,8 @@
 package codec
 
 import (
+	"fmt"
+
 	"github.com/xo/oracle/internal/codec/oson"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
@@ -26,11 +28,17 @@ func (param *JSONParameter) Init() {
 func (param *JSONParameter) Encode(input any, _ Conn) (err error) {
 	param.Init()
 	encoder := &types.JSON{}
-	encoder.Coder = &oson.Oson{}
 	encoder.SetDataType(param.DataType)
 	err = encoder.SetValue(input)
 	if err != nil {
 		return
+	}
+	if text := encoder.Text(); text != nil {
+		b, err := oson.EncodeText(text)
+		if err != nil {
+			return err
+		}
+		encoder.SetOSON(b)
 	}
 	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
@@ -45,7 +53,6 @@ func (param *JSONParameter) Encode(input any, _ Conn) (err error) {
 
 func (param *JSONParameter) Decode(_ Conn) (any, error) {
 	decoder := &types.JSON{}
-	decoder.Coder = &oson.Oson{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
 	return decoder, nil
@@ -68,4 +75,19 @@ func (param *JSONParameter) Write(session tns.SessionWriter) error {
 
 func (param *JSONParameter) SetAQMessage() {
 	param.isQueueMessage = true
+}
+
+// DecodeOSON sets the text of js from the OSON bytes that it holds, when it
+// holds them. A JSON that the server streams holds a locator until it is
+// loaded, and the driver calls DecodeOSON again after the load.
+func DecodeOSON(js *types.JSON) error {
+	b := js.Bytes()
+	if len(b) == 0 || js.Text() != nil {
+		return nil
+	}
+	text, err := oson.DecodeText(b)
+	if err != nil {
+		return fmt.Errorf("decoding OSON: %w", err)
+	}
+	return js.SetValue(text)
 }

@@ -5,9 +5,6 @@ type (
 		Encode() ([]byte, error)
 	}
 	FieldDecoder any
-	FieldCreator interface {
-		CreateField(input any, header *header) (Field, error)
-	}
 )
 type Field interface {
 	Encode() ([]byte, error)

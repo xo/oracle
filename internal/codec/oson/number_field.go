@@ -3,8 +3,6 @@ package oson
 import (
 	"bytes"
 	"fmt"
-	"math/big"
-	"strings"
 
 	"github.com/xo/oracle/internal/types"
 )
@@ -15,23 +13,11 @@ type numberField struct {
 }
 
 func (field *numberField) Value() (any, error) {
-	strNum, err := field.value.String()
+	s, err := field.value.String()
 	if err != nil {
 		return nil, err
 	}
-	if strings.Contains(strNum, ".") {
-		ret, success := big.NewFloat(0).SetString(strNum)
-		if !success {
-			return nil, fmt.Errorf("cannot convert %s to big float", strNum)
-		}
-		return ret, nil
-	}
-
-	ret, success := big.NewInt(0).SetString(strNum, 10)
-	if !success {
-		return nil, fmt.Errorf("cannot convert %s to big int", strNum)
-	}
-	return ret, nil
+	return number(s), nil
 }
 func (field *numberField) Encode() ([]byte, error) {
 	data := field.value.Bytes()

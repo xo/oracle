@@ -49,6 +49,14 @@ which nothing checks. The recorded exchanges show it. Find which statement it
 is, and return the error or stop running the statement (D14).
 sijms/go-ora#611 asks for an option to skip the NLS query.
 
+### Report SELECT CAST(:1 AS JSON) on 21c
+
+On 21c, `SELECT CAST(:1 AS JSON) FROM dual` with a JSON bind fails inside the
+server with ORA-00600 [25026] or [kcbgtcr_1]. The same bind inserts into a JSON
+column, `JSON_SERIALIZE(CAST(:1 AS JSON))` works, and 26ai returns it. Find
+whether the driver can send the bind so that 21c accepts it, as python-oracledb
+does, or record it as a fault of 21c.
+
 ### Finish the values of dates
 
 `TestTime` in `integration` fails on 26ai: a timestamp comes back in UTC and

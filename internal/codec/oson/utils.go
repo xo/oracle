@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"reflect"
 
 	"github.com/xo/oracle/internal/types"
 )
@@ -79,8 +78,6 @@ op = 62 and length = 11
 2- parse input
 */
 
-var jsonEncoder map[reflect.Type]FieldCreator
-
 //var jsonDecoder map[int]FieldDecoder
 
 func Encode(mainObj any) ([]byte, error) {
@@ -96,17 +93,6 @@ func Encode(mainObj any) ([]byte, error) {
 	}
 	header.keyDataLen = len(keyBuffer)
 	var objectData []byte
-	creator := jsonEncoder[reflect.TypeOf(mainObj)]
-	if creator != nil {
-		obj, err := creator.CreateField(mainObj, header)
-		if err != nil {
-			return nil, err
-		}
-		objectData, err = obj.Encode()
-		if err != nil {
-			return nil, err
-		}
-	}
 	switch mainObj := mainObj.(type) {
 	case map[string]any:
 		obj, err := NewobjectField(mainObj, header)

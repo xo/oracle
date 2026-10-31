@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"reflect"
 
 	"github.com/xo/oracle/internal/types"
 )
@@ -18,51 +17,37 @@ func (array *arrayField) Value() (any, error) {
 	return array.value, nil
 }
 
-func NewarrayField(value any, header *header) (*arrayField, error) {
+func NewarrayField(value []any, header *header) (*arrayField, error) {
 	ret := new(arrayField)
 	ret.header = header
 	var err error
-	rValue := reflect.ValueOf(value)
-	length := rValue.Len()
-	for i := range length {
+	for i, item := range value {
 		var field Field
-		item := rValue.Index(i)
-		if item.IsNil() || !item.IsValid() {
+		switch v := item.(type) {
+		case nil:
 			field = &nullField{}
-		} else {
-			item = reflect.ValueOf(item.Interface())
-			switch item.Kind() {
-			case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				fallthrough
-			case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				fallthrough
-			case reflect.Float32, reflect.Float64:
-				temp, err := types.NewNumber(item.Interface())
-				if err != nil {
-					return nil, err
-				}
-				field = &numberField{value: *temp}
-			case reflect.String:
-				field = NewstringField(item.String())
-			case reflect.Bool:
-				field = &booleanField{value: item.Bool()}
-			case reflect.Slice, reflect.Array:
-				field, err = NewarrayField(item.Interface(), header)
-				if err != nil {
-					return nil, err
-				}
-			case reflect.Map:
-				if temp, ok := item.Interface().(map[string]any); ok {
-					field, err = NewobjectField(temp, header)
-					if err != nil {
-						return nil, err
-					}
-				} else {
-					return nil, fmt.Errorf("invalid JSON Object at index: %d", i)
-				}
-			default:
-				return nil, fmt.Errorf("unsupported type: %s at index: %d", rValue.Type(), i)
+		case number:
+			temp, err := types.NewNumber(string(v))
+			if err != nil {
+				return nil, err
 			}
+			field = &numberField{value: *temp}
+		case string:
+			field = NewstringField(v)
+		case bool:
+			field = &booleanField{value: v}
+		case []any:
+			field, err = NewarrayField(v, header)
+			if err != nil {
+				return nil, err
+			}
+		case map[string]any:
+			field, err = NewobjectField(v, header)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("encoding a value of the type %T at %v", v, i)
 		}
 		if field == nil {
 			return nil, fmt.Errorf("no value for index %d", i)
