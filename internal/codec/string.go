@@ -66,12 +66,13 @@ func (param *StringParameter) Encode(input any, conn Conn) error {
 	length = conn.MaxStringLength()
 	if param.MaxLen > length {
 		param.DataType = types.LongVarChar
-		// 11g converts a long string to the UTF-16 of a CLOB one packet at
-		// a time, and stores U+FFFD for a character that the end of a
-		// packet splits. A string with no such character binds as a LONG,
-		// and one with them as a temporary CLOB, which a CLOB column stores
-		// whole and a LONG column refuses with an error.
-		if conn.ServerRelease() < 12 && !isASCII(param.BValue) {
+		// 11g and 18c convert a long string to the UTF-16 of a CLOB one
+		// packet at a time, and store U+FFFD for a character that the end
+		// of a packet splits. 19.33, 21c and later do not. A string with no
+		// such character binds as a LONG, and one with them as a temporary
+		// CLOB, which a CLOB column stores whole and a LONG column refuses
+		// with an error.
+		if conn.ServerRelease() < 19 && !isASCII(param.BValue) {
 			return param.encodeClob(input, conn)
 		}
 	} else {

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json/jsontext"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -458,20 +459,18 @@ func TestVector(t *testing.T) {
 	}
 }
 
-// TestLongColumn binds text longer than a VARCHAR2 into a LONG. Before 12c
-// a string with characters outside ASCII binds as a temporary CLOB, so that
-// a CLOB column stores it whole, and a LONG column refuses it.
+// TestLongColumn binds text longer than a VARCHAR2 into a LONG, which must
+// hold it whole or refuse it. Before 19c a string with characters outside
+// ASCII binds as a temporary CLOB, which 11g refuses for a LONG and 18c
+// stores.
 func TestLongColumn(t *testing.T) {
 	db := openLive(t)
 	ctx := t.Context()
 	createTable(t, db, "xo_oracle_long", "id NUMBER, l LONG")
-	old := serverRelease(t, db) < 12
+	old := serverRelease(t, db) < 19
 	for i, s := range []string{strings.Repeat("a", 0x5000), strings.Repeat("é", 0x3000)} {
 		_, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_long VALUES (:1, :2)", i, s)
-		if old && i == 1 {
-			if err == nil {
-				t.Error("11g stores text outside ASCII in a LONG, which it garbled")
-			}
+		if err != nil && old && i == 1 {
 			continue
 		}
 		if err != nil {
@@ -484,5 +483,39 @@ func TestLongColumn(t *testing.T) {
 		if got != s {
 			t.Errorf("%d: got %d bytes, want %d", i, len(got), len(s))
 		}
+	}
+}
+
+// TestOutput reads the lines of DBMS_OUTPUT, as go-ora v2 did through
+// dbms.NewOutput (D19).
+func TestOutput(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := oracle.EnableOutput(ctx, conn, 0); err != nil {
+		t.Fatal(err)
+	}
+	if lines, err := oracle.ReadOutput(ctx, conn); err != nil || lines != nil {
+		t.Errorf("no output: got %q, %v", lines, err)
+	}
+	if _, err := conn.ExecContext(ctx, "BEGIN DBMS_OUTPUT.PUT_LINE('one'); DBMS_OUTPUT.PUT_LINE(NULL); DBMS_OUTPUT.PUT_LINE('wörld'); END;"); err != nil {
+		t.Fatal(err)
+	}
+	lines, err := oracle.ReadOutput(ctx, conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"one", "", "wörld"}; !reflect.DeepEqual(lines, want) {
+		t.Errorf("got %q, want %q", lines, want)
+	}
+	if lines, err := oracle.ReadOutput(ctx, conn); err != nil || lines != nil {
+		t.Errorf("a second read: got %q, %v", lines, err)
+	}
+	if err := oracle.DisableOutput(ctx, conn); err != nil {
+		t.Fatal(err)
 	}
 }

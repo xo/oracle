@@ -1,6 +1,7 @@
 package charset
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -63,5 +64,56 @@ func BenchmarkFirstUse(b *testing.B) {
 		if _, err := decodeCharset(0x354, e.data); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// TestEncodeReplacement is sijms/go-ora#773: a character that a charset
+// lacks was written as 0xFD, the low byte of U+FFFD, which is half a
+// character of JA16EUC and ý in WE8ISO8859P1. It is the '?' of the charset.
+func TestEncodeReplacement(t *testing.T) {
+	tests := []struct {
+		id   int
+		in   string
+		want []byte
+	}{
+		{830, "aⅠb", []byte("a?b")}, // JA16EUC
+		{831, "Ⅱ", []byte("?")},     // JA16EUCYEN
+		{837, "aⅠ", []byte("a?")},   // JA16EUCTILDE
+		{31, "a€b", []byte("a?b")},  // WE8ISO8859P1
+	}
+	for _, test := range tests {
+		c := New(test.id)
+		if c == nil {
+			t.Fatalf("no charset %d", test.id)
+		}
+		if got := c.Encode(test.in); !bytes.Equal(got, test.want) {
+			t.Errorf("%d: %q encodes as % x, want % x", test.id, test.in, got, test.want)
+		}
+	}
+	// a charset whose '?' is not 0x3F, such as EBCDIC, replaces with its own
+	m, err := charsets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for id := range m {
+		c := New(id)
+		if c == nil || c.eBuffer == nil {
+			continue
+		}
+		q, ok := c.eBuffer['?']
+		if !ok || q == '?' {
+			continue
+		}
+		n++
+		if _, has := c.eBuffer[0x2160]; has {
+			continue
+		}
+		if got, want := c.Encode("Ⅰ"), appendChar(nil, q); !bytes.Equal(got, want) {
+			t.Errorf("%d: Ⅰ encodes as % x, want its '?', % x", id, got, want)
+		}
+	}
+	if n == 0 {
+		t.Error("no charset has a '?' other than 0x3F")
 	}
 }

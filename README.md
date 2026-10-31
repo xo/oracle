@@ -1,3 +1,30 @@
+<div align="center">
+  <a href="#installation" title="Installation">Installation</a> |
+  <a href="#quick-start" title="Quick Start">Quick Start</a> |
+  <a href="#connection-options" title="Connection options">Connection options</a> |
+  <a href="#values" title="Values">Values</a> |
+  <a href="#migration-from-go-ora" title="Migration from go-ora">Migration</a> |
+  <a href="#related-projects" title="Related Projects">Related Projects</a> |
+  <a href="https://pkg.go.dev/github.com/xo/oracle" title="Go Reference">Reference</a> |
+  <a href="CONTRIBUTING.md" title="Contributing">Contributing</a>
+</div>
+
+<br/>
+
+[![Unit Tests][oracle-ci-status]][oracle-ci]
+[![Go Reference][goref-oracle-status]][goref-oracle]
+[![Releases][release-status]][releases]
+[![Discord Discussion][discord-status]][discord]
+
+[oracle-ci]: https://github.com/xo/oracle/actions/workflows/test.yml "Test CI"
+[oracle-ci-status]: https://github.com/xo/oracle/actions/workflows/test.yml/badge.svg "Test CI"
+[goref-oracle]: https://pkg.go.dev/github.com/xo/oracle "Go Reference"
+[goref-oracle-status]: https://pkg.go.dev/badge/github.com/xo/oracle.svg "Go Reference"
+[release-status]: https://img.shields.io/github/v/release/xo/oracle?display_name=tag "Latest Release"
+[releases]: https://github.com/xo/oracle/releases "Releases"
+[discord]: https://discord.gg/WDWAgXwJqN "Discord Discussion"
+[discord-status]: https://img.shields.io/discord/829150509658013727.svg?label=Discord&logo=Discord&colorB=7289da&style=flat-square "Discord Discussion"
+
 # oracle
 
 A pure Go Oracle Database driver for [`database/sql`](https://pkg.go.dev/database/sql).
@@ -9,8 +36,8 @@ only. It does not carry the `v1` or `v2` code, and it does not carry the
 upstream tags. It is under rewrite, and [`docs/PLAN.md`](docs/PLAN.md) holds
 the plan.
 
-[usql](https://github.com/xo/usql), [dbtpl](https://github.com/xo/dbtpl) and
-[dbmeta](https://github.com/xo/dbmeta) read Oracle through this driver.
+[`usql`][usql], [`dbtpl`][dbtpl] and [`dbmeta`][dbmeta] read Oracle through
+this driver.
 
 ## Features
 
@@ -232,6 +259,28 @@ c, err := oracle.NewConnector(cfg,
 The connector sets each parameter with `ALTER SESSION` on each connection
 after its logon.
 
+## DBMS_OUTPUT
+
+`DBMS_OUTPUT` belongs to one session, so the helpers take a `*sql.Conn` or a
+`*sql.Tx`:
+
+```go
+conn, err := db.Conn(ctx)
+if err != nil {
+    return err
+}
+defer conn.Close()
+if err := oracle.EnableOutput(ctx, conn, 0); err != nil {
+    return err
+}
+if _, err := conn.ExecContext(ctx, "BEGIN my_proc; END;"); err != nil {
+    return err
+}
+lines, err := oracle.ReadOutput(ctx, conn)
+```
+
+`ReadOutput` reads every line in one round trip, and removes them.
+
 ## Logging
 
 The driver logs nothing unless the caller sets `Config.Logger`:
@@ -285,6 +334,7 @@ oracle/
 | `github.com/sijms/go-ora/v2` | `github.com/xo/oracle` |
 | Types in the driver package | Types in the driver package, such as `oracle.Clob` and `oracle.Vector` |
 | `go_ora/dbms.NewAQ` | `aq.CreateQueue` |
+| `go_ora/dbms.NewOutput` | `oracle.EnableOutput` and `oracle.ReadOutput` |
 | Manual UDT setup | `oracle.RegisterType` with struct tags |
 | `go_ora.AddSessionParam` / `DelSessionParam` | `oracle.WithSessionParam` on the connector |
 | `go_ora.NewConnector(dsn)`, `Dialer`, `WithTLSConfig` | `oracle.NewConnector(cfg)` with `Config.Dialer` and `Config.TLS` |
@@ -294,6 +344,26 @@ oracle/
 | The package `go_ora` | The package `oracle` |
 
 The DSN is not compatible. See Connection options.
+
+## Related Projects
+
+- [`usql`][usql] is a universal command line client for databases, and reads
+  Oracle through this driver.
+- [`dbtpl`][dbtpl] generates Go code from a database schema.
+- [`dbmeta`][dbmeta] reads the metadata of a database, and its `dbrun` starts
+  the Oracle releases that this driver is tested against.
+- [`dburl`][dburl] parses database URLs, and builds the `oracle` URL of this
+  driver.
+- [`dbimp`][dbimp] holds `database/sql` drivers for other databases, whose
+  design this driver follows.
+- [`tblfmt`][tblfmt] renders result sets as tables.
+
+[usql]: https://github.com/xo/usql "usql"
+[dbtpl]: https://github.com/xo/dbtpl "dbtpl"
+[dbmeta]: https://github.com/xo/dbmeta "dbmeta"
+[dburl]: https://github.com/xo/dburl "dburl"
+[dbimp]: https://github.com/xo/dbimp "dbimp"
+[tblfmt]: https://github.com/xo/tblfmt "tblfmt"
 
 ## Contributing
 

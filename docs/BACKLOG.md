@@ -50,8 +50,8 @@ Write a test for each again, on the new API. Step 9 wrote `TestStrings`,
   `inout_lob_test.go`.
 - `issue_173_test.go`, `issue_264_test.go`, `issue_320_test.go` and
   `issue_363_test.go`.
-- `dbms_aq_test.go` and `dbms_output_test.go`. The `aq` package replaces the
-  first, and the reader of D19 the second.
+- `dbms_aq_test.go`, which the `aq` package replaces. `TestOutput` in
+  `values_test.go` replaces `dbms_output_test.go`.
 - `gorm_test.go`, which tests `gorm` and not this driver. It does not come back.
 
 Step 1 also deleted the unit tests of functions that `v3` removed:
@@ -59,12 +59,6 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 `setFieldValue` and `setNull`, and `TestCreateNewType` with the dead function
 that it tested. The vectors of `converters/other_types_test.go` moved to
 `internal/types/vectors_test.go`.
-
-### Read DBMS_OUTPUT
-
-Ken decided that the driver reads `DBMS_OUTPUT` (D19). Write a helper that
-enables it on a connection and reads its lines with `DBMS_OUTPUT.GET_LINES`,
-and a live test.
 
 ### Read tnsnames.ora
 
@@ -89,7 +83,9 @@ negotiation (D21).
 ### Write four upstream pull requests again
 
 Ken decided to take sijms/go-ora#734, #721, #770 and #773 (D18). Step 9 wrote
-#770, which reads XMLType. Write the other three for this code, with a test. `UPSTREAM.md` says what each does. On 2026-10-31
+#770, which reads XMLType, and #773, which replaces a character that a
+charset lacks. #734 is not applied, because its fault does not reproduce, as
+`UPSTREAM.md` says. Write #721 for this code, with a test. `UPSTREAM.md` says what each does. On 2026-10-31
 `dbrun` added the Autonomous Database Free image as `oracle-adb-26ai` and
 `oracle-adb-19c`, which CI leaves out. The driver connects to both with
 `sslmode=require` in place of the query that `dbrun dsn` prints, which names

@@ -79,13 +79,15 @@ The fourth part of step 9 is done (`9d4ea66`). `ColumnTypeDatabaseTypeName`
 gives the names of the data dictionary, a `time.Time` with a fraction of a
 second binds as a `TIMESTAMP`, and `Config.NTS` replaces `SetNTSAuth`.
 
-The fifth part of step 9 is staged. The driver reads XMLType, which `v3`
-never did, and tests the bits of its flag word, which fixes #771 on
-Autonomous Database (D18). On 11g a long string with characters outside
-ASCII binds as a temporary CLOB, which a CLOB column stores whole, and a
-`bool` binds. `values_test.go` holds the tests of `go-ora` that step 1
-deleted, for strings, LOBs, BOOLEAN and VECTOR. Ken accepted D8 to D15 and
-decided D17 to D21. `dbrun` added `oracle-adb-19c` and `oracle-adb-26ai`, and
-the root package and `integration` pass on 11g, 18c, 21c, 23ai, 26ai and
-both of them. 19c is left out (D17). Left in `UPSTREAM.md`: #729, which Ken
-asked to reproduce, and the work of D18 to D21 in `BACKLOG.md`.
+The fifth part of step 9 is done (`91a5448`, pushed). It reads XMLType,
+which fixes #771, binds long text safely on 11g, and records D8 to D21. CI found the same
+fault of long text on 18c, and the sixth part covers every release before
+19c.
+
+The sixth part of step 9 is staged. A character that a charset lacks is the
+'?' of that charset, where every charset wrote 0xFD (#773). #733, for which
+Ken took #734, does not reproduce, and `TestClobCharset` holds the case.
+`oracle.EnableOutput`, `ReadOutput` and `DisableOutput` read `DBMS_OUTPUT`
+(D19). `README.md` has the badges and the related projects of the other `xo`
+repositories. Left: #721, `tnsnames.ora` (D20), the four features of D21,
+and #729.

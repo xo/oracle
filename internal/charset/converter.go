@@ -101,21 +101,44 @@ func (conv *Converter) Encode(input string) []byte {
 			return []byte(input)
 		}
 		output := make([]byte, 0, len(temp))
+		var replacement []byte
 		for x := range temp {
 			if ch, ok := conv.eBuffer[int(temp[x])]; ok {
-				if ch < 0x100 {
-					output = append(output, uint8(ch))
-				} else if ch < 0x10000 {
-					output = append(output, uint8(ch>>8), uint8(ch))
-				} else {
-					output = append(output, uint8(ch>>24), uint8(ch>>16), uint8(ch>>8), uint8(ch))
-				}
-			} else {
-				output = append(output, uint8(conv.eReplace))
+				output = appendChar(output, ch)
+				continue
 			}
+			if replacement == nil {
+				replacement = conv.replacement()
+			}
+			output = append(output, replacement...)
 		}
 		return output
 	}
+}
+
+// appendChar appends the bytes of ch, a character of the charset.
+func appendChar(output []byte, ch int) []byte {
+	switch {
+	case ch < 0x100:
+		return append(output, uint8(ch))
+	case ch < 0x10000:
+		return append(output, uint8(ch>>8), uint8(ch))
+	}
+	return append(output, uint8(ch>>24), uint8(ch>>16), uint8(ch>>8), uint8(ch))
+}
+
+// replacement returns the bytes that stand for a character that the charset
+// lacks: its own character for the replacement of the table, which is
+// U+FFFD in every table, or for '?', which is 0x3F in ASCII and 0x6F in
+// EBCDIC. go-ora wrote the low byte of U+FFFD, 0xFD, which is a character
+// of most charsets and half of one in JA16EUC, sijms/go-ora#773.
+func (conv *Converter) replacement() []byte {
+	for _, r := range []int{conv.eReplace, '?'} {
+		if ch, ok := conv.eBuffer[r]; ok {
+			return appendChar(nil, ch)
+		}
+	}
+	return []byte{'?'}
 }
 
 func (conv *Converter) toUnicodeChar(ch, leading int) int {

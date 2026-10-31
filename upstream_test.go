@@ -265,3 +265,32 @@ func TestXMLType(t *testing.T) {
 	}
 	usable(t, db)
 }
+
+// TestClobCharset is sijms/go-ora#733: text outside ASCII written through
+// the LOB API read back garbled. Here it reads back whole, into a CLOB
+// column and as a CLOB bound into a VARCHAR2.
+func TestClobCharset(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_clob_charset", "id NUMBER, c CLOB, v VARCHAR2(4000 CHAR)")
+	long := strings.Repeat("سلام دنیا ", 300)
+	short := strings.Repeat("سلام ", 100)
+	c1, err := oracle.CreateClob(ctx, db, long, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := oracle.CreateClob(ctx, db, short, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_clob_charset VALUES (1, :1, :2)", c1, c2); err != nil {
+		t.Fatal(err)
+	}
+	var c, v string
+	if err := db.QueryRowContext(ctx, "SELECT c, v FROM xo_oracle_clob_charset").Scan(&c, &v); err != nil {
+		t.Fatal(err)
+	}
+	if c != long || v != short {
+		t.Errorf("got %d and %d bytes, want %d and %d", len(c), len(v), len(long), len(short))
+	}
+}

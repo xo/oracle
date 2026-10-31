@@ -64,8 +64,9 @@ yourself and do not write it as though it were settled.
 
 - `/` is the driver, the package `oracle` (D8). `dsn.go` holds `Config` and
   `ParseDSN`, `connector.go` the `Connector`, `driver.go` the `Driver` and
-  `RegisterType`, `errors.go` the sentinel errors, and `values.go` the types
-  of `internal/ttc` that a caller uses.
+  `RegisterType`, `errors.go` the sentinel errors, `values.go` the types
+  of `internal/ttc` that a caller uses, and `output.go` the reader of
+  `DBMS_OUTPUT`.
 - `internal/ttc` holds the connection, statements, rows and the rest of the
   protocol above TNS (D12).
 - `aq` is public. `internal/types` holds the value types, and `values.go`

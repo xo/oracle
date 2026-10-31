@@ -111,7 +111,8 @@ one job, so that a person or an agent finds a behavior by its file name.
 | `object.go` | User defined types and collections |
 
 The table is the target. The root package holds `driver.go`, `connector.go`,
-`dsn.go`, `errors.go` and `values.go` today. `values.go` names the types of
+`dsn.go`, `errors.go`, `values.go` and `output.go`, the reader of
+`DBMS_OUTPUT` (D19), today. `values.go` names the types of
 `internal/ttc` and `internal/types` that a caller uses, such as `Out`,
 `RefCursor` and `Clob`, as aliases. `conn`, `stmt`, `rows` and `tx` are still
 `ttc.Connection`, `ttc.Stmt`, `ttc.DataSet` and `ttc.Transaction`, which steps
@@ -353,11 +354,13 @@ the session. `TimestampTZ` binds with its zone.
 A `bool` binds as a `BOOLEAN` on 23ai and later, and as the `NUMBER` 1 or 0
 before, whose SQL has no `BOOLEAN`. `go-ora` bound no `bool`.
 
-A string longer than the longest `VARCHAR2` binds as a `LONG`. 11g converts
-one to the UTF-16 of a `CLOB` one packet at a time, and stored U+FFFD for a
-character that the end of a packet split. So on 11g a string that long with a
-character outside ASCII binds as a temporary `CLOB`, which a `CLOB` column
-stores whole and a `LONG` column refuses with ORA-22835. A bind in the
+A string longer than the longest `VARCHAR2` binds as a `LONG`. 11g and 18c
+convert one to the UTF-16 of a `CLOB` one packet at a time, and stored U+FFFD
+for a character that the end of a packet split. 19.33, 21c, 23ai and 26ai
+store it whole, and 19.3, which CI leaves out (D17), is not tested. So before
+19c a string that long with a character outside ASCII binds as a temporary
+`CLOB`, which a `CLOB` column stores whole. A `LONG` column of 18c stores it
+whole too, and one of 11g refuses it with ORA-22835, where it garbled it. A bind in the
 national charset fixed the `CLOB` too, and garbled a `LONG` on 11g.
 `TestStrings` and `TestLongColumn` hold it.
 
