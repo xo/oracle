@@ -22,6 +22,7 @@ every other agent read the same rules. Edit this file, not that one.
 
 | If you are | Read |
 | --- | --- |
+| changing the shape of the driver | [docs/DESIGN.md](docs/DESIGN.md) |
 | asking why something is the way it is | the table at the top of [docs/PLAN.md](docs/PLAN.md) |
 | looking for work that is known and not done | [docs/BACKLOG.md](docs/BACKLOG.md) |
 | testing against a database | the `dbrun` rule below, then `../dbmeta/docs/DBRUN.md` |
@@ -39,8 +40,9 @@ yourself and do not write it as though it were settled.
 1. Never merge, cherry pick or copy a pull request from `sijms/go-ora` without
    asking Ken first. Triage it in `docs/UPSTREAM.md` and wait for his answer
    (D5).
-2. The module imports the standard library and nothing else. Do not add a
-   `require` line to `go.mod` without asking Ken.
+2. The module imports the standard library and
+   `github.com/cockroachdb/apd/v3`, for decimals (D16), and nothing else. Do
+   not add a `require` line to `go.mod` without asking Ken.
 3. The module path is `github.com/xo/oracle`. Do not write `sijms/go-ora`
    in code, except where a comment credits the origin of the code.
 4. A change that fixes an upstream issue names the issue in its test and in

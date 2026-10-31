@@ -81,15 +81,16 @@ The earlier analysis also found `go test ./types/` panics in `TestCreateNewType`
 that most other tests need a live database. Only `./types/oson/...` passes alone.
 `data_type_nego.go.old` was a v1 leftover and is already deleted here.
 
-### Tell dburl when the URL changes
+### Tell dburl when the parser lands
 
 dburl staged its `oracle` scheme as provisional on 2026-10-31 (its D69), with
 `github.com/xo/oracle` as the package. Its `GenOracle` writes
 `oracle://user:pass@host:1521/service?<query>`. It adds the host `localhost`
-and the port 1521, and it passes the query through untouched. It does not
-change `tls` to `SSL`. It was checked against `ParseConfig` in this tree. Tell
-the dburl session when any of these changes: a host with no port, a `tls` key,
-the package name, or the first tag. dburl checks again before it tags.
+and the port 1521, and it passes the path and the query through as they are,
+so `%2F` in a service name and every `ssl*` key reach the parser unchanged.
+dburl maps no `tls` key to `sslmode` for any scheme, and will not. The parser
+of D11 is not written yet. When it lands, and again when the first tag
+exists, tell the dburl session, which then rechecks its tests and documents.
 
 ### Fix the upstream issues
 

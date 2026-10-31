@@ -1,0 +1,359 @@
+# Driver design
+
+This document is the target design for the rewritten driver. It is a proposal
+until Ken accepts it, and D8 to D16 in [PLAN.md](PLAN.md) record it. The design
+follows the drivers of [`xo/dbimp`](https://github.com/xo/dbimp) and
+[`xo/cassandra`](https://github.com/xo/cassandra), so that an `xo` driver looks
+the same whatever database it reaches. Where this document cites a decision of
+another repository, it names the repository, as in "dbimp D8".
+
+The sources, read on 2026-10-31:
+
+- `dbimp/AGENTS.md`, `dbimp/docs/DESIGN.md`, and dbimp D6, D8, D25, D27, D35 and
+  D109.
+- `cassandra/docs/DESIGN.md`, which is the nearest example of a repository that
+  holds one driver.
+- The code of this repository at `cb68b12`, which is the `v3` code of
+  `sijms/go-ora` at upstream commit `62f8a42`.
+- The Go 1.27.2 source of `database/sql/driver`.
+
+## Goals
+
+1. Keep the contract of dbimp D8 with `database/sql`. Implement the context form
+   of every interface, stop work when the context ends, return a NULL as nil,
+   keep the column order, and return every error wrapped with `%w`.
+2. Hold no state at the package level. Everything that belongs to one database
+   belongs to one `Connector` (dbimp hard rule 2).
+3. Use the idioms of Go 1.27, and require Go 1.27.1 or newer, as dbimp D2 and
+   dbimp D25 do. Depend on the standard library and on
+   `github.com/cockroachdb/apd/v3` alone (D16).
+4. Keep the wire protocol code. TNS (the Oracle network layer), TTC (the Oracle
+   two task layer), the authentication and the encryption are the hard part, and
+   they work. The rewrite changes the shape around them, and fixes them only
+   where a fault is known.
+5. Run every unit test with no server. Gate the integration tests on
+   `ORACLE_DSN`, which a test reads from `dbrun` (D6).
+
+## What changes, and why
+
+The table lists the faults of the current shape. Each row names the part of the
+design that removes it.
+
+| Today | Fault | Design |
+| --- | --- | --- |
+| One package variable, `oracleDriver`, holds the session parameters, the registered types, the coders, the TLS configuration and the string converters of every database | Two databases in one process share them. A string converter set by the first connection decodes the text of the second, which is sijms/go-ora#692 | Connector |
+| `AddSessionParam(db, ...)`, `RegisterType(db, ...)` and `AddParameterCoder(db, ...)` reach the driver through a `*sql.DB` | The call changes the driver of every `*sql.DB`, not only the one that the caller names | Connector |
+| `StartContext` starts a goroutine for each call, and the goroutine breaks the connection when the context ends | A goroutine for each round trip, a race on `breakConn`, and a rollback that runs under a context that already ended, which is sijms/go-ora#767 | Context |
+| `Transaction` stores its context | Against dbimp hard rule 4 | Transactions |
+| The library calls `context.Background()` or `context.TODO()` in 20 places | A caller cannot stop that work | Context |
+| The DSN takes any scheme, keys with spaces, and a host that must have a port | Against dbimp D27 and dbimp D35 | DSN |
+| The `trace` package writes files | A package holds no configuration of its own, by dbimp hard rule 2 | Logging |
+| The errors are made with `errors.New` and `fmt.Errorf` with no `%w` | A caller cannot test an error with `errors.Is` | Errors |
+| `converters` is 79,775 lines, almost all one generated table | A build of a program that imports the driver is 23.6 MB | Charsets |
+| The package is `go_ora` | Not an idiomatic name | Packages |
+
+## Packages
+
+The root package is `oracle`, at `github.com/xo/oracle`. Its name is the name
+that it registers with `database/sql`, and the name of the scheme of its DSN, as
+dbimp hard rule 1 asks. A consumer imports it as `_ "github.com/xo/oracle"` or
+calls it as `oracle.NewConnector`.
+
+Everything that a caller does not use goes under `internal/`, so that it can
+change without a new major version. Today every package is public.
+
+| Path | Holds | Today |
+| --- | --- | --- |
+| `/` | The driver, the connector, the DSN, the options, the errors and the value types that a caller passes or scans | the root package, `configurations` and `types` |
+| `aq/` | Advanced Queuing | `aq` |
+| `internal/tns/` | Packets, the session, TLS, the redirect, out of band breaks | `network` |
+| `internal/ttc/` | Messages, the negotiation of protocol and data types, cursors, LOB calls | the root package, `network` |
+| `internal/auth/` | O5LOGON, Kerberos, NTS and NTLM, tokens, wallets | `advanced_nego`, `auth_object.go`, `configurations/wallet*.go` |
+| `internal/charset/` | The Oracle charsets, compacted | `converters` |
+| `internal/codec/` | The encoders and decoders of each Oracle type, NUMBER, dates, intervals, OSON, VECTOR | `parameter_coder`, `converters`, `types/oson` |
+
+`lazy_init`, `trace` and `utils` are deleted. Their contents move to the package
+that uses them or go away.
+
+## The root package
+
+The layout is the one of `cassandra` and of every dbimp driver. Each file holds
+one job, so that a person or an agent finds a behavior by its file name.
+
+| File | Holds |
+| --- | --- |
+| `driver.go` | `Driver`, `Open`, `OpenConnector`, and the `init` that calls `sql.Register("oracle", ...)` |
+| `connector.go` | `Connector`, `NewConnector`, `Connect` and `Close` |
+| `conn.go` | `conn` and every method that `database/sql` calls on it |
+| `stmt.go` | `stmt` |
+| `rows.go` | `rows`, with `NextRow`, `ScanColumn` and the column type methods |
+| `tx.go` | `tx` |
+| `dsn.go` | `ParseDSN` and `Config.DSN` |
+| `options.go` | `Option` and `WithOptions` |
+| `errors.go` | `Error`, the sentinel errors, and `*ServerError` |
+| `values.go` | The Oracle types that Go lacks, such as `IntervalYM`, `RowID`, `Vector` and `JSON` |
+| `lob.go` | `Clob`, `Blob` and `BFile` |
+| `object.go` | User defined types and collections |
+
+## Connector
+
+```go
+// Connector opens connections to one Oracle database. It holds everything
+// that belongs to that database: the configuration, the registered types,
+// the session parameters and the TLS configuration.
+type Connector struct {
+	cfg Config // a copy, so that the caller can change theirs
+
+	mu    sync.Mutex
+	types map[string]objectType
+}
+
+// NewConnector returns a Connector for cfg. It does not connect.
+func NewConnector(cfg Config, opts ...ConnectorOption) (*Connector, error)
+```
+
+A caller that needs more than the DSN can say builds a `Config`, or parses the
+DSN with `ParseDSN` and changes the result, and calls
+`sql.OpenDB(oracle.NewConnector(cfg))`. These replace the functions that take a
+`*sql.DB`:
+
+| Today | Design |
+| --- | --- |
+| `AddSessionParam(db, k, v)` | `WithSessionParam(k, v)`, a `ConnectorOption`, run after each logon |
+| `RegisterType(db, name, array, v)` | `WithType(name, array, v)`, a `ConnectorOption` |
+| `AddParameterCoder(db, t, id, c)` | Removed until a caller needs it. A user defined type covers the case that issues name |
+| `SetStringConverter(db, ...)` | Removed. The server names the charset at logon, and the connection keeps it |
+| `WithTLSConfig(cfg)` | `Config.TLS`, a `*tls.Config` that the connector clones for each dial, which fixes sijms/go-ora#757 |
+| `RegisterConnConfig(cfg)` | Removed |
+
+`sql.Open` and `OpenConnector` never connect. The first network traffic is the
+first `Connect`, as in `cassandra`.
+
+The charset and the national charset belong to each connection. The server
+sends them at logon, and `conn` keeps them. Nothing caches them across
+connections. That fixes sijms/go-ora#692.
+
+## Context
+
+The context comes first, is named `ctx`, and is never stored in a struct. The
+library never calls `context.Background()` or `context.TODO()`.
+
+Each round trip takes its context. The deadline of the context becomes the
+deadline of the `net.Conn`, with `SetDeadline`, before the call writes. A
+context that ends early is watched with `context.AfterFunc`, which sends the
+Oracle break, by out of band data where the server supports it and by a marker
+packet where it does not. The call then reads to the reset and returns the
+error of the context. There is no goroutine for each call. `context.AfterFunc`
+runs a function only when the context ends, and the stop function that it
+returns is called when the round trip ends.
+
+When the break fails, or the read after it fails, the connection is broken. The
+next call returns `driver.ErrBadConn`, and `ResetSession` and `IsValid` say so,
+so that `database/sql` drops it.
+
+Logon, the TNS connect, and the TLS handshake take the context of `Connect`.
+
+## Transactions
+
+`database/sql` calls `Commit` and `Rollback` with no context. So `tx` keeps no
+context, and the two calls run with the read and write deadline of the
+connection, not with the context of `BeginTx`. A context that ends while a
+transaction is open makes `database/sql` call `Rollback`. The rollback then
+runs to the end, because nothing cancels it, and that fixes sijms/go-ora#767.
+The isolation levels that Oracle has, read committed and serializable, are
+accepted. A read only transaction is `SET TRANSACTION READ ONLY`. Any other
+level fails with an error that wraps `ErrNotSupported`.
+
+## DSN
+
+The DSN is a standard URL whose scheme is `oracle`, parsed with `net/url`, by
+dbimp D27 and dbimp D35. Another scheme is an error. This is a new package, so
+the DSN keeps no form and no key name of `go-ora` (D11).
+
+```
+oracle://user:password@host:port/service/dbname?key=value
+```
+
+- The user and the password are the user information of the URL.
+- The host is required. The port is 1521 when the URL names none.
+- The first segment of the path is the service name. The second segment, when
+  there is one, is the database name, which goes in the connect data as
+  `INSTANCE_NAME`. A path with more than two segments is an error.
+- Each segment is read from `URL.EscapedPath` and unescaped on its own. A
+  service name that holds a `/` is written as `%2F` by the code that builds
+  the URL, which is `dburl` or the caller. There is no key that names the
+  service in place of the path.
+- A key that the driver does not know is an error. A key that appears twice is
+  an error, except `server`, which names one more address each time.
+- Every key is lower case, with no space. Where Oracle Net names the setting,
+  the key is that name in lower case, such as `connect_timeout` and
+  `retry_count`.
+
+The TLS keys are the ones of `pgx` and `lib/pq`, which `usql` users know.
+
+| Key | Values | Default |
+| --- | --- | --- |
+| `sslmode` | `disable`, `require`, `verify-ca`, `verify-full` | `disable` |
+| `sslrootcert` | A file of PEM certificates that sign the certificate of the server | the roots of the system |
+| `sslcert`, `sslkey` | The certificate and the key of the client, for mutual TLS | none |
+| `sslservername` | The name to check the certificate against, in place of the host | the host of the URL |
+| `wallet` | A folder that holds `cwallet.sso` or `ewallet.p12` | none |
+| `wallet_password` | The password of `ewallet.p12` | none |
+
+`require` encrypts and checks nothing. `verify-ca` checks the chain.
+`verify-full` checks the chain and the name. After a listener redirect, the
+name stays the one of the URL, which fixes sijms/go-ora#765. `allow` and
+`prefer` of `pgx` are not accepted, because an Oracle listener speaks TCP or
+TCPS on a port and never both, so there is no plain connection to fall back to.
+
+The other keys:
+
+| Key | Holds | `go-ora` read it as |
+| --- | --- | --- |
+| `sid` | The SID, in place of a service name | `SID` |
+| `descriptor` | A TNS descriptor that replaces the host, the port and the path | `CONNSTR` |
+| `server` | One more address, `host:port` | `SERVER` |
+| `timeout` | The read and write deadline of a round trip, a Go duration such as `30s` | `TIMEOUT` |
+| `connect_timeout` | The limit on the TCP connect, TLS and logon, a Go duration | `CONNECT TIMEOUT` |
+| `prefetch` | The rows that one fetch asks for | `PREFETCH_ROWS` |
+| `lob_fetch` | `inline` or `stream` | `LOB FETCH` |
+| `lob_read` | `auto` or `explicit` | `LOB READ` |
+| `auth` | `password`, `os`, `kerberos` or `token` | `AUTH TYPE` |
+| `privilege` | `sysdba`, `sysoper` and the other administrative privileges | `DBA PRIVILEGE` |
+| `token`, `token_key` | The files of a token and its private key | `TOKEN FILE`, `TOKEN PRIVATE KEY FILE` |
+| `encryption`, `checksum` | `accepted`, `rejected`, `requested` or `required` | `ENCRYPTION`, `DATA INTEGRITY` |
+| `language`, `territory`, `charset` | The NLS settings of the client | `LANGUAGE`, `TERRITORY`, `CHARSET` |
+| `program`, `proxy_user` | What the session reports | `PROGRAM`, `PROXY CLIENT NAME` |
+| `unix_socket` | A Unix socket in place of TCP | `UNIX SOCKET` |
+
+A user named `SYS` gets no privilege by its name. The DSN names it with
+`privilege=sysdba`.
+
+## Options
+
+A statement takes options as dbimp D109 sets them out. An option comes from the
+DSN, then from the context through `WithOptions`, then from an argument of the
+type `Option`, and a later one wins. `CheckNamedValue` takes an `Option` out of
+the arguments. The common options are `WithTimeout`, the time that the server
+gives one statement, and `WithReadonly`. The options of this driver are
+`WithPrefetch` and `WithLobFetch`. dbimp holds the machinery in its root
+package. This module cannot import it (hard rule 2), so it holds a copy of the
+part it needs.
+
+## Values
+
+A NULL is nil. A value has the Go type that fits its Oracle type, and `rows`
+implements `driver.RowsColumnScanner`, so that `Scan` fills the destination of
+the caller with no copy through `any`.
+
+| Oracle | Go, for a scan into `*any` | Also scans into |
+| --- | --- | --- |
+| `VARCHAR2`, `CHAR`, `NVARCHAR2`, `NCHAR`, `LONG`, `CLOB`, `NCLOB` | `string` | `[]byte`, `Clob` |
+| `NUMBER` with scale 0 and precision 18 or less | `int64` | the numeric types, `string` |
+| `NUMBER` with any other precision or scale | `*apd.Decimal`, which holds every digit | `apd.Decimal`, `string`, `float64`, `int64` |
+| `BINARY_FLOAT`, `BINARY_DOUBLE` | `float64` | `float32` |
+| `DATE`, `TIMESTAMP` | `time.Time` in UTC, because the type holds no zone | |
+| `TIMESTAMP WITH TIME ZONE` | `time.Time` in its zone | |
+| `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` in the zone of the session | |
+| `INTERVAL YEAR TO MONTH` | `IntervalYM` | `string` |
+| `INTERVAL DAY TO SECOND` | `time.Duration` | `string` |
+| `RAW`, `LONG RAW`, `BLOB` | `[]byte` | `Blob` |
+| `BOOLEAN` | `bool` | |
+| `JSON` | `JSON`, which holds the document | `string`, any type that `encoding/json/v2` decodes |
+| `VECTOR` | `Vector` | the slices of each element type |
+| `ROWID`, `UROWID` | `string` | `RowID` |
+| `REF CURSOR` | `*sql.Rows` through `driver.Rows` | |
+| An object or a collection | the type that `WithType` registered | |
+
+A decimal is an `*apd.Decimal` from `github.com/cockroachdb/apd/v3`, a new one
+for each value, as in dbimp D33 (D16). `NUMBER` holds 38 digits, which neither
+`float64` nor `int64` holds.
+
+A nullable value is `sql.Null[T]`. The driver accepts the old `sql.NullString`
+types because `database/sql` hands their value through `driver.Valuer`, but the
+driver defines none.
+
+JSON and OSON (the binary JSON of Oracle) are read and written with
+`encoding/json/v2` and `encoding/json/jsontext`.
+
+## Errors
+
+A sentinel error is a constant of the type `Error`, as in dbimp D6:
+`ErrNotSupported`, `ErrScheme`, `ErrUnknownKey`, `ErrRepeatedKey`,
+`ErrInvalidValue`, `ErrConnectorClosed` and `ErrAuthentication`.
+
+An error from the server is a `*ServerError`, with the `ORA-` code, the message
+and the position in the statement. Its `Is` method makes ORA-01017 and
+ORA-28000 match `ErrAuthentication`, as dbimp D197 asks. A message is lower
+case, starts with a gerund and names what failed, such as
+`reading the accept packet: %w`.
+
+`driver.ErrBadConn` is returned only when the statement did not reach the
+server, so that `database/sql` runs it again only when that is safe.
+
+## Logging
+
+The driver writes no file and holds no logger of its own. The `trace` package
+and the `TRACE FILE` key go. A caller that needs to see the packets sets
+`Config.Logger`, a `*slog.Logger`. The connection writes each packet it sends
+and receives to it at `slog.LevelDebug`, and each break and each reconnect at
+`slog.LevelInfo`. A nil logger, the default, logs nothing. A password and a
+key never reach the logger (D14).
+
+## Charsets
+
+The 236 charset tables move to `internal/charset` in the compact form that
+`BACKLOG.md` describes: one blob of varints, deflated one charset at a time,
+read with `go:embed`, and decoded on first use. The work is in the backlog, and
+it is a separate change from this design.
+
+## Go 1.27 idioms
+
+The code uses these, where each fits:
+
+- `any`, `min`, `max`, a `for` range over an integer, and `new(expr)`.
+- The `slices`, `maps` and `iter` packages, in place of a loop that copies.
+- `sync.OnceValue` and `sync.OnceValues`, in place of a flag and a mutex.
+- `context.AfterFunc`, for a break.
+- `errors.Join`, where two errors both reach the caller, as for a statement
+  that failed and a cursor that did not close.
+- `encoding/json/v2`, `uuid.UUID`, and `sql.Null[T]`.
+- `driver.RowsColumnScanner`.
+- In tests, `t.Context()`, `b.Loop()`, and `testing/synctest` for deadlines.
+- `reflect.TypeFor[T]()`, in place of `reflect.TypeOf((*T)(nil)).Elem()`.
+
+The `go fix` of Go 1.27 does most of the mechanical part. The rest is review.
+
+## Testing
+
+A unit test needs no server. A fake server in the test speaks TNS on a
+`net.Pipe`, and plays back the packets of a recorded exchange. The recordings
+come from the releases that `dbrun` starts, and live under `testdata/`. This is
+the same idea as the recorded exchanges of `dbimptest`, for a protocol that is
+not HTTP.
+
+An integration test reads `ORACLE_DSN` and skips when it is empty. CI sets it
+from `dbrun dsn` for every release (D7). `TestIssues` becomes these tests, one
+for each upstream issue that this design fixes, named for the issue.
+
+## The order of the work
+
+Each step leaves a driver that builds and passes its tests.
+
+1. Make the tests build, and raise `go.mod` to Go 1.27.1. Run `go fix`.
+2. Record the exchanges of logon, a query, a DML statement, a LOB and a
+   transaction against each release, and write the fake server.
+3. Move the protocol code to `internal/`, with no change of behavior.
+4. Write the root package as this document says, as the package `oracle`:
+   `Driver`, `Connector`, `conn`, `stmt`, `rows`, `tx`, the DSN and the errors.
+   Delete the package variable.
+5. Replace `StartContext` with deadlines and `context.AfterFunc`.
+6. Change the values to the table above, and add `RowsColumnScanner`.
+7. Move JSON and OSON to `encoding/json/v2`.
+8. Compact the charsets.
+9. Fix the upstream faults in `UPSTREAM.md`, each with a test.
+10. Tell the consumers about the package name and the keys of the DSN. They are
+    `dburl`, `usql` and `dbmeta`. `dburl` staged a scheme on 2026-10-31 that
+    passes the old keys through, so it changes with step 4.
+
+Steps 4 to 6 change what a caller sees. Nothing is tagged until they are done.

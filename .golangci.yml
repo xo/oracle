@@ -37,6 +37,7 @@ linters:
           allow:
             - $gostd
             - github.com/xo/oracle
+            - github.com/cockroachdb/apd/v3
     gosec:
       excludes:
         - G101
