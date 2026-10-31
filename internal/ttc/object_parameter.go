@@ -131,6 +131,10 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 				if err != nil {
 					return err
 				}
+				item, err = basicValue(item)
+				if err != nil {
+					return err
+				}
 				err = coder.Encode(item, conn)
 			} else {
 				err = coder.Encode(nil, conn)
@@ -157,7 +161,11 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 			if idx, ok := param.activeFields[field]; ok {
 				field := rValue.Field(idx)
 				if field.CanInterface() {
-					err = attrib.Encode(field.Interface(), conn)
+					var value any
+					value, err = basicValue(field.Interface())
+					if err == nil {
+						err = attrib.Encode(value, conn)
+					}
 				} else {
 					err = attrib.Encode(nil, conn)
 				}
@@ -346,6 +354,9 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 		for _, field := range param.fields {
 			attrib := param.attribs[field].Copy()
 			attrib.SetParentSession(param.PSession)
+			// a LOB attribute reads its locator through a streamer, which
+			// it lacked, and the read panicked
+			attrib.SetLobStreamer(conn.NewLobStreamer())
 			err = attrib.Read(param.PSession)
 			if err != nil {
 				return nil, err
@@ -355,7 +366,15 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 				return nil, err
 			}
 			if idx, ok := param.activeFields[field]; ok {
-				err = copyValue(retObj.Elem().Field(idx).Addr().Interface(), value)
+				dest := retObj.Elem().Field(idx).Addr().Interface()
+				// a LOB attribute holds a locator, and the decode runs while
+				// the reply is read, when no LOB can load. A string or a
+				// []byte field would get nothing, so only a LOB field takes
+				// one, and it loads after the call
+				if _, ok := value.(types.Lob); ok && !isLobDest(dest) {
+					return nil, fmt.Errorf("reading the attribute %s: a CLOB or a BLOB of an object reads only into an oracle.Clob or an oracle.Blob: %w", field, tns.ErrNotSupported)
+				}
+				err = copyValue(dest, value)
 				if err != nil {
 					return nil, err
 				}
@@ -408,4 +427,13 @@ func (param *ObjectParameter) Read(session tns.SessionReader) error {
 		param.BValue, err = param.BasicRead(session)
 	}
 	return err
+}
+
+// isLobDest reports whether dest, a pointer to a field, takes a LOB.
+func isLobDest(dest any) bool {
+	switch dest.(type) {
+	case *types.Clob, **types.Clob, *types.Blob, **types.Blob, *types.BFile, **types.BFile:
+		return true
+	}
+	return false
 }

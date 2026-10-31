@@ -118,9 +118,28 @@ runs no query, so `skip_nls` is gone (#611), and the exchanges of 11g, 18c,
 (D23), so its exchanges are deleted. #683 is not a fault: a lower case user name logs
 on quoted.
 
-The thirteenth part of step 9 is staged. In a PL/SQL block a string or a
+The thirteenth part of step 9 is done (`c037ddd`, pushed). In a PL/SQL block a string or a
 `[]byte` binds as a `VARCHAR2` or a `RAW` up to 32,767 bytes on every release,
 and as a temporary LOB past that (D24), where the driver bound a `LONG` over
 4,000 bytes on 11g and 32,767 on the rest, and PL/SQL refused it with
 ORA-01483. `UPSTREAM.md` records #635, #688, #680 and #697, which did not
 reproduce.
+
+The fourteenth part of step 9 is staged. The integration tests that step 1
+deleted are written again on the new API, in `collections_test.go`,
+`lobs_test.go`, `objects_test.go` and `named_types_test.go`. `gorm_test.go`
+and `issue_363_test.go` test `gorm` and `xorm`, and do not come back. The
+tests found five faults, which are fixed:
+
+- An object with a CLOB or a BLOB attribute panicked on a read.
+- An OUT collection of CLOBs or BLOBs gave the locators of its elements.
+- A named type of a basic kind, `time.Time` or `[]byte` inside an object or a
+  collection failed to bind, and `RegisterType` refused a named `[]byte`.
+- A PL/SQL IN OUT string longer than 32,767 bytes failed. It binds as a
+  CLOB now, under D24.
+- With `lob_fetch=stream`, a NULL CLOB or BLOB scanned into a string or a
+  `[]byte` failed, which the eleventh part brought in.
+
+`Object` names a type at a bind (D25). A LOB attribute read as text, and a
+bind of an object with one, are in `BACKLOG.md`.
+

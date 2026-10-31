@@ -292,7 +292,33 @@ err = oracle.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStru
 ```
 
 Supports nested objects, collections (VARRAY, TABLE OF), and struct mapping via `udt` tags.
-A type registers with the database of `db` alone.
+A type registers with the database of `db` alone. A value of the Go type that
+`RegisterType` names binds as its Oracle type, and a field of a named type,
+such as `type Status string`, binds as its kind.
+
+A collection of a basic type registers with the name of its element type. Its
+Go element type can be a named type, which binds with no more help:
+
+```go
+type Name string
+
+err := oracle.RegisterType(db, "varchar2", "NAME_LIST", Name(""))
+rows, err := db.Query("SELECT column_value FROM TABLE(:1)", []Name{"a", "b"})
+```
+
+With no Go type, `oracle.Object` names the collection at the bind. A
+`[]time.Time` or a `[][]byte` binds as a PL/SQL array without it:
+
+```go
+err := oracle.RegisterType(db, "date", "DATE_LIST", nil)
+var out []time.Time
+_, err = db.Exec("BEGIN :1 := :2; END;",
+    oracle.Out{Dest: oracle.Object{Name: "DATE_LIST", Value: &out}},
+    oracle.Object{Name: "DATE_LIST", Value: []time.Time{time.Now()}})
+```
+
+A CLOB or a BLOB attribute of an object reads into an `oracle.Clob` or an
+`oracle.Blob` field, which loads after the call.
 
 ## Session parameters
 

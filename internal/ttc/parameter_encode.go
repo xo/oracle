@@ -43,6 +43,9 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 		return err
 	}
 
+	if p, ok := tempValue.(*types.Object); ok && p != nil {
+		tempValue = *p
+	}
 	if value, ok := tempValue.(types.Object); ok {
 		par.encoder, err = connection.ParameterCoder(value.Name)
 		if err != nil {
@@ -111,15 +114,17 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 	}
 	par.UpdateParameterInfo(par.encoder.ParameterInfo())
 	// PL/SQL takes a string or a RAW of up to 32,767 bytes, and no LONG
-	// past that, which failed with ORA-01483. A longer value goes as a
-	// temporary LOB, as python-oracledb sends it (D24)
-	if stmt.stmtType == PLSQL && par.Direction == Input {
+	// past that, which failed with ORA-01483. A longer value, IN or IN OUT,
+	// goes as a temporary LOB, as python-oracledb sends it (D24). An OUT of
+	// a longer size stays a VARCHAR2, which a LONG column selects into
+	if stmt.stmtType == PLSQL && par.Direction != Output {
 		switch par.DataType {
 		case types.LONG, types.LongVarChar, types.LongRaw:
 			err = par.encodeLob(tempValue, connection)
 			if err != nil {
 				return err
 			}
+			size = 0
 		}
 	}
 	if par.MaxLen < size {

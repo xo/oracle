@@ -96,6 +96,8 @@ func (dataSet *DataSet) ScanColumn(scanCtx driver.ScanContext, index int, dest a
 // rowLob is a LOB of a row that ScanColumn can load.
 type rowLob interface {
 	Streamer() types.LobStreamer
+	IsNil() bool
+	IsInline() bool
 	ReadMode() config.LobReadMode
 	Load() error
 	Value() (any, error)
@@ -123,11 +125,20 @@ func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
 	case *types.Clob, *types.Blob:
 		return lob, nil
 	}
-	if lob.ReadMode() != config.LobReadModeAuto {
+	switch {
+	case lob.IsNil():
+		// a NULL has no locator, which a NULL BLOB of stream mode gave to
+		// dest as itself
+		dataSet.row[index] = nil
+		return nil, nil
+	case lob.IsInline():
+		// the locator holds the value
+	case lob.ReadMode() != config.LobReadModeAuto:
 		return lob, nil
-	}
-	if err := lob.Load(); err != nil {
-		return nil, err
+	default:
+		if err := lob.Load(); err != nil {
+			return nil, err
+		}
 	}
 	v, err := lob.Value()
 	if err != nil {

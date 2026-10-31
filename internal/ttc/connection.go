@@ -86,7 +86,6 @@ type Connection struct {
 	oracleTypeCoder   map[uint16]codec.OracleParameterCoder
 	nameTypeCoder     map[string]codec.OracleParameterCoder
 	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
-	cusTyp map[string]types.Object
 	maxLen struct {
 		varchar   int64
 		nvarchar  int64
@@ -506,7 +505,6 @@ func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
 		lobFetch:        cfg.Lob,
 		autoCommit:      true,
 		oracleTypeCoder: nil,
-		cusTyp:          map[string]types.Object{},
 		maxLen: struct {
 			varchar   int64
 			nvarchar  int64

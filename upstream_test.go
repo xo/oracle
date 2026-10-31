@@ -483,6 +483,14 @@ func TestLobReader(t *testing.T) {
 		if mode == oracle.LobFetchStream && !errors.Is(err, oracle.ErrRowsClosed) {
 			t.Errorf("%s: a read after Close: %v, want ErrRowsClosed", mode, err)
 		}
+		// a NULL scans as nil, where stream mode gave a NULL LOB to a
+		// []byte as itself
+		var nc sql.Null[string]
+		var nb []byte
+		err = db.QueryRowContext(ctx, "SELECT TO_CLOB(NULL), TO_BLOB(NULL) FROM dual", oracle.WithLobFetch(mode)).Scan(&nc, &nb)
+		if err != nil || nc.Valid || nb != nil {
+			t.Errorf("%s: NULL LOBs: got %v and %v, %v", mode, nc, nb, err)
+		}
 	}
 	usable(t, db)
 }

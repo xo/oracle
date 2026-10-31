@@ -21,7 +21,6 @@ type Registry struct {
 	oracleTypeCoder map[uint16]codec.OracleParameterCoder
 	goTypeCoder     map[reflect.Type]codec.OracleParameterCoder
 	nameTypeCoder   map[string]codec.OracleParameterCoder
-	cusTyp          map[string]types.Object
 	cookies         cookieJar
 	mu              sync.Mutex
 	UserId          string
@@ -42,7 +41,6 @@ func NewRegistry() *Registry {
 		oracleTypeCoder: make(map[uint16]codec.OracleParameterCoder),
 		nameTypeCoder:   make(map[string]codec.OracleParameterCoder),
 		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
-		cusTyp: map[string]types.Object{},
 	}
 	drv.init()
 	return drv
@@ -171,7 +169,10 @@ func (drv *Registry) RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTyp
 		case reflect.Map:
 			return errors.New("unsupported type object: Map")
 		case reflect.Slice:
-			return errors.New("unsupported type object: Slice")
+			// a named []byte is the element of a collection of RAW
+			if typ.PkgPath() == "" || typ.Elem().Kind() != reflect.Uint8 {
+				return errors.New("unsupported type object: Slice")
+			}
 		}
 	}
 
@@ -235,7 +236,6 @@ func (drv *Registry) NewConnection(config *config.ConnectionConfig) (*Connection
 		return nil, err
 	}
 	conn.buildParameterCoderMap(drv)
-	conn.cusTyp = drv.cusTyp
 	conn.cookies = &drv.cookies
 	return conn, nil
 }

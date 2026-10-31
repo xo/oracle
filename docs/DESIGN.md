@@ -217,7 +217,10 @@ row of a fetch, so the driver holds the values of one row (sijms/go-ora#664).
 Under `database/sql`, which scans through `ScanColumn`, a CLOB or a BLOB is
 loaded there instead, and only for a destination that is not an
 `oracle.Clob` or an `oracle.Blob`. That destination gets the locator, which
-`NewReader` reads in pieces (D22). A locator of a row holds the closed flag
+`NewReader` reads in pieces (D22). A NULL LOB scans as nil, and a LOB whose
+locator holds its value scans as the value with no round trip. Both went to
+the destination as the LOB itself after D22, until `TestBatchBlob` found it.
+A locator of a row holds the closed flag
 of its `DataSet`, and each operation of its `LobStream` fails with
 `ErrRowsClosed` once the flag is set.
 A fetch that brings LOB or LONG values inside it, as `lob_fetch=inline`
@@ -408,9 +411,29 @@ binds `CreateClob` or `CreateBlob` there (D24). PL/SQL takes a `VARCHAR2` or
 a `RAW` of up to 32,767 bytes on every release, and no `LONG` past that, so in
 a PL/SQL block a string or a `[]byte` binds as a `VARCHAR2` or a `RAW` up to
 32,767 bytes, and as a temporary `CLOB` or `BLOB` past that, as
-python-oracledb binds it. The driver used the limit of SQL in PL/SQL, so a
+python-oracledb binds it. An IN OUT value that long binds so too, and comes
+back as a string or a `[]byte`. An OUT with a larger size stays a `VARCHAR2`
+or a `RAW`, as a `LONG` column selects into one and not into a `CLOB`, so a
+longer CLOB comes back through an `oracle.Clob`. The driver used the limit of SQL in PL/SQL, so a
 value over 4,000 bytes on 11g and 32,767 bytes on 18c and later failed with
 ORA-01483. `TestPLSQLLongValues` holds it.
+
+A value of the Go type that `RegisterType` names binds as its user defined
+type. A collection of a basic type, such as a `TABLE OF VARCHAR2`, binds
+through a named Go element type, such as `type Name string`, or through
+`Object`, which names the type at the bind (D25). `Object` was
+`go_ora.Object`. A named value of a basic kind, or of `time.Time` or
+`[]byte`, inside an object or a collection binds as that kind, where
+`database/sql` converts one only at the top of a statement.
+
+The values of a call are decoded while its reply is read, when no LOB can
+load. After the call, the driver loads each CLOB and BLOB of an OUT value:
+the value, the elements of a collection, and the LOB fields of an object. An
+object with a LOB attribute panicked, and an OUT collection of CLOBs gave the
+locators as text. A LOB attribute read into a `string` or a `[]byte` field
+is an error, since the field was filled while the reply was read.
+`TestBasicCollections` and `TestObjectLobAttributes` in `integration` hold
+it.
 
 The type of a column decides the Go type, and the value never does, so every
 row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,

@@ -26,43 +26,15 @@ column, `JSON_SERIALIZE(CAST(:1 AS JSON))` works, and 26ai returns it. Find
 whether the driver can send the bind so that 21c accepts it, as python-oracledb
 does, or record it as a fault of 21c.
 
-### Write the integration tests again
+### Bind and read a LOB attribute of an object as text
 
-Step 1 deleted the files of `TestIssues` that did not build against the `v3`
-code. They used the API of `v2`, such as `go_ora.Clob`, `go_ora.Object` and
-`go_ora.NVarChar`, or a package that the module does not carry: `gorm`, `xorm`
-and the `dbms` package of `v2`. Each one is in commit `d9fa927` and earlier.
-Write a test for each again, on the new API. Step 9 wrote `TestStrings`,
-`TestBlob`, `TestBoolean` and `TestVector` in `values_test.go`, for
-`bool_type_test.go`, `emoji_test.go`, `long_input_test.go`, `lob_test.go` and
-`vector_test.go`. These are left:
-
-- `regular_type_array_test.go`, `udt_string_test.go` and `varray_test.go`.
-- `bulkinsert_bfile_test.go`, `bulkinsert_blob_test.go` and
-  `inout_lob_test.go`.
-- `issue_173_test.go`, `issue_264_test.go`, `issue_320_test.go` and
-  `issue_363_test.go`.
-- `dbms_aq_test.go`, which the `aq` package replaces. `TestOutput` in
-  `values_test.go` replaces `dbms_output_test.go`.
-- `gorm_test.go`, which tests `gorm` and not this driver. It does not come back.
-
-Step 1 also deleted the unit tests of functions that `v3` removed:
-`parameter_encode_test.go`, `bulkcopy_test.go`, the tests of `setString`,
-`setFieldValue` and `setNull`, and `TestCreateNewType` with the dead function
-that it tested. The vectors of `converters/other_types_test.go` moved to
-`internal/types/vectors_test.go`.
-
-### Write four upstream pull requests again
-
-Ken decided to take sijms/go-ora#734, #721, #770 and #773 (D18). Step 9 wrote
-#770, which reads XMLType, #773, which replaces a character that a charset
-lacks, and #721, which encodes a collection in an object. #734 is not
-applied, because its fault does not reproduce, as `UPSTREAM.md` says. `UPSTREAM.md` says what each does. On 2026-10-31
-`dbrun` added the Autonomous Database Free image as `oracle-adb-26ai` and
-`oracle-adb-19c`, which CI leaves out. The driver connects to both with
-`sslmode=require` in place of the query that `dbrun dsn` prints, which names
-the options of `go-ora`. The `v3` code reads no XMLType column, so #770 starts
-with a reader of XMLType, tested on those releases and on the others.
+An object with a CLOB or a BLOB attribute reads into an `oracle.Clob` or an
+`oracle.Blob` field, which loads after the call. A `string` or a `[]byte`
+field is an error, because the decode fills the field while the reply is
+read. A bind of such an object fails with ORA-03101 on 26ai. go-ora panicked
+on the read. Load the LOBs of an object before its fields are filled, and
+write a LOB attribute as python-oracledb does. `TestObjectLobAttributes`
+holds what works.
 
 ### Tell dburl when the first tag exists
 

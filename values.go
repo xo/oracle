@@ -41,6 +41,13 @@ func NewBatch(array driver.Value) driver.Value {
 	return ttc.NewBatch(array)
 }
 
+// Object names the user defined type of a bind, as RegisterType registered
+// it. Most values need none, because the Go type that RegisterType names
+// binds as its type. A collection of a basic type, such as a TABLE OF DATE,
+// needs one, since a []time.Time binds as a PL/SQL array. Value is the
+// value, or a pointer to the destination in an Out.
+type Object = types.Object
+
 // Clob is a CLOB or an NCLOB. A column scans into it, and it binds as an
 // argument.
 type Clob = types.Clob

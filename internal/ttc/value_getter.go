@@ -198,6 +198,32 @@ func namedBasic(v any) bool {
 	return false
 }
 
+// basicValue returns v as its basic kind when it is a named type of one, such
+// as type Name string, and as a time.Time or a []byte when it is a named type
+// of one of those. database/sql converts a named basic value of a statement,
+// and the driver converts one in an object or a collection.
+func basicValue(v any) (any, error) {
+	if namedBasic(v) {
+		return driver.DefaultParameterConverter.ConvertValue(v)
+	}
+	if v == nil || builtinCoder(v) != nil {
+		return v, nil
+	}
+	rv := reflect.ValueOf(v)
+	t := rv.Type()
+	if t.PkgPath() == "" {
+		return v, nil
+	}
+	timeType := reflect.TypeFor[time.Time]()
+	switch {
+	case t.Kind() == reflect.Struct && t.ConvertibleTo(timeType):
+		return rv.Convert(timeType).Interface(), nil
+	case t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8:
+		return rv.Bytes(), nil
+	}
+	return v, nil
+}
+
 // ownValue reports whether v is a value that the driver binds itself, which
 // database/sql must not convert first.
 func ownValue(v any) bool {

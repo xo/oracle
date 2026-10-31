@@ -33,6 +33,7 @@ conclusion.
 | [D22](#d22-a-lob-is-read-in-pieces-until-its-rows-close) | Decided |
 | [D23](#d23-no-test-runs-on-19c) | Decided. Amends D17 |
 | [D24](#d24-a-long-value-binds-as-a-temporary-lob-in-plsql-only) | Decided |
+| [D25](#d25-a-collection-of-a-basic-type-binds-through-a-named-type-or-object) | Decided |
 
 ## Purpose
 
@@ -332,6 +333,19 @@ no locator, and that python-oracledb binds it so. The source of
 python-oracledb shows a temporary LOB for each value instead, so the driver
 does not build such a bind. DeepSeek V4 Pro gave no answer in time, and no
 OpenAI model was at hand.
+
+## D25. A collection of a basic type binds through a named type or Object
+
+Status: Decided.
+
+Ken decided on 2026-11-01 how a caller binds a collection of a basic type,
+such as a `TABLE OF DATE`, which `RegisterType` registers with the name of its
+element type. The main way is a named Go element type, such as
+`type Name string`, which `RegisterType` maps to the collection. The root
+package also exports `Object`, which names the type at the bind, as
+`go_ora.Object` did, for a basic type with no named Go type. Registering a
+`[]time.Time` or a `[][]byte` as the collection would take those types from
+every bind of the connector, PL/SQL arrays among them.
 
 ## Open questions for Ken
 

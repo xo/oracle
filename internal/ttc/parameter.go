@@ -48,7 +48,6 @@ type ParameterInfo struct {
 	oPrimValue        driver.Value
 	getDataFromServer bool
 	oaccollid         int
-	cusType           *types.Object
 	parent            *ParameterInfo
 	Annotations       map[string]string
 	// databaseType is the name of the type of a column, which the define of
@@ -191,14 +190,6 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		return err
 	}
 	par.TypeName = strings.ToUpper(session.StrConv.Decode(bName))
-	if par.DataType == types.XMLType && par.TypeName != "XMLTYPE" {
-		for typName, cusTyp := range conn.cusTyp {
-			if typName == par.TypeName {
-				par.cusType = new(types.Object)
-				*par.cusType = cusTyp
-			}
-		}
-	}
 	if par.TypeName == "XMLTYPE" {
 		par.DataType = types.XMLType
 		par.IsXmlType = true

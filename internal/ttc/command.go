@@ -388,14 +388,6 @@ func (stmt *Stmt) writePars() error {
 					}
 					ms.PutClr(par.BValue)
 				}
-			} else {
-				if par.cusType != nil {
-					ms.PutBytes(0, 0, 0, 0)
-					ms.PutUint(len(par.BValue), 4, true, true)
-					ms.PutBytes(1, 1)
-					ms.PutClr(par.BValue)
-				} else {
-				}
 			}
 		}
 	}
@@ -1489,11 +1481,9 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			} else {
 				// check if LobReadMode is auto so auto read all lobs
 				if stmt.connection.connOption.LobReadMode == config.LobReadModeAuto {
-					if lob, ok := par.oPrimValue.(types.Lob); ok {
-						err = lob.Load()
-						if err != nil {
-							return nil, err
-						}
+					par.oPrimValue, err = loadLobs(par.oPrimValue)
+					if err != nil {
+						return nil, err
 					}
 				}
 
@@ -1897,6 +1887,61 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 		}
 	}
 	return nil
+}
+
+// loadLobs loads v when it is a LOB, each LOB of v when it is the elements
+// of a collection, and each LOB field of v when it is an object, and returns
+// v. The values of a call are decoded while the reply is read, when no LOB
+// can load, so an OUT collection of CLOBs held the locators of its elements,
+// and a string read one as its text.
+func loadLobs(v any) (any, error) {
+	switch v := v.(type) {
+	case types.Lob:
+		return v, v.Load()
+	case []any:
+		for i, item := range v {
+			var err error
+			if v[i], err = loadLobs(item); err != nil {
+				return nil, err
+			}
+		}
+		return v, nil
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Struct {
+		return v, nil
+	}
+	// the fields of a copy can be addressed, and a LOB loads through a
+	// pointer
+	obj := reflect.New(rv.Type()).Elem()
+	obj.Set(rv)
+	for i := range obj.NumField() {
+		field := obj.Field(i)
+		if !field.CanSet() {
+			continue
+		}
+		var lob types.Lob
+		switch f := field.Addr().Interface().(type) {
+		case *types.Clob:
+			lob = f
+		case *types.Blob:
+			lob = f
+		case **types.Clob:
+			if *f != nil {
+				lob = *f
+			}
+		case **types.Blob:
+			if *f != nil {
+				lob = *f
+			}
+		}
+		if lob != nil {
+			if err := lob.Load(); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return obj.Interface(), nil
 }
 
 // Query execute a query command and return dataset object in form of driver.Rows interface
