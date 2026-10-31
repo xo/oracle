@@ -401,6 +401,17 @@ whole too, and one of 11g refuses it with ORA-22835, where it garbled it. A bind
 national charset fixed the `CLOB` too, and garbled a `LONG` on 11g.
 `TestStrings` and `TestLongColumn` hold it.
 
+A `[]byte` longer than the longest `RAW` binds as a `LONG RAW`. SQL takes a
+`LONG` or a `LONG RAW` bind only as a value to insert or set, and refuses one
+in an expression or in the `SELECT` of a `MERGE` with ORA-01461. A caller
+binds `CreateClob` or `CreateBlob` there (D24). PL/SQL takes a `VARCHAR2` or
+a `RAW` of up to 32,767 bytes on every release, and no `LONG` past that, so in
+a PL/SQL block a string or a `[]byte` binds as a `VARCHAR2` or a `RAW` up to
+32,767 bytes, and as a temporary `CLOB` or `BLOB` past that, as
+python-oracledb binds it. The driver used the limit of SQL in PL/SQL, so a
+value over 4,000 bytes on 11g and 32,767 bytes on 18c and later failed with
+ORA-01483. `TestPLSQLLongValues` holds it.
+
 The type of a column decides the Go type, and the value never does, so every
 row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,
 so it is an `*apd.Decimal`, and it scans into an `*int64`.

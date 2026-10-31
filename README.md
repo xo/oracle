@@ -170,6 +170,12 @@ in a zone, such as `Europe/Prague`, call `time.Date` with the fields of the
 value and that zone. A `time.Time` binds as its wall clock, and the server
 reads it in the zone of the session. `oracle.TimestampTZ` binds with its zone.
 
+A string or a `[]byte` longer than 32,767 bytes, or 4,000 on 11g, binds as a
+`LONG` or a `LONG RAW`. SQL takes one only as a value to insert or set. Where
+SQL uses the value in an expression, as in the `SELECT` of a `MERGE`, bind
+`oracle.CreateClob` or `oracle.CreateBlob` in its place. In a PL/SQL block the
+driver binds a value that long as a temporary LOB itself.
+
 A decimal scans into a `*string`, a `*float64` or an `*int64` too. Both
 interval types bind as arguments. `docs/DESIGN.md`, under Values, holds the
 whole table.

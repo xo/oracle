@@ -53,13 +53,28 @@ blocks a connection, P2 is a fault with a workaround.
 ## Faults that need a reproduction first
 
 sijms/go-ora#724 and sijms/go-ora#697 (a malformed TTC packet), sijms/go-ora#706
-and sijms/go-ora#700 (EOF under load), sijms/go-ora#635 and sijms/go-ora#688 (ORA-12564), sijms/go-ora#680 (a TLS
-cipher on RDS), sijms/go-ora#615 and sijms/go-ora#673. Each needs a test
-against a release that `dbrun` starts before it is a fault. Step 9 reproduced
+and sijms/go-ora#700 (EOF under load), sijms/go-ora#615 and sijms/go-ora#673.
+Each needs a test against a release that `dbrun` starts before it is a fault. Step 9 reproduced
 sijms/go-ora#683, #687, #672, #655 and #568, which the table above and the
 section below hold. It did not reproduce sijms/go-ora#704: in the root
 container of 18c and 26ai, `SELECT * FROM CONTAINERS(DUAL)` returns a row for
 the root and one for the PDB, as `system` and as `sys`.
+
+Step 9 did not reproduce three more. sijms/go-ora#635: a descriptor with
+spaces around each `=` connects. sijms/go-ora#688: a user of a PDB that logs
+on to the root gets ORA-01017, and an unknown service gets ORA-12514, on 18c,
+and neither gets ORA-12564. sijms/go-ora#680 is the cipher
+`TLS_RSA_WITH_AES_256_CBC_SHA`, which Go leaves out of its default list since
+Go 1.22, because it has no forward secrecy. A caller that needs it names it in
+the `CipherSuites` of `Config.TLS`.
+
+sijms/go-ora#697 reports a malformed packet for a BLOB over 50 KB in a
+`MERGE`. That did not reproduce. A `[]byte` longer than the longest `RAW`
+binds as a `LONG RAW`, and a string longer than the longest `VARCHAR2` as a
+`LONG`, and the server refuses either in a `SELECT` of a `MERGE` with
+ORA-01461, on 11g, 18c and 26ai. `CreateBlob` and `CreateClob` bind a
+temporary LOB, which works there at any size, and D24 keeps it so. In PL/SQL
+the same values failed with ORA-01483, which D24 fixed.
 
 ## Features
 

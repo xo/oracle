@@ -32,6 +32,7 @@ conclusion.
 | [D21](#d21-four-upstream-features-are-taken) | Decided |
 | [D22](#d22-a-lob-is-read-in-pieces-until-its-rows-close) | Decided |
 | [D23](#d23-no-test-runs-on-19c) | Decided. Amends D17 |
+| [D24](#d24-a-long-value-binds-as-a-temporary-lob-in-plsql-only) | Decided |
 
 ## Purpose
 
@@ -311,6 +312,26 @@ Ken decided on 2026-11-01 that no test runs on 19c, not even a change to the
 protocol. The tests on 18c and 26ai cover what lies between, so 19c repeats
 them. No exchange is recorded on 19c. `oracle-adb-19c` is another image, and
 the tests still run on it.
+
+## D24. A long value binds as a temporary LOB in PL/SQL only
+
+Status: Decided.
+
+Ken decided on 2026-11-01 how a string or a `[]byte` longer than the longest
+`VARCHAR2` or `RAW` binds. In SQL it stays a `LONG` or a `LONG RAW`, so an
+`INSERT` or an `UPDATE` takes one round trip and a `LONG` column still takes
+it on 11g. SQL refuses such a bind in an expression or in the `SELECT` of a
+`MERGE`, and the caller binds `CreateClob` or `CreateBlob` there, as JDBC and
+python-oracledb ask for an explicit LOB type. In a PL/SQL block a value binds
+as a `VARCHAR2` or a `RAW` up to 32,767 bytes, and as a temporary LOB past
+that, as python-oracledb does. A per-statement option that binds a temporary
+LOB in SQL can come later, if a caller needs one.
+
+Gemini 3.1 Pro said that 12c and later take the data of a LOB in a bind with
+no locator, and that python-oracledb binds it so. The source of
+python-oracledb shows a temporary LOB for each value instead, so the driver
+does not build such a bind. DeepSeek V4 Pro gave no answer in time, and no
+OpenAI model was at hand.
 
 ## Open questions for Ken
 

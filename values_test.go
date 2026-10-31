@@ -660,3 +660,46 @@ func TestLocalTimeZone(t *testing.T) {
 		}
 	}
 }
+
+// TestPLSQLLongValues binds long values in PL/SQL. The driver bound a string
+// or a []byte longer than the longest of SQL as a LONG or a LONG RAW, which
+// PL/SQL refused with ORA-01483, from 4,001 bytes on 11g. Up to 32,767 bytes
+// it binds as a VARCHAR2 or a RAW in PL/SQL, and past that as a temporary
+// LOB (D24).
+func TestPLSQLLongValues(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	db.ExecContext(ctx, "DROP TABLE go_plsql_lob")
+	if _, err := db.ExecContext(ctx, "CREATE TABLE go_plsql_lob (id NUMBER, c CLOB, b BLOB)"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Exec("DROP TABLE go_plsql_lob") })
+	for i, n := range []int{10000, 32767, 40000, 1 << 20} {
+		texts := []string{strings.Repeat("a", n), strings.Repeat("é😀", n/6)}
+		data := bytes.Repeat([]byte{0, 1, 0xFE}, n/3+1)[:n]
+		for j, text := range texts {
+			id := i*10 + j
+			_, err := db.ExecContext(ctx, "BEGIN INSERT INTO go_plsql_lob VALUES (:1, :2, :3); END;", id, text, data)
+			if err != nil {
+				t.Fatalf("%d bytes: %v", len(text), err)
+			}
+			var c string
+			var b []byte
+			if err := db.QueryRowContext(ctx, "SELECT c, b FROM go_plsql_lob WHERE id = :1", id).Scan(&c, &b); err != nil {
+				t.Fatal(err)
+			}
+			if c != text || !bytes.Equal(b, data) {
+				t.Errorf("%d bytes: the values differ, %d and %d bytes back", len(text), len(c), len(b))
+			}
+		}
+		// a VARCHAR2 variable takes up to 32,767 bytes
+		if n <= 32767 {
+			var l int64
+			_, err := db.ExecContext(ctx, "DECLARE v VARCHAR2(32767) := :1; BEGIN :2 := LENGTH(v); END;", texts[0], sql.Out{Dest: &l})
+			if err != nil || l != int64(n) {
+				t.Errorf("a VARCHAR2 of %d bytes: got %d, %v", n, l, err)
+			}
+		}
+	}
+	usable(t, db)
+}

@@ -1256,7 +1256,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 				if err != nil {
 					return
 				}
-				err = tempPar.encodeValue(0, stmt.connection)
+				err = tempPar.encodeValue(0, stmt)
 				if err != nil {
 					return
 				}
@@ -1284,7 +1284,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					if err != nil {
 						return
 					}
-					err = tempPar.encodeValue(0, stmt.connection)
+					err = tempPar.encodeValue(0, stmt)
 				} else {
 					tempPar, err = addOutputField(name, _type, size, ParameterDirection(dir), i)
 				}
@@ -1414,7 +1414,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				arrayValues := make([][]byte, stmt.arrayBindCount)
 				for y := 0; y < stmt.arrayBindCount; y++ {
 					par.Value = tempVal.Index(y).Interface()
-					err = par.encodeValue(0, stmt.connection)
+					err = par.encodeValue(0, stmt)
 					if err != nil {
 						return nil, err
 					}
@@ -1642,7 +1642,7 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		Direction: direction,
 		Value:     val,
 	}
-	err := param.encodeValue(int64(size), stmt.connection)
+	err := param.encodeValue(int64(size), stmt)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,21 @@ func (par *ParameterInfo) init() {
 	par.oPrimValue = nil
 }
 
-func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error {
+// plsqlMaxLen is the longest string or RAW that a PL/SQL block takes as a
+// VARCHAR2 or a RAW bind, on every release.
+const plsqlMaxLen = 32767
+
+// plsqlConn is a connection whose longest string is that of PL/SQL.
+type plsqlConn struct {
+	*Connection
+}
+
+func (plsqlConn) MaxStringLength() int64 {
+	return plsqlMaxLen
+}
+
+func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
+	connection := stmt.connection
 	par.init()
 	var err error
 	par.MaxLen = size
@@ -87,11 +101,27 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 		}
 	}
 	par.encoder.UpdateParameterInfo(par.ParameterInfo())
-	err = par.encoder.Encode(tempValue, connection)
+	var conn codec.Conn = connection
+	if stmt.stmtType == PLSQL {
+		conn = plsqlConn{connection}
+	}
+	err = par.encoder.Encode(tempValue, conn)
 	if err != nil {
 		return err
 	}
 	par.UpdateParameterInfo(par.encoder.ParameterInfo())
+	// PL/SQL takes a string or a RAW of up to 32,767 bytes, and no LONG
+	// past that, which failed with ORA-01483. A longer value goes as a
+	// temporary LOB, as python-oracledb sends it (D24)
+	if stmt.stmtType == PLSQL && par.Direction == Input {
+		switch par.DataType {
+		case types.LONG, types.LongVarChar, types.LongRaw:
+			err = par.encodeLob(tempValue, connection)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	if par.MaxLen < size {
 		par.MaxLen = size
 	}
@@ -127,5 +157,26 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	if par.Direction == Output && !(par.DataType == types.XMLType) {
 		par.BValue = nil
 	}
+	return nil
+}
+
+// encodeLob encodes value, a string or a []byte, as a temporary CLOB or
+// BLOB.
+func (par *ParameterInfo) encodeLob(value any, connection *Connection) error {
+	var lob codec.OracleParameterCoder
+	if par.DataType == types.LongRaw {
+		lob = &codec.BlobParameter{}
+	} else {
+		clob := &codec.ClobParameter{}
+		clob.CharsetForm = par.CharsetForm
+		lob = clob
+	}
+	if err := lob.Encode(value, connection); err != nil {
+		return err
+	}
+	par.encoder = lob
+	// UpdateParameterInfo keeps a type that is set, so the LOB replaces
+	// the parameter whole
+	par.BasicParameter = lob.ParameterInfo()
 	return nil
 }

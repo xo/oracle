@@ -108,7 +108,7 @@ The eleventh part of step 9 is done (`63282cc`, pushed). `Clob`, `Blob` and `BFi
 loads the value for any other destination. A read after the rows close
 fails with `ErrRowsClosed`. With this, D21 is done.
 
-The twelfth part of step 9 is staged. A refused logon on 23ai and later gives
+The twelfth part of step 9 is done (`dfba5e0`, pushed). A refused logon on 23ai and later gives
 ORA-01017, where the driver read the reply to the protocol negotiation twice
 and gave "message code error". `Query` of a statement that is not a query
 gives no rows, where `Next` failed with ORA-01002. A `DATE` is in UTC (#672),
@@ -117,3 +117,10 @@ runs no query, so `skip_nls` is gone (#611), and the exchanges of 11g, 18c,
 21c, 23ai and 26ai are recorded again. Ken decided that no test runs on 19c
 (D23), so its exchanges are deleted. #683 is not a fault: a lower case user name logs
 on quoted.
+
+The thirteenth part of step 9 is staged. In a PL/SQL block a string or a
+`[]byte` binds as a `VARCHAR2` or a `RAW` up to 32,767 bytes on every release,
+and as a temporary LOB past that (D24), where the driver bound a `LONG` over
+4,000 bytes on 11g and 32,767 on the rest, and PL/SQL refused it with
+ORA-01483. `UPSTREAM.md` records #635, #688, #680 and #697, which did not
+reproduce.
