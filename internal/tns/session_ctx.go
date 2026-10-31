@@ -1,7 +1,7 @@
 package tns
 
 import (
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 type SessionContext struct {
@@ -14,7 +14,7 @@ type SessionContext struct {
 	// Protocol string
 	// ServiceName string
 	SID                 []byte
-	connConfig          *configurations.ConnectionConfig
+	connConfig          *config.ConnectionConfig
 	Version             uint16
 	LoVersion           uint16
 	Options             uint16
@@ -39,7 +39,7 @@ type SessionContext struct {
 	UUID                []byte
 }
 
-func NewSessionContext(config *configurations.ConnectionConfig) *SessionContext {
+func NewSessionContext(config *config.ConnectionConfig) *SessionContext {
 	ctx := &SessionContext{
 		SessionDataUnit:   config.SessionDataUnitSize,
 		TransportDataUnit: config.TransportDataUnitSize,

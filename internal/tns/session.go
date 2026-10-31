@@ -19,18 +19,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 
 	"github.com/xo/oracle/internal/trace"
 
 	"github.com/xo/oracle/internal/converters"
 )
 
-var read_buffer_size = 0x4000
+var readBufferSize = 0x4000
 
 type SessionState struct {
 	summary   *SummaryObject
-	sendPcks  []PacketInterface
+	sendPcks  []packet
 	InBuffer  *bytes.Buffer
 	OutBuffer *bytes.Buffer
 }
@@ -49,14 +49,14 @@ type Session struct {
 	remainingBytes    int
 	lastPacket        bytes.Buffer
 	Context           *SessionContext
-	sendPcks          []PacketInterface
+	sendPcks          []packet
 	breakIndex        int
 	TimeZone          []byte
 	HasEOSCapability  bool
 	HasFSAPCapability bool
 	Summary           *SummaryObject
 	states            []SessionState
-	StrConv           converters.IStringConverter
+	StrConv           *converters.StringConverter
 	breakConn         bool
 	Connected         bool
 	SSL               struct {
@@ -71,7 +71,7 @@ type Session struct {
 }
 
 func NewSessionWithInputBufferForDebug(input []byte) *Session {
-	options := &configurations.ConnectionConfig{
+	options := &config.ConnectionConfig{
 		AuthService:           nil,
 		SessionDataUnitSize:   0xFFFF,
 		TransportDataUnitSize: 0xFFFF,
@@ -91,7 +91,7 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 	return ret
 }
 
-func NewSession(config *configurations.ConnectionConfig, tracer trace.Tracer) *Session {
+func NewSession(config *config.ConnectionConfig, tracer trace.Tracer) *Session {
 	ret := &Session{
 		conn:       nil,
 		Context:    NewSessionContext(config),
@@ -401,7 +401,7 @@ func (session *Session) BreakConnection() error {
 		}
 	}
 	if !done {
-		err = session.writePacket(newMarkerPacket(marker_type_interrupt, session.Context))
+		err = session.writePacket(newMarkerPacket(markerTypeInterrupt, session.Context))
 		if err != nil {
 			return err
 		}
@@ -423,7 +423,7 @@ func (session *Session) Connect(ctx context.Context) error {
 	session.tracer.Print("Connect")
 	var err error
 	connected := false
-	var host *configurations.ServerAddr
+	var host *config.ServerAddr
 	loop := true
 	dialer := connOption.Dialer
 	if dialer == nil {
@@ -481,9 +481,9 @@ func (session *Session) Connect(ctx context.Context) error {
 	if connOption.SSL {
 		session.tracer.Print("Using SSL/TLS")
 		session.negotiate()
-		session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
+		session.reader = bufio.NewReaderSize(session.sslConn, readBufferSize)
 	} else {
-		session.reader = bufio.NewReaderSize(session.conn, read_buffer_size)
+		session.reader = bufio.NewReaderSize(session.conn, readBufferSize)
 	}
 	session.tracer.Print("Open :", connOption.ConnectionData())
 	connectPacket := newConnectPacket(session.Context)
@@ -627,7 +627,7 @@ func (session *Session) processMarker() error {
 	var err error
 	// send reset connection
 	session.resetWrite()
-	marker := newMarkerPacket(marker_type_reset, session.Context)
+	marker := newMarkerPacket(markerTypeReset, session.Context)
 	err = session.writePacket(marker)
 	if err != nil {
 		return err
@@ -643,7 +643,7 @@ func (session *Session) processMarker() error {
 		return err
 	}
 	// receive all packet until you get marker
-	// var pck PacketInterface = nil
+	// var pck packet = nil
 	// for pck == nil || pck.getPacketType() != MARKER {
 	//
 	// 	if session.isFinalPacketRead {
@@ -667,7 +667,7 @@ func (session *Session) processMarker() error {
 // than input buffer session will get the remaining from network stream
 func (session *Session) read(numBytes int) ([]byte, error) {
 	var err error
-	var pck PacketInterface
+	var pck packet
 	ret := make([]byte, numBytes)
 	index := 0
 	actualRead, err := session.inBuffer.Read(ret)
@@ -709,7 +709,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 }
 
 // Write a packet to the network stream
-func (session *Session) writePacket(pck PacketInterface) error {
+func (session *Session) writePacket(pck packet) error {
 	session.mu.Lock()
 	defer session.mu.Unlock()
 	session.sendPcks = append(session.sendPcks, pck)
@@ -819,7 +819,7 @@ func (session *Session) readPacketData() error {
 }
 
 // read a packet from network stream
-func (session *Session) readPacket() (PacketInterface, error) {
+func (session *Session) readPacket() (packet, error) {
 	var err error
 	err = session.readPacketData()
 	if err != nil {
@@ -832,7 +832,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 	case RESEND:
 		if session.Context.connConfig.SSL && flag&8 != 0 {
 			session.negotiate()
-			session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
+			session.reader = bufio.NewReaderSize(session.sslConn, readBufferSize)
 		}
 		resend := func() error {
 			session.mu.Lock()
@@ -906,7 +906,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		if dataPck != nil {
 			if session.Context.connConfig.SSL && (dataPck.dataFlag&0x8000 > 0 || dataPck.flag&0x80 > 0) {
 				session.negotiate()
-				session.reader = bufio.NewReaderSize(session.sslConn, read_buffer_size)
+				session.reader = bufio.NewReaderSize(session.sslConn, readBufferSize)
 			}
 			if dataPck.dataFlag == 0x40 {
 				// close connection

@@ -54,7 +54,7 @@ func TestDecodeBinaryDouble(t *testing.T) {
 
 func TestDecodeTimestampTZ(t *testing.T) {
 	raw := []byte{0x78, 0x7C, 0x01, 0x08, 0x11, 0x23, 0x32, 0x28, 0xE9, 0x6E, 0x70, 0x84, 0x80}
-	d := &Date{bValue: raw, dataType: TimeStampTZ_DTY}
+	d := &Date{bValue: raw, dataType: TimestampTZDTY}
 	got, err := d.Value()
 	if err != nil {
 		t.Fatalf("decoding %v: %v", raw, err)
@@ -83,7 +83,7 @@ func TestDecodeIntervalYM(t *testing.T) {
 		{[]byte{128, 0, 0, 0, 57}, IntervalYM{0, -3}, "-00-03"},
 	}
 	for _, test := range tests {
-		iv := &Interval{Basic{bValue: test.raw, dataType: INTERVALYM_DTY}}
+		iv := &Interval{Basic{bValue: test.raw, dataType: IntervalYMDTY}}
 		got, err := iv.Value()
 		if err != nil {
 			t.Fatalf("decoding %v: %v", test.raw, err)
@@ -117,7 +117,7 @@ func TestDecodeIntervalDS(t *testing.T) {
 		{[]byte{128, 0, 0, 0, 50, 40, 30, 128, 0, 0, 0}, -(10*time.Hour + 20*time.Minute + 30*time.Second)},
 	}
 	for _, test := range tests {
-		iv := &Interval{Basic{bValue: test.raw, dataType: INTERVALDS_DTY}}
+		iv := &Interval{Basic{bValue: test.raw, dataType: IntervalDSDTY}}
 		got, err := iv.Value()
 		if err != nil {
 			t.Fatalf("decoding %v: %v", test.raw, err)

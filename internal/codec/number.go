@@ -22,7 +22,7 @@ func (param *NumberParameter) Init() {
 	}
 }
 
-func (param *NumberParameter) Encode(input any, _ IConnection) error {
+func (param *NumberParameter) Encode(input any, _ Conn) error {
 	param.Init()
 	encoder := types.Number{}
 	err := encoder.SetValue(input)
@@ -39,7 +39,7 @@ func (param *NumberParameter) Encode(input any, _ IConnection) error {
 	return nil
 }
 
-func (param *NumberParameter) Decode(_ IConnection) (any, error) {
+func (param *NumberParameter) Decode(_ Conn) (any, error) {
 	decoder := types.Number{}
 	decoder.SetBytes(param.BValue)
 	decoder.SetDataType(param.DataType)

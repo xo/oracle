@@ -26,7 +26,7 @@ func (param *ArrayParameter) Init() {
 	param.Flag = 0x43
 }
 
-func (param *ArrayParameter) FillAttrib(input any, conn IConnection) error {
+func (param *ArrayParameter) FillAttrib(input any, conn Conn) error {
 	var err error
 	if param.attrib == nil {
 		inputType := derefType(input)
@@ -48,7 +48,7 @@ func (param *ArrayParameter) FillAttrib(input any, conn IConnection) error {
 	return err
 }
 
-func (param *ArrayParameter) Encode(input any, conn IConnection) (err error) {
+func (param *ArrayParameter) Encode(input any, conn Conn) (err error) {
 	param.Init()
 	inputType := derefType(input)
 	if inputType.Kind() == reflect.Array || inputType.Kind() == reflect.Slice {
@@ -118,7 +118,7 @@ func (param *ArrayParameter) Encode(input any, conn IConnection) (err error) {
 	return
 }
 
-func (param *ArrayParameter) Decode(conn IConnection) (value any, err error) {
+func (param *ArrayParameter) Decode(conn Conn) (value any, err error) {
 	err = param.FillAttrib(nil, conn)
 	if err != nil {
 		return nil, err

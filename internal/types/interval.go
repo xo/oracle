@@ -34,14 +34,14 @@ type Interval struct {
 // NewYearMonthInterval returns an INTERVAL YEAR TO MONTH.
 func NewYearMonthInterval(years, months int) (*Interval, error) {
 	ret := &Interval{}
-	ret.dataType = INTERVALYM_DTY
+	ret.dataType = IntervalYMDTY
 	return ret, ret.SetValue(IntervalYM{Years: years, Months: months})
 }
 
 // NewDaySecondInterval returns an INTERVAL DAY TO SECOND.
 func NewDaySecondInterval(days, hours, minutes, seconds, nanoseconds int) (*Interval, error) {
 	ret := &Interval{}
-	ret.dataType = INTERVALDS_DTY
+	ret.dataType = IntervalDSDTY
 	d := time.Duration(days)*24*time.Hour + time.Duration(hours)*time.Hour +
 		time.Duration(minutes)*time.Minute + time.Duration(seconds)*time.Second +
 		time.Duration(nanoseconds)
@@ -50,7 +50,7 @@ func NewDaySecondInterval(days, hours, minutes, seconds, nanoseconds int) (*Inte
 
 func (interval *Interval) GetMaxLen() int64 {
 	switch interval.dataType {
-	case INTERVALYM_DTY:
+	case IntervalYMDTY:
 		return MaxLenIntervalYM
 	default:
 		return MaxLenIntervalDS
@@ -73,13 +73,13 @@ func (interval *Interval) Value() (any, error) {
 	if typeID == 0 {
 		switch {
 		case len(b) >= int(MaxLenIntervalDS):
-			typeID = INTERVALDS_DTY
+			typeID = IntervalDSDTY
 		case len(b) >= int(MaxLenIntervalYM):
-			typeID = INTERVALYM_DTY
+			typeID = IntervalYMDTY
 		}
 	}
 	switch typeID {
-	case INTERVALYM_DTY:
+	case IntervalYMDTY:
 		if len(b) < int(MaxLenIntervalYM) {
 			return nil, fmt.Errorf("decoding an interval year to month of %d bytes", len(b))
 		}
@@ -87,7 +87,7 @@ func (interval *Interval) Value() (any, error) {
 			Years:  int(int64(binary.BigEndian.Uint32(b)) - offset),
 			Months: int(b[4]) - 60,
 		}, nil
-	case INTERVALDS_DTY:
+	case IntervalDSDTY:
 		if len(b) < int(MaxLenIntervalDS) {
 			return nil, fmt.Errorf("decoding an interval day to second of %d bytes", len(b))
 		}
@@ -108,7 +108,7 @@ func (interval *Interval) encodeYM(iv IntervalYM) {
 	b := make([]byte, 5)
 	binary.BigEndian.PutUint32(b, uint32(int64(iv.Years)+offset))
 	b[4] = uint8(iv.Months + 60)
-	interval.dataType = INTERVALYM_DTY
+	interval.dataType = IntervalYMDTY
 	interval.bValue = b
 }
 
@@ -129,7 +129,7 @@ func (interval *Interval) encodeDS(d time.Duration) {
 	b[5] = uint8(int(minutes) + 60)
 	b[6] = uint8(int(seconds) + 60)
 	binary.BigEndian.PutUint32(b[7:], uint32(int64(d)+offset))
-	interval.dataType = INTERVALDS_DTY
+	interval.dataType = IntervalDSDTY
 	interval.bValue = b
 }
 

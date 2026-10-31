@@ -8,7 +8,7 @@ import (
 
 type String struct {
 	Basic
-	Conv        converters.IStringConverter
+	Conv        *converters.StringConverter
 	UseNCharset bool
 }
 

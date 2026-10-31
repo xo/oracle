@@ -17,7 +17,7 @@ type BFile struct {
 	lobBase
 	//dirName  string
 	//fileName string
-	Conv     converters.IStringConverter
+	Conv     *converters.StringConverter
 	isOpened bool
 }
 

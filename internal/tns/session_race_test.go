@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/trace"
 )
 
@@ -15,8 +15,8 @@ import (
 // canceled during connection establishment. Run with -race.
 // See issue #736.
 func TestConnectDisconnectRace(t *testing.T) {
-	connOption := &configurations.ConnectionConfig{
-		Servers: []configurations.ServerAddr{
+	connOption := &config.ConnectionConfig{
+		Servers: []config.ServerAddr{
 			{Addr: "192.0.2.1", Port: 1521}, // TEST-NET-1: TCP handshake never completes
 		},
 		ServiceName:           "svc",

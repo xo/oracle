@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/trace"
 )
@@ -16,8 +16,8 @@ type LobStreamer interface {
 	SetLocator(locator Locator)
 	DatabaseVersionNumber() int
 	GetStringCoder() converters.StringCoder
-	GetLobStreamMode() configurations.LobFetch
-	GetLobReadMode() configurations.LobReadMode
+	GetLobStreamMode() config.LobFetch
+	GetLobReadMode() config.LobReadMode
 	GetTracer() trace.Tracer
 	GetSize() (int64, error)
 	Exists() (bool, error)

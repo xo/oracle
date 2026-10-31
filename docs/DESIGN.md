@@ -158,7 +158,7 @@ wrote the key `CONNSTR` and the parser read `connStr`, so a descriptor failed.
 `RegisterType` keeps its `*sql.DB`, and `WithType` does not exist. A
 `ConnectorOption` acts when the connector connects, and `RegisterType` reads
 the attributes of the type from the database, so the type has to exist
-before the first connection. A program, and many tests in `TestIssues`,
+before the first connection. A program, and many tests in `integration`,
 create the type through the same `*sql.DB` and register it after. Under
 `WithType` the first connection fails, and the type can never be created. The
 registry belongs to one connector, so `RegisterType` changes no other
@@ -354,7 +354,7 @@ for each value, as in dbimp D33 (D16). `NUMBER` holds 38 digits, which neither
 `float64` nor `int64` holds.
 
 A nullable value is `sql.Null[T]`, and the driver defines no nullable type of
-its own. `NullTimeStampTZ` is gone, and `sql.Null[TimeStampTZ]` takes its
+its own. `NullTimeStampTZ` is gone, and `sql.Null[TimestampTZ]` takes its
 place. The driver handles every nullable type through two interfaces, with no
 case for each one:
 
@@ -365,9 +365,9 @@ case for each one:
   with `types.ScanExternal`.
 
 Three nullable types are the exception, because `sql.Null[T].Value` converts a
-`time.Duration` to an `int64` and refuses an `IntervalYM` and a `TimeStampTZ`.
+`time.Duration` to an `int64` and refuses an `IntervalYM` and a `TimestampTZ`.
 `types.OwnNull` reads `sql.Null[time.Duration]`, `sql.Null[IntervalYM]` and
-`sql.Null[TimeStampTZ]` itself.
+`sql.Null[TimestampTZ]` itself.
 
 A NULL binds with the type of its value, which an OUT argument needs, for
 `sql.NullX` and for `sql.Null[T]` of the common types. A NULL of any other
@@ -470,7 +470,7 @@ needs the exchanges recorded again. That is the point: it shows each change to
 what the driver sends.
 
 An integration test reads `ORACLE_DSN` and skips when it is empty. CI sets it
-from `dbrun dsn --json` for every release (D7). `TestIssues` becomes these
+from `dbrun dsn --json` for every release (D7). `integration`, which was `TestIssues`, becomes these
 tests, one for each upstream issue that this design fixes, named for the issue.
 
 ## Idiomatic names and structure
@@ -484,7 +484,7 @@ each item names its fix.
 
 | Today | Fix |
 | --- | --- |
-| `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration_test`, one file for each area and not for each upstream issue. A test names its issue in a comment |
+| `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration`, done. One file for each area, and not for each upstream issue, is still to do |
 | `internal/utils` | Delete. `Max` is the built in `max`. `CreateQuasiLocator`, `GetValue`, `GetType` and the `Ty` variables repeat code of `internal/types` and `internal/ttc`. `ExtractTag` moves to the code of user defined types |
 | `internal/lazyinit` | Delete. `sync.OnceValue` does the same |
 | `internal/converters` | `internal/charset`, the charsets, and the NUMBER and date encoders into `internal/types` (step 8) |
@@ -563,8 +563,29 @@ Done, on 2026-10-31:
 
 `reflect` fell from 158 to 19 uses in `internal/types` and from 295 to 151 in
 `internal/ttc`, where the mapping of user defined types and struct tags holds
-most of what is left. The renames, the interfaces and the move of
-`TestIssues` are next.
+most of what is left.
+
+Also done, the same day:
+
+- Every declared name with an underscore, 74 of them, has mixed caps:
+  `TNSTypeRepUniversal`, `IntervalDSDTY`, `TimestampTZDTY`, `LobReadModeAuto`.
+  `gopls rename` made the changes, except two in `internal/ttc`, which the
+  `gopls` of this machine cannot load, because it predates the promoted fields
+  of Go 1.27 in a composite literal.
+- `IStringConverter` is gone, because `*StringConverter` is its one
+  implementation. `IConnection` is `codec.Conn`, `NTSAuthInterface` is
+  `NTSAuthenticator`, `KerberosAuthInterface` is `KerberosAuthenticator`,
+  `DialerContext` is `Dialer`, `PacketInterface` is `packet` and
+  `StmtInterface` is `parentStmt`.
+- `Json` is `JSON`, and `TimeStamp` is `Timestamp` in every name. The Oracle
+  type ID that was `JSON` is `JSONType`. A quasi locator is an inline locator,
+  `NewInlineLocator` and `IsInline`, with a comment that says what it is.
+- `internal/configurations` is `internal/config`. `TestIssues` is
+  `integration`, a package of tests alone, with a README for `dbrun`.
+
+Left: the `Get` prefixes, the interfaces with one implementation that the list
+above names, `internal/converters` until step 8 splits it, and one file of
+integration tests for each area.
 
 ## The order of the work
 

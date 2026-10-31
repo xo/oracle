@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 // Servers speaking TNS protocol versions below 315 (e.g. Oracle 11g) reply
@@ -24,7 +24,7 @@ func TestNewAcceptPacketFromDataShortPacket(t *testing.T) {
 	binary.BigEndian.PutUint16(packetData[18:], 0)      // accept data length
 	binary.BigEndian.PutUint16(packetData[20:], 32)     // accept data offset
 
-	pck := newAcceptPacketFromData(packetData, &configurations.ConnectionConfig{})
+	pck := newAcceptPacketFromData(packetData, &config.ConnectionConfig{})
 	if pck == nil {
 		t.Fatal("expected accept packet, got nil")
 	}
@@ -54,7 +54,7 @@ func TestNewAcceptPacketFromDataMalformed(t *testing.T) {
 	// truncated header: 8-byte TNS header, ACCEPT type, no body
 	short := make([]byte, 8)
 	short[4] = uint8(ACCEPT)
-	if pck := newAcceptPacketFromData(short, &configurations.ConnectionConfig{}); pck != nil {
+	if pck := newAcceptPacketFromData(short, &config.ConnectionConfig{}); pck != nil {
 		t.Errorf("expected nil for 8-byte accept packet, got %+v", pck)
 	}
 
@@ -65,7 +65,7 @@ func TestNewAcceptPacketFromDataMalformed(t *testing.T) {
 	mismatch[4] = uint8(ACCEPT)
 	binary.BigEndian.PutUint16(mismatch[18:], 4)  // accept data length
 	binary.BigEndian.PutUint16(mismatch[20:], 64) // accept data offset
-	if pck := newAcceptPacketFromData(mismatch, &configurations.ConnectionConfig{}); pck != nil {
+	if pck := newAcceptPacketFromData(mismatch, &config.ConnectionConfig{}); pck != nil {
 		t.Errorf("expected nil for length-mismatch accept packet, got %+v", pck)
 	}
 }

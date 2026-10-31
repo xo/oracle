@@ -28,18 +28,18 @@ func builtinCoder(v any) codec.OracleParameterCoder {
 		return &codec.BoolParameter{}
 	case time.Time, oraTypes.Date, sql.NullTime, sql.Null[time.Time]:
 		return &codec.DateParameter{}
-	case oraTypes.TimeStampTZ, sql.Null[oraTypes.TimeStampTZ]:
-		return &codec.DateParameter{BasicParameter: codec.BasicParameter{DataType: oraTypes.TimeStampTZ_DTY, MaxLen: oraTypes.MaxLenTimeStampTZ}}
+	case oraTypes.TimestampTZ, sql.Null[oraTypes.TimestampTZ]:
+		return &codec.DateParameter{BasicParameter: codec.BasicParameter{DataType: oraTypes.TimestampTZDTY, MaxLen: oraTypes.MaxLenTimestampTZ}}
 	case time.Duration, sql.Null[time.Duration]:
-		return &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: oraTypes.INTERVALDS_DTY, MaxLen: oraTypes.MaxLenIntervalDS}}
+		return &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: oraTypes.IntervalDSDTY, MaxLen: oraTypes.MaxLenIntervalDS}}
 	case oraTypes.IntervalYM, sql.Null[oraTypes.IntervalYM]:
-		return &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: oraTypes.INTERVALYM_DTY, MaxLen: oraTypes.MaxLenIntervalYM}}
+		return &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: oraTypes.IntervalYMDTY, MaxLen: oraTypes.MaxLenIntervalYM}}
 	case oraTypes.Interval:
 		return &codec.IntervalParameter{}
 	case oraTypes.Vector:
 		return &codec.VectorParameter{}
-	case oraTypes.Json:
-		return &codec.JsonParameter{}
+	case oraTypes.JSON:
+		return &codec.JSONParameter{}
 	case oraTypes.Clob:
 		return &codec.ClobParameter{}
 	case oraTypes.Blob:

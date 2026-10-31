@@ -6,26 +6,26 @@ import (
 	"github.com/xo/oracle/internal/types"
 )
 
-type JsonParameter struct {
+type JSONParameter struct {
 	locator types.Locator
 	lobParameter
 	isQueueMessage bool
 }
 
-func (param *JsonParameter) Copy() OracleParameterCoder {
-	ret := new(JsonParameter)
+func (param *JSONParameter) Copy() OracleParameterCoder {
+	ret := new(JSONParameter)
 	*ret = *param
 	return ret
 }
 
-func (param *JsonParameter) Init() {
+func (param *JSONParameter) Init() {
 	param.SetDefault()
-	param.DataType = types.JSON
+	param.DataType = types.JSONType
 }
 
-func (param *JsonParameter) Encode(input any, _ IConnection) (err error) {
+func (param *JSONParameter) Encode(input any, _ Conn) (err error) {
 	param.Init()
-	encoder := &types.Json{}
+	encoder := &types.JSON{}
 	encoder.Coder = &oson.Oson{}
 	encoder.SetDataType(param.DataType)
 	err = encoder.SetValue(input)
@@ -43,15 +43,15 @@ func (param *JsonParameter) Encode(input any, _ IConnection) (err error) {
 	return
 }
 
-func (param *JsonParameter) Decode(_ IConnection) (any, error) {
-	decoder := &types.Json{}
+func (param *JSONParameter) Decode(_ Conn) (any, error) {
+	decoder := &types.JSON{}
 	decoder.Coder = &oson.Oson{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)
 	return decoder, nil
 }
 
-func (param *JsonParameter) Write(session tns.SessionWriter) error {
+func (param *JSONParameter) Write(session tns.SessionWriter) error {
 	if param.locator != nil {
 		session.PutUint(len(param.locator), 4, true, true)
 		if param.isQueueMessage {
@@ -66,6 +66,6 @@ func (param *JsonParameter) Write(session tns.SessionWriter) error {
 	return nil
 }
 
-func (param *JsonParameter) SetAQMessage() {
+func (param *JSONParameter) SetAQMessage() {
 	param.isQueueMessage = true
 }

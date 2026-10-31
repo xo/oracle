@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 type Lob interface {
@@ -17,7 +17,7 @@ type Lob interface {
 	// calls it inside a call whose context it watches already, and while it
 	// fetches rows, where database/sql gives it no context.
 	Load() error
-	GetReadMode() configurations.LobReadMode
+	GetReadMode() config.LobReadMode
 	sql.Scanner
 }
 
@@ -50,11 +50,11 @@ func (l *lobBase) GetLocator() Locator {
 func (l *lobBase) IsNil() bool {
 	return l.stream == nil || l.stream.GetLocator() == nil
 }
-func (l *lobBase) IsQuasi() bool {
+func (l *lobBase) IsInline() bool {
 	if l.IsNil() {
 		return true
 	}
-	return l.stream.GetLocator().IsQuasi()
+	return l.stream.GetLocator().IsInline()
 }
 func (l *lobBase) IsDataUploaded() bool {
 	return l.stream != nil && l.stream.GetLocator() != nil
@@ -79,7 +79,7 @@ func (lob *lobBase) uploadData(data []byte, charsetID, charsetForm int) error {
 }
 
 func (l *lobBase) Free() error {
-	if !l.IsQuasi() {
+	if !l.IsInline() {
 		err := l.stream.FreeTemporaryLocator()
 		if err != nil {
 			return err
@@ -89,17 +89,17 @@ func (l *lobBase) Free() error {
 }
 
 func (l *lobBase) GetLength() (int64, error) {
-	if !l.IsQuasi() {
+	if !l.IsInline() {
 		return l.stream.GetSize()
 	}
 	return 0, nil
 }
 
-func (l *lobBase) GetReadMode() configurations.LobReadMode {
-	if !l.IsQuasi() {
+func (l *lobBase) GetReadMode() config.LobReadMode {
+	if !l.IsInline() {
 		return l.stream.GetLobReadMode()
 	}
-	return configurations.LobReadMode_NONE
+	return config.LobReadModeNone
 }
 
 func (l *lobBase) ReadFromPos(ctx context.Context, pos int64) ([]byte, error) {
@@ -107,7 +107,7 @@ func (l *lobBase) ReadFromPos(ctx context.Context, pos int64) ([]byte, error) {
 }
 
 func (l *lobBase) ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byte, error) {
-	if !l.IsQuasi() {
+	if !l.IsInline() {
 		done := l.stream.StartContext(ctx)
 		defer l.stream.EndContext(done)
 		return l.stream.Read(pos, count)
@@ -117,7 +117,7 @@ func (l *lobBase) ReadBytesFromPos(ctx context.Context, pos, count int64) ([]byt
 
 // load reads the whole value and watches no context.
 func (l *lobBase) load() ([]byte, error) {
-	if l.IsQuasi() {
+	if l.IsInline() {
 		return nil, nil
 	}
 	return l.stream.Read(0, 0)

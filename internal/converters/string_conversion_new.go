@@ -1,6 +1,6 @@
 package converters
 
-func NewStringConverter(langID int) IStringConverter {
+func NewStringConverter(langID int) *StringConverter {
 	switch langID {
 	case 0x1: // 1
 		return &StringConverter{

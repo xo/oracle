@@ -9,7 +9,7 @@ import (
 	"math/big"
 
 	"github.com/xo/oracle/internal/auth/security"
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/trace"
 )
 
@@ -23,7 +23,7 @@ type dataIntegrityService struct {
 	tracer trace.Tracer
 }
 
-func newDataIntegrityService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo, tracer trace.Tracer) (*dataIntegrityService, error) {
+func newDataIntegrityService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo, tracer trace.Tracer) (*dataIntegrityService, error) {
 	output := &dataIntegrityService{
 		ano:                   ano,
 		level:                 negoInfo.IntServiceLevel,

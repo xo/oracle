@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/trace"
 	ora_types "github.com/xo/oracle/internal/types"
@@ -53,7 +53,7 @@ func (lob *LobStream) GetLocator() ora_types.Locator {
 }
 func (lob *LobStream) SetLocator(locator ora_types.Locator) {
 	lob.sourceLocator = locator
-	if !locator.IsQuasi() && locator.IsTemporary() {
+	if !locator.IsInline() && locator.IsTemporary() {
 		lob.conn.appendTemporaryLoc(locator)
 	}
 
@@ -164,10 +164,10 @@ func (lob *LobStream) Exists() (bool, error) {
 	return lob.isNull, nil
 }
 
-func (lob *LobStream) GetLobStreamMode() configurations.LobFetch {
+func (lob *LobStream) GetLobStreamMode() config.LobFetch {
 	return lob.conn.connOption.Lob
 }
-func (lob *LobStream) GetLobReadMode() configurations.LobReadMode {
+func (lob *LobStream) GetLobReadMode() config.LobReadMode {
 	return lob.conn.connOption.LobReadMode
 }
 
@@ -183,7 +183,7 @@ func (lob *LobStream) GetLobReadMode() configurations.LobReadMode {
 //	}
 //
 //	func (lob *LobStream) isQuasiLocator() bool {
-//		return lob.sourceLocator.IsQuasi()
+//		return lob.sourceLocator.IsInline()
 //	}
 //
 //	func (lob *LobStream) isValueBasedLocator() bool {

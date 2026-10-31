@@ -6,7 +6,7 @@ import (
 	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/internal/types"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 type RefCursor struct {
@@ -101,7 +101,7 @@ func (cursor *RefCursor) load() error {
 }
 
 func (cursor *RefCursor) getExeOptions() int {
-	if cursor.connection.connOption.Lob == configurations.INLINE {
+	if cursor.connection.connOption.Lob == config.INLINE {
 		return 0x8050
 	} else {
 		return 0x8040
@@ -154,7 +154,7 @@ func (cursor *RefCursor) Query() (*DataSet, error) {
 
 func (cursor *RefCursor) write() error {
 	define := false
-	if cursor.connection.connOption.Lob == configurations.INLINE {
+	if cursor.connection.connOption.Lob == config.INLINE {
 		define = true
 	}
 	err := cursor.basicWrite(cursor.getExeOptions(), false, define)

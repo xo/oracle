@@ -21,9 +21,9 @@ func OwnNull(v any) (any, bool) {
 		return nullOf(n), true
 	case *sql.Null[IntervalYM]:
 		return nullOf(*n), true
-	case sql.Null[TimeStampTZ]:
+	case sql.Null[TimestampTZ]:
 		return nullOf(n), true
-	case *sql.Null[TimeStampTZ]:
+	case *sql.Null[TimestampTZ]:
 		return nullOf(*n), true
 	}
 	return nil, false
@@ -49,7 +49,7 @@ func ValueOf(input any) (any, error) {
 		return input, nil
 	}
 	switch input.(type) {
-	case OracleType, TimeStampTZ, *TimeStampTZ:
+	case OracleType, TimestampTZ, *TimestampTZ:
 		return input, nil
 	}
 	if rv := reflect.ValueOf(input); rv.Kind() == reflect.Pointer && rv.IsNil() {

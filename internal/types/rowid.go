@@ -92,7 +92,7 @@ func (rowid *RowID) logicalRawIDToByteArray(data []byte) []byte {
 	length2 := num3 + num4
 	var output []byte = nil
 	if length2 > 0 {
-		KGRD_INDBYTE_CHAR := []byte{65, 42, 45, 40, 41}
+		KGRDIndByteChar := []byte{65, 42, 45, 40, 41}
 		buffer := []byte{
 			65, 66, 67, 68, 69, 70, 71, 72,
 			73, 74, 75, 76, 77, 78, 79, 80,
@@ -106,7 +106,7 @@ func (rowid *RowID) logicalRawIDToByteArray(data []byte) []byte {
 		output = make([]byte, length2)
 		srcIndex := 0
 		dstIndex := 1
-		output[dstIndex] = KGRD_INDBYTE_CHAR[data[srcIndex]-1]
+		output[dstIndex] = KGRDIndByteChar[data[srcIndex]-1]
 		length1 -= 1
 		srcIndex++
 		dstIndex++

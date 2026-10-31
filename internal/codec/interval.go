@@ -19,7 +19,7 @@ func (param *IntervalParameter) Init() {
 	param.SetDefault()
 }
 
-func (param *IntervalParameter) Encode(input any, _ IConnection) error {
+func (param *IntervalParameter) Encode(input any, _ Conn) error {
 	param.Init()
 	encoder := &types.Interval{}
 	encoder.SetDataType(param.DataType)
@@ -37,7 +37,7 @@ func (param *IntervalParameter) Encode(input any, _ IConnection) error {
 	return nil
 }
 
-func (param *IntervalParameter) Decode(_ IConnection) (any, error) {
+func (param *IntervalParameter) Decode(_ Conn) (any, error) {
 	decoder := &types.Interval{}
 	decoder.SetBytes(param.BValue)
 	return decoder.Value()

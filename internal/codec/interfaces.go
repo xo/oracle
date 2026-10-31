@@ -8,7 +8,7 @@ import (
 	"github.com/xo/oracle/internal/types"
 )
 
-type IConnection interface {
+type Conn interface {
 	converters.StringCoder
 	GetSession() tns.SessionReadWriter
 	NewLobStreamer() types.LobStreamer
@@ -32,7 +32,7 @@ type (
 		SetParentSession(input tns.SessionReadWriter)
 	}
 	OracleParameterEncoder interface {
-		Encode(input any, conn IConnection) error
+		Encode(input any, conn Conn) error
 		tns.ValueStreamWriter
 		GetParameterInfo() BasicParameter
 		UpdateParameterInfo(data BasicParameter)
@@ -40,7 +40,7 @@ type (
 
 	OracleParameterDecoder interface {
 		Read(session tns.SessionReader) error
-		Decode(conn IConnection) (any, error)
+		Decode(conn Conn) (any, error)
 		SetLobStreamer(lobStreamer types.LobStreamer)
 		SetParameterInfo(data BasicParameter)
 		SetBytes(data []byte)

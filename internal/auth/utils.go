@@ -1,8 +1,8 @@
 package auth
 
 const (
-	ENCRYPTION_SERVICE_ID     = 2
-	DATA_INTEGRITY_SERVICE_ID = 3
+	EncryptionServiceID    = 2
+	DataIntegrityServiceID = 3
 )
 
 func breakUpVersion(fullVersion uint32) (version, update int) {

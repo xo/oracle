@@ -51,7 +51,7 @@ sijms/go-ora#611 asks for an option to skip the NLS query.
 
 ### Finish the values of dates
 
-`TestTime` in `TestIssues` fails on 26ai: a timestamp comes back in UTC and
+`TestTime` in `integration` fails on 26ai: a timestamp comes back in UTC and
 without its fraction of a second. The table in `DESIGN.md`, under Values,
 says what each date type returns. Fix it with a test in `values_test.go`.
 
@@ -81,9 +81,9 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 that it tested. The vectors of `converters/other_types_test.go`, now under `internal/`, moved to
 `types/vectors_test.go`.
 
-### Make TestIssues pass on every release
+### Make the integration tests pass on every release
 
-`TestIssues` reads `ORACLE_DSN` and skips without it, and CI sets it from
+`integration`, which was `TestIssues`, reads `ORACLE_DSN` and skips without it, and CI sets it from
 `dbrun dsn --json`. On 2026-10-31 it ran against 26ai alone: 42 tests passed
 and 3 failed, the same 3 at `eb5e173` before step 4 and after it.
 

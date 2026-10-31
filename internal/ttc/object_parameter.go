@@ -105,7 +105,7 @@ func (param *ObjectParameter) Init() {
 	}
 }
 
-func (param *ObjectParameter) Encode(input any, conn codec.IConnection) (err error) {
+func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	param.Init()
 	session := tns.NewMemorySession(nil, nil, conn.GetSession().GetProperties())
 	inputType := getType(input)
@@ -248,7 +248,7 @@ func (param *ObjectParameter) Write(session tns.SessionWriter) error {
 	return nil
 }
 
-func (param *ObjectParameter) Decode(conn codec.IConnection) (any, error) {
+func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 	// need main session to get its properties
 	var objectType uint8
 	var err error

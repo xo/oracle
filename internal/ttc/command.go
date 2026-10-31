@@ -15,7 +15,7 @@ import (
 
 	oraTypes "github.com/xo/oracle/internal/types"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
 )
 
@@ -28,7 +28,7 @@ const (
 	OTHERS StmtType = 4
 )
 
-type StmtInterface interface {
+type parentStmt interface {
 	hasMoreRows() bool
 	noOfRowsToFetch() int
 	fetch(resultSet *ResultSet) error
@@ -119,7 +119,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	// 	break;
 	// }
 	// we use here int.MaxValue
-	if stmt.connection.connOption.Lob == configurations.INLINE {
+	if stmt.connection.connOption.Lob == config.INLINE {
 		session.PutInt(0x3FFFFFFF, 4, true, true)
 	} else {
 		session.PutUint(0x7FFFFFFF, 4, true, true)
@@ -185,7 +185,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	default:
 		// this.m_al8i4[1] = !fetch ? 0L : noOfRowsToFetch;
 		// al8i4[1] = stmt._noOfRowsToFetch
-		if stmt.connection.connOption.Lob == configurations.INLINE {
+		if stmt.connection.connOption.Lob == config.INLINE {
 			if parse {
 				al8i4[1] = 0
 			} else {
@@ -240,9 +240,9 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.isLobType() {
 			num = 0
 			// temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == configurations.INLINE && !col.IsJson && col.DataType != oraTypes.OCIFileLocator {
+			if stmt.connection.connOption.Lob == config.INLINE && !col.IsJSON && col.DataType != oraTypes.OCIFileLocator {
 				num = 0x3FFFFFFF
-				if col.DataType == oraTypes.OCIBlobLocator || col.DataType == oraTypes.VECTOR || col.DataType == oraTypes.JSON {
+				if col.DataType == oraTypes.OCIBlobLocator || col.DataType == oraTypes.VECTOR || col.DataType == oraTypes.JSONType {
 					col.DataType = oraTypes.LongRaw
 					// change data type in the original array
 					stmt.columns[index].DataType = oraTypes.LongRaw
@@ -1158,7 +1158,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "timestamptz":
-			fieldVal := &sql.Null[oraTypes.TimeStampTZ]{}
+			fieldVal := &sql.Null[oraTypes.TimestampTZ]{}
 			if !hasNullValue {
 				var tempDate time.Time
 				tempDate, err = getDate(fieldValue)
@@ -1166,7 +1166,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					err = typeErr
 					return
 				}
-				fieldVal.V = oraTypes.TimeStampTZ(tempDate)
+				fieldVal.V = oraTypes.TimestampTZ(tempDate)
 				fieldVal.Valid = true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
@@ -1464,7 +1464,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if par.ArraySize > 0 {
 			} else {
 				// check if LobReadMode is auto so auto read all lobs
-				if stmt.connection.connOption.LobReadMode == configurations.LobReadMode_AUTO {
+				if stmt.connection.connOption.LobReadMode == config.LobReadModeAuto {
 					if lob, ok := par.oPrimValue.(oraTypes.Lob); ok {
 						err = lob.Load()
 						if err != nil {
@@ -1670,10 +1670,10 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	}
 }
 
-// Query_ execute a query command and return oracle dataset object
+// RunQuery execute a query command and return oracle dataset object
 //
 // args is an array of values that corresponding to parameters in sql
-func (stmt *Stmt) Query_(namedArgs []driver.NamedValue) (*DataSet, error) {
+func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 	if stmt.connection.State != Opened {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
@@ -1752,7 +1752,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	done := stmt.connection.session.StartContext(ctx)
 	defer stmt.connection.session.EndContext(done)
 
-	rows, err := stmt.Query_(namedArgs)
+	rows, err := stmt.RunQuery(namedArgs)
 	if err != nil {
 		return nil, stmt.execError(ctx, err)
 	}
@@ -1785,7 +1785,7 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 		dataSet.index++
 	}
 	// deal with lobs
-	if stmt.parse && (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == configurations.INLINE {
+	if stmt.parse && (stmt._hasBLOB || stmt._hasLONG) && stmt.connection.connOption.Lob == config.INLINE {
 		stmt.define = true
 		stmt.execute = false
 		stmt.parse = false
@@ -1820,13 +1820,13 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					return err
 				}
 			case *oraTypes.Vector:
-				if stmt.connection.connOption.Lob == configurations.INLINE {
+				if stmt.connection.connOption.Lob == config.INLINE {
 					resultSet.rows[rowIndex][colIndex], err = val.Value()
 					if err != nil {
 						return err
 					}
 				} else {
-					if val.GetReadMode() == configurations.LobReadMode_AUTO {
+					if val.GetReadMode() == config.LobReadModeAuto {
 						err = val.Load()
 						if err != nil {
 							return err
@@ -1838,7 +1838,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					}
 				}
 			case *oraTypes.Clob:
-				if val.GetReadMode() == configurations.LobReadMode_AUTO {
+				if val.GetReadMode() == config.LobReadModeAuto {
 					err = val.Load()
 					if err != nil {
 						return err
@@ -1849,7 +1849,7 @@ func (stmt *defaultStmt) decodePrim(resultSet *ResultSet) error {
 					}
 				}
 			case *oraTypes.Blob:
-				if val.GetReadMode() == configurations.LobReadMode_AUTO {
+				if val.GetReadMode() == config.LobReadModeAuto {
 					err = val.Load()
 					if err != nil {
 						return err
@@ -1878,13 +1878,13 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	var dataSet *DataSet
 	var err error
 	if len(args) == 0 {
-		dataSet, err = stmt.Query_(nil)
+		dataSet, err = stmt.RunQuery(nil)
 	} else {
 		namedArgs := make([]driver.NamedValue, len(args))
 		for x := range args {
 			namedArgs[x].Value = args[x]
 		}
-		dataSet, err = stmt.Query_(namedArgs)
+		dataSet, err = stmt.RunQuery(namedArgs)
 	}
 	return dataSet, err
 }

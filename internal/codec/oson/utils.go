@@ -121,7 +121,7 @@ func Encode(mainObj any) ([]byte, error) {
 		}
 		objectData, err = obj.Encode()
 	default:
-		return nil, fmt.Errorf("cannot set value of %T into Json", mainObj)
+		return nil, fmt.Errorf("cannot set value of %T into JSON", mainObj)
 	}
 	if err != nil {
 		return nil, err

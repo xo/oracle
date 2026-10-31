@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/ttc"
 )
 
@@ -46,8 +46,8 @@ func (Driver) OpenConnector(dsn string) (driver.Connector, error) {
 // the registered types and the type coders (D9). Pass it to sql.OpenDB.
 type Connector struct {
 	cfg    Config
-	conn   *configurations.ConnectionConfig
-	wallet *configurations.Wallet
+	conn   *config.ConnectionConfig
+	wallet *config.Wallet
 	params []ttc.SessionParam
 	reg    *ttc.Registry
 
@@ -73,7 +73,7 @@ func WithSessionParam(key, value string) ConnectorOption {
 // of the folder that Config.Wallet names.
 func WithWallet(r io.Reader) ConnectorOption {
 	return func(c *Connector) error {
-		w, err := configurations.NewWalletFromReader(r)
+		w, err := config.NewWalletFromReader(r)
 		if err != nil {
 			return fmt.Errorf("reading the wallet: %w", err)
 		}
@@ -145,18 +145,18 @@ func (c *Connector) Close() error {
 }
 
 // connectionConfig returns the configuration of the protocol code for cfg.
-func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
+func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 	if err := cfg.check(); err != nil {
 		return nil, fmt.Errorf("checking the configuration: %w", err)
 	}
-	conn := configurations.New()
+	conn := config.New()
 	conn.UserID, conn.Password = cfg.User, cfg.Password
 	if cfg.Host != "" {
 		port := cfg.Port
 		if port == 0 {
 			port = DefaultPort
 		}
-		conn.Servers = append(conn.Servers, configurations.ServerAddr{Addr: cfg.Host, Port: port})
+		conn.Servers = append(conn.Servers, config.ServerAddr{Addr: cfg.Host, Port: port})
 	}
 	conn.ServiceName = cfg.Service
 	if cfg.Descriptor != "" {
@@ -181,16 +181,16 @@ func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading the port of the server %q: %w", s, ErrInvalidValue)
 		}
-		conn.Servers = append(conn.Servers, configurations.ServerAddr{Addr: host, Port: port})
+		conn.Servers = append(conn.Servers, config.ServerAddr{Addr: host, Port: port})
 	}
 	if len(conn.Servers) == 0 {
 		return nil, fmt.Errorf("no address: %w", ErrInvalidValue)
 	}
 	switch cfg.Auth {
 	case AuthOS:
-		conn.AuthType = configurations.OS
+		conn.AuthType = config.OS
 	case AuthKerberos:
-		conn.AuthType = configurations.Kerberos
+		conn.AuthType = config.Kerberos
 	}
 	conn.EncServiceLevel = cfg.Encryption.level()
 	conn.IntServiceLevel = cfg.Checksum.level()
@@ -201,7 +201,7 @@ func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
 	default:
 		conn.SSL, conn.SSLVerify = true, true
 	}
-	conn.DBAPrivilege = configurations.DBAPrivilegeFromString(string(cfg.Privilege))
+	conn.DBAPrivilege = config.DBAPrivilegeFromString(string(cfg.Privilege))
 	if cfg.Timeout != 0 {
 		conn.Timeout = cfg.Timeout
 	}
@@ -212,10 +212,10 @@ func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
 		conn.PrefetchRows = cfg.Prefetch
 	}
 	if cfg.LobFetch == LobFetchStream {
-		conn.Lob = configurations.STREAM
+		conn.Lob = config.STREAM
 	}
 	if cfg.LobRead == LobReadExplicit {
-		conn.LobReadMode = configurations.LobReadMode_NONE
+		conn.LobReadMode = config.LobReadModeNone
 	}
 	conn.UnixAddress = cfg.UnixSocket
 	conn.TokenFile, conn.TokenPrivateKeyFile = cfg.Token, cfg.TokenKey
@@ -227,7 +227,7 @@ func (cfg Config) connectionConfig() (*configurations.ConnectionConfig, error) {
 		conn.Territory = cfg.Territory
 	}
 	if cfg.Charset != "" {
-		id, err := configurations.CharsetID(cfg.Charset)
+		id, err := config.CharsetID(cfg.Charset)
 		if err != nil {
 			return nil, fmt.Errorf("reading the charset: %w: %w", ErrInvalidValue, err)
 		}

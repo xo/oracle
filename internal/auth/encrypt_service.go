@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/xo/oracle/internal/auth/security"
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 type encryptService struct {
@@ -13,7 +13,7 @@ type encryptService struct {
 	algoID int
 }
 
-func newEncryptService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (*encryptService, error) {
+func newEncryptService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo) (*encryptService, error) {
 	output := &encryptService{
 		ano:         ano,
 		level:       negoInfo.EncServiceLevel,

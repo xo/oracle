@@ -55,7 +55,7 @@ package ttc
 // 	defer func(stmt *Stmt) {
 // 		_ = stmt.Close()
 // 	}(stmt)
-// 	rows, err := stmt.Query_([]driver.NamedValue{{Value: strings.ToUpper(owner)}, {Value: strings.ToUpper(typeName)}})
+// 	rows, err := stmt.RunQuery([]driver.NamedValue{{Value: strings.ToUpper(owner)}, {Value: strings.ToUpper(typeName)}})
 // 	if err != nil {
 // 		return err
 // 	}
@@ -65,7 +65,7 @@ package ttc
 // 		attTypeName sql.NullString
 // 		length      sql.NullInt64
 // 	)
-// 	for rows.Next_() {
+// 	for rows.Advance() {
 // 		err = rows.Scan(&attName, &attTypeName, &length, &attOrder)
 // 		if err != nil {
 // 			return err

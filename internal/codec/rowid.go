@@ -22,7 +22,7 @@ func (param *RowIDParameter) Init() {
 	param.SetDefault()
 }
 
-func (param *RowIDParameter) Encode(input any, _ IConnection) error {
+func (param *RowIDParameter) Encode(input any, _ Conn) error {
 	param.Init()
 	coder := &types.RowID{}
 	coder.SetDataType(param.DataType)
@@ -36,7 +36,7 @@ func (param *RowIDParameter) Encode(input any, _ IConnection) error {
 	return err
 }
 
-func (param *RowIDParameter) Decode(_ IConnection) (any, error) {
+func (param *RowIDParameter) Decode(_ Conn) (any, error) {
 	decoder := &types.RowID{}
 	*decoder = param.rowid
 	decoder.SetBytes(param.BValue)

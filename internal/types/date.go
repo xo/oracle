@@ -15,15 +15,15 @@ type Date struct {
 	DBServerTimeZone *time.Location
 }
 
-func NewTimeStamp(t time.Time) *Date {
+func NewTimestamp(t time.Time) *Date {
 	ret := new(Date)
 	ret.dataType = TIMESTAMP
 	_ = ret.SetValue(t)
 	return ret
 }
-func NewTimeStampTZ(t time.Time) *Date {
+func NewTimestampTZ(t time.Time) *Date {
 	ret := new(Date)
-	ret.dataType = TimeStampTZ_DTY
+	ret.dataType = TimestampTZDTY
 	_ = ret.SetValue(t)
 	return ret
 }
@@ -33,9 +33,9 @@ func (date *Date) GetMaxLen() int64 {
 	case DATE:
 		return MaxLenDate
 	case TIMESTAMP:
-		return MaxLenTimeStamp
+		return MaxLenTimestamp
 	default:
-		return MaxLenTimeStampTZ
+		return MaxLenTimestampTZ
 	}
 }
 func (date *Date) Value() (any, error) {
@@ -53,16 +53,16 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 		bytes = make([]byte, MaxLenDate)
 		putDate(bytes, &input)
 	case TIMESTAMP:
-		bytes = make([]byte, MaxLenTimeStamp)
+		bytes = make([]byte, MaxLenTimestamp)
 		putTimestamp(bytes, &input)
-	case TIMESTAMPTZ, TimeStampTZ_DTY, TimeStampLTZ, TimeStampLTZ_DTY:
+	case TIMESTAMPTZ, TimestampTZDTY, TimestampLTZ, TimestampLTZDTY:
 		var val time.Time
 		if date.AsUTC {
 			val = input.UTC()
 		} else {
 			val = input
 		}
-		bytes = make([]byte, MaxLenTimeStamp)
+		bytes = make([]byte, MaxLenTimestamp)
 		putTimestamp(bytes, &val)
 		zoneLoc := input.Location()
 		zoneID := 0
@@ -134,8 +134,8 @@ func (date *Date) SetValue(input any) (err error) {
 			date.dataType = data.dataType
 			return date.SetValue(temp)
 		}
-	case TimeStampTZ:
-		date.dataType = TimeStampTZ_DTY
+	case TimestampTZ:
+		date.dataType = TimestampTZDTY
 		date.bValue, err = date.encode(time.Time(data))
 	case time.Time:
 		date.bValue, err = date.encode(data)
@@ -194,12 +194,12 @@ func (date *Date) decode() (output time.Time, err error) {
 		}
 	}
 	switch date.dataType {
-	case DATE, TIMESTAMP, TimeStampDTY:
+	case DATE, TIMESTAMP, TimestampDTY:
 		if date.DBServerTimeZone != nil && !isEqualLoc(date.DBServerTimeZone, time.UTC) {
 			output = time.Date(output.Year(), output.Month(), output.Day(),
 				output.Hour(), output.Minute(), output.Second(), output.Nanosecond(), date.DBServerTimeZone)
 		}
-	case TimeStampLTZ, TimeStampLTZ_DTY:
+	case TimestampLTZ, TimestampLTZDTY:
 		if date.DBTimeZone != nil && !isEqualLoc(date.DBTimeZone, time.UTC) {
 			output = time.Date(output.Year(), output.Month(), output.Day(),
 				output.Hour(), output.Minute(), output.Second(), output.Nanosecond(), date.DBTimeZone)

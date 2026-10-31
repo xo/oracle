@@ -17,7 +17,7 @@ func (param *BFileParameter) Copy() OracleParameterCoder {
 	*ret = *param
 	return ret
 }
-func (param *BFileParameter) Encode(input any, conn IConnection) (err error) {
+func (param *BFileParameter) Encode(input any, conn Conn) (err error) {
 	param.Init()
 	encoder := &types.BFile{}
 	encoder.Conv, err = conn.GetDefaultStringCoder()
@@ -40,7 +40,7 @@ func (param *BFileParameter) Encode(input any, conn IConnection) (err error) {
 	return
 }
 
-func (param *BFileParameter) Decode(conn IConnection) (output any, err error) {
+func (param *BFileParameter) Decode(conn Conn) (output any, err error) {
 	decoder := &types.BFile{}
 	decoder.Conv, err = conn.GetDefaultStringCoder()
 	if err != nil {

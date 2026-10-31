@@ -3,8 +3,8 @@ package tns
 import "encoding/binary"
 
 const (
-	marker_type_reset     = 2
-	marker_type_interrupt = 3
+	markerTypeReset     = 2
+	markerTypeInterrupt = 3
 )
 
 type MarkerPacket struct {

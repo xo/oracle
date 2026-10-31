@@ -6,7 +6,7 @@ import (
 
 type PacketType uint8
 
-type PacketInterface interface {
+type packet interface {
 	bytes() []byte
 	getPacketType() PacketType
 	getFlag() uint8

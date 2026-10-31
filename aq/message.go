@@ -8,16 +8,16 @@ import (
 	//"github.com/xo/oracle/type_coder"
 )
 
-var XMLTYPE_TOID = []byte{
+var XMLTypeTOID = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 2, 1, 0}
-var ANYDATA_TOID = []byte{
+var AnyDataTOID = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 2, 0, 17}
-var JSON_TOID = []byte{
+var JSONTOID = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 71}
-var RAW_TOID = []byte{
+var RawTOID = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 23}
 
@@ -81,7 +81,7 @@ type Message struct {
 	extensions []QAExtension
 }
 
-func (message *Message) read(conn IConnection) error {
+func (message *Message) read(conn Conn) error {
 	session := conn.GetSession()
 	var err error
 	message.Priority, err = session.GetInt(4, true, true)
@@ -159,7 +159,7 @@ func (message *Message) read(conn IConnection) error {
 		//if (this.mEngine.UnmarshalSB4(false) > 0) {
 		//	this.mEngine.UnmarshalCLR(this.aqmeqtBuffer, 0, this.retInt, 7, false);
 		//	OracleDate oracleDate = new OracleDate(this.aqmeqtBuffer);
-		//	this.aqmeqt = new OracleTimeStamp(oracleDate.Value);
+		//	this.aqmeqt = new OracleTimestamp(oracleDate.Value);
 		//}
 	}
 	if conn.TTCVersion() >= 3 {
@@ -245,7 +245,7 @@ func (message *Message) read(conn IConnection) error {
 	}
 	return nil
 }
-func (message *Message) write(conn IConnection) {
+func (message *Message) write(conn Conn) {
 	session := conn.GetSession()
 	session.PutInt(message.Priority, 4, true, true)
 	session.PutInt(message.Delay, 4, true, true)
@@ -297,7 +297,7 @@ func (message *Message) ServerMessageID() []byte {
 	return message.messageID
 }
 
-func (message *Message) readData(conn IConnection, messageType MessageType, udtName string) error {
+func (message *Message) readData(conn Conn, messageType MessageType, udtName string) error {
 	var err error
 	session := conn.GetSession()
 	message.bValue, err = session.GetClr()
@@ -310,7 +310,7 @@ func (message *Message) readData(conn IConnection, messageType MessageType, udtN
 		decoder, err = conn.GetParameterCoder(types.RAW)
 
 	case JSON:
-		decoder, err = conn.GetParameterCoder(types.JSON)
+		decoder, err = conn.GetParameterCoder(types.JSONType)
 	default:
 		decoder, err = conn.GetParameterCoder(udtName)
 
@@ -328,7 +328,7 @@ func (message *Message) readData(conn IConnection, messageType MessageType, udtN
 		return err
 	}
 	if messageType == JSON {
-		if temp, ok := message.Payload.(*types.Json); ok {
+		if temp, ok := message.Payload.(*types.JSON); ok {
 			message.Payload, err = temp.Value()
 			if err != nil {
 				return err

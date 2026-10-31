@@ -3,7 +3,7 @@ package tns
 import (
 	"encoding/binary"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 // type AcceptPacket Packet
@@ -34,7 +34,7 @@ func (pck *AcceptPacket) bytes() []byte {
 	return output
 }
 
-func newAcceptPacketFromData(packetData []byte, config *configurations.ConnectionConfig) *AcceptPacket {
+func newAcceptPacketFromData(packetData []byte, config *config.ConnectionConfig) *AcceptPacket {
 	if len(packetData) < 32 {
 		return nil
 	}

@@ -21,7 +21,7 @@ func (param *VectorParameter) Init() {
 	param.DataType = types.VECTOR
 }
 
-func (param *VectorParameter) Encode(input any, _ IConnection) error {
+func (param *VectorParameter) Encode(input any, _ Conn) error {
 	param.Init()
 	encoder := &types.Vector{}
 	encoder.SetDataType(param.DataType)
@@ -41,7 +41,7 @@ func (param *VectorParameter) Encode(input any, _ IConnection) error {
 	return nil
 }
 
-func (param *VectorParameter) Decode(_ IConnection) (any, error) {
+func (param *VectorParameter) Decode(_ Conn) (any, error) {
 	decoder := &types.Vector{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)

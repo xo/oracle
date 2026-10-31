@@ -17,7 +17,7 @@ import (
 
 	"github.com/xo/oracle/aq"
 	"github.com/xo/oracle/internal/codec"
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/trace"
 	"github.com/xo/oracle/internal/types"
 
@@ -90,7 +90,7 @@ type Connection struct {
 	LogonMode         LogonMode
 	autoCommit        bool
 	tracer            trace.Tracer
-	connOption        *configurations.ConnectionConfig
+	connOption        *config.ConnectionConfig
 	session           *tns.Session
 	tcpNego           *TCPNego
 	dataNego          *DataTypeNego
@@ -100,9 +100,9 @@ type Connection struct {
 	sessionID         int
 	serialID          int
 	transactionID     []byte
-	sStrConv          converters.IStringConverter
-	nStrConv          converters.IStringConverter
-	cStrConv          converters.IStringConverter
+	sStrConv          *converters.StringConverter
+	nStrConv          *converters.StringConverter
+	cStrConv          *converters.StringConverter
 	NLSData           NLSData
 	goTypeCoder       map[reflect.Type]codec.OracleParameterCoder
 	oracleTypeCoder   map[uint16]codec.OracleParameterCoder
@@ -256,11 +256,11 @@ func (conn *Connection) getDefaultCharsetID() int {
 
 	return conn.tcpNego.ServerCharset
 }
-func (conn *Connection) GetDefaultStringCoder() (converters.IStringConverter, error) {
+func (conn *Connection) GetDefaultStringCoder() (*converters.StringConverter, error) {
 	return conn.GetStringCoder(conn.getDefaultCharsetID(), 1)
 }
 
-func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (converters.IStringConverter, error) {
+func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (*converters.StringConverter, error) {
 	errStringCoder := fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
 	if charsetID == 0 {
 		if charsetForm == 1 {
@@ -297,10 +297,10 @@ func (conn *Connection) GetStringCoder(charsetID, charsetForm int) (converters.I
 	return temp, nil
 }
 
-func (conn *Connection) GetServerStringCoder() converters.IStringConverter {
+func (conn *Connection) GetServerStringCoder() *converters.StringConverter {
 	return conn.sStrConv
 }
-func (conn *Connection) GetServerNStringCoder() converters.IStringConverter {
+func (conn *Connection) GetServerNStringCoder() *converters.StringConverter {
 	return conn.nStrConv
 }
 func (conn *Connection) Logoff() error {
@@ -362,19 +362,19 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	tracer := conn.tracer
 	switch conn.connOption.DBAPrivilege {
-	case configurations.SYSDBA:
+	case config.SYSDBA:
 		conn.LogonMode |= SysDba
-	case configurations.SYSOPER:
+	case config.SYSOPER:
 		conn.LogonMode |= SysOper
-	case configurations.SYSASM:
+	case config.SYSASM:
 		conn.LogonMode |= SysAsm
-	case configurations.SYSBACKUP:
+	case config.SYSBACKUP:
 		conn.LogonMode |= SysBackup
-	case configurations.SYSDG:
+	case config.SYSDG:
 		conn.LogonMode |= SysDg
-	case configurations.SYSKM:
+	case config.SYSKM:
 		conn.LogonMode |= SysKm
-	case configurations.SYSRAC:
+	case config.SYSRAC:
 		conn.LogonMode |= SysRac
 	default:
 		conn.LogonMode = 0
@@ -630,20 +630,20 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 }
 
 // NewConnection create a new connection from databaseURL string or configuration
-func NewConnection(config *configurations.ConnectionConfig) (*Connection, error) {
+func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
 	var err error
-	if config == nil {
+	if cfg == nil {
 		return nil, errors.New("database url or configuration is required")
 	}
 	var token, tokenPrivateKey []byte
-	if len(config.TokenFile) > 0 {
-		token, err = os.ReadFile(config.TokenFile)
+	if len(cfg.TokenFile) > 0 {
+		token, err = os.ReadFile(cfg.TokenFile)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if len(config.TokenPrivateKeyFile) > 0 {
-		tokenPrivateKey, err = os.ReadFile(config.TokenPrivateKeyFile)
+	if len(cfg.TokenPrivateKeyFile) > 0 {
+		tokenPrivateKey, err = os.ReadFile(cfg.TokenPrivateKeyFile)
 		if err != nil {
 			return nil, err
 		}
@@ -651,12 +651,12 @@ func NewConnection(config *configurations.ConnectionConfig) (*Connection, error)
 	if len(token) > 0 && len(tokenPrivateKey) == 0 {
 		return nil, errors.New("token private key file is required")
 	}
-	temp := new(configurations.ConnectionConfig)
-	*temp = *config
+	temp := new(config.ConnectionConfig)
+	*temp = *cfg
 	return &Connection{
 		State:           Closed,
 		connOption:      temp,
-		cStrConv:        converters.NewStringConverter(config.CharsetID),
+		cStrConv:        converters.NewStringConverter(cfg.CharsetID),
 		autoCommit:      true,
 		oracleTypeCoder: nil,
 		cusTyp:          map[string]types.Object{},
@@ -1083,7 +1083,7 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 	return stmt.Exec(args)
 }
 
-func SetNTSAuth(newNTSManager auth.NTSAuthInterface) {
+func SetNTSAuth(newNTSManager auth.NTSAuthenticator) {
 	auth.NTSAuth = newNTSManager
 }
 
@@ -1217,7 +1217,7 @@ func (conn *Connection) QueryRowContext(ctx context.Context, query string, args 
 		dataSet.currentResultSet().lastErr = fmt.Errorf("expected DataSet, got %T", rows)
 		return dataSet
 	}
-	dataSet.Next_()
+	dataSet.Advance()
 	return dataSet
 }
 

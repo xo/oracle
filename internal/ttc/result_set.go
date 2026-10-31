@@ -26,7 +26,7 @@ type ResultSet struct {
 	rows            []Row
 	currentRow      Row
 	index           int
-	parent          StmtInterface
+	parent          parentStmt
 	lastErr         error
 }
 
@@ -177,17 +177,17 @@ func (resultSet *ResultSet) ColumnTypeScanType(index int) reflect.Type {
 		return reflect.TypeFor[[]byte]()
 	case types.DATE, types.TIMESTAMP:
 		fallthrough
-	case types.TimeStampDTY:
+	case types.TimestampDTY:
 		fallthrough
-	case types.TimeStampLTZ, types.TimeStampLTZ_DTY:
+	case types.TimestampLTZ, types.TimestampLTZDTY:
 		fallthrough
-	case types.TIMESTAMPTZ, types.TimeStampTZ_DTY:
+	case types.TIMESTAMPTZ, types.TimestampTZDTY:
 		return reflect.TypeFor[time.Time]()
 	case types.IBFLOAT:
 		return reflect.TypeFor[float64]()
 	case types.IBDOUBLE:
 		return reflect.TypeFor[float64]()
-	case types.INTERVALDS_DTY, types.INTERVALYM_DTY:
+	case types.IntervalDSDTY, types.IntervalYMDTY:
 		return reflect.TypeFor[string]()
 	default:
 		return nil
@@ -259,8 +259,8 @@ func (resultSet *ResultSet) Scan(dest ...any) error {
 	return nil
 }
 
-// Next_ act like Next in sql package return false if no other rows in dataset
-func (resultSet *ResultSet) Next_() bool {
+// Advance act like Next in sql package return false if no other rows in dataset
+func (resultSet *ResultSet) Advance() bool {
 	err := resultSet.Next(resultSet.currentRow)
 	if err != nil {
 		if errors.Is(err, io.EOF) {

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/xo/oracle/internal/codec"
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/converters"
 	"github.com/xo/oracle/internal/tns"
 	oraTypes "github.com/xo/oracle/internal/types"
@@ -47,7 +47,7 @@ type ParameterInfo struct {
 	Direction    ParameterDirection
 	IsNull       bool
 	AllowNull    bool
-	IsJson       bool
+	IsJSON       bool
 	ColAlias     string
 	IsXmlType    bool
 	Precision    uint8
@@ -83,11 +83,11 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	switch par.DataType {
 	case oraTypes.NUMBER:
 		fallthrough
-	case oraTypes.TimeStampDTY:
+	case oraTypes.TimestampDTY:
 		fallthrough
-	case oraTypes.TimeStampTZ_DTY:
+	case oraTypes.TimestampTZDTY:
 		fallthrough
-	case oraTypes.INTERVALDS_DTY:
+	case oraTypes.IntervalDSDTY:
 		fallthrough
 	case oraTypes.TIMESTAMP:
 		fallthrough
@@ -95,9 +95,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		fallthrough
 	case oraTypes.INTERVALDS:
 		fallthrough
-	case oraTypes.TimeStampLTZ_DTY:
+	case oraTypes.TimestampLTZDTY:
 		fallthrough
-	case oraTypes.TimeStampLTZ:
+	case oraTypes.TimestampLTZ:
 		scale, err := session.GetInt(2, true, true)
 		if err != nil {
 			return err
@@ -125,16 +125,16 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	case oraTypes.ROWID:
 		par.MaxLen = 128
 	case oraTypes.DATE:
-		par.MaxLen = int64(converters.MAX_LEN_DATE)
+		par.MaxLen = int64(converters.MaxLenDate)
 	case oraTypes.IBFLOAT:
 		par.MaxLen = 4
 	case oraTypes.IBDOUBLE:
 		par.MaxLen = 8
-	case oraTypes.TimeStampTZ_DTY:
-		par.MaxLen = int64(converters.MAX_LEN_TIMESTAMP)
-	case oraTypes.INTERVALYM_DTY:
+	case oraTypes.TimestampTZDTY:
+		par.MaxLen = int64(converters.MaxLenTimestamp)
+	case oraTypes.IntervalYMDTY:
 		fallthrough
-	case oraTypes.INTERVALDS_DTY:
+	case oraTypes.IntervalDSDTY:
 		fallthrough
 	case oraTypes.INTERVALYM:
 		fallthrough
@@ -216,9 +216,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if session.TTCVersion < 6 {
 		return nil
 	}
-	var uds_flags int
-	uds_flags, err = session.GetInt(4, true, true)
-	par.IsJson = (uds_flags & 0x500) > 0
+	var udsFlags int
+	udsFlags, err = session.GetInt(4, true, true)
+	par.IsJSON = (udsFlags & 0x500) > 0
 	if session.TTCVersion < 17 {
 		return nil
 	}
@@ -281,9 +281,9 @@ func (par *ParameterInfo) load(conn *Connection) error {
 		}
 		par.VectorFlag, err = session.GetByte()
 
-		par.VectorType = oraTypes.VECTOR_DENSE
+		par.VectorType = oraTypes.VectorDense
 		if par.VectorFlag&2 == 2 {
-			par.VectorType = oraTypes.VECTOR_SPARSE
+			par.VectorType = oraTypes.VectorSparse
 		}
 		//colMetaData.m_vectorDim = (int)mEngine.UnmarshalUB4(bAsync, false);
 		//colMetaData.m_vectorNumFormat = (VectorNumFormat)mEngine.UnmarshalUB1(bAsync, false);
@@ -360,7 +360,7 @@ func (par *ParameterInfo) isLobType() bool {
 		par.DataType == oraTypes.OCIClobLocator ||
 		par.DataType == oraTypes.OCIFileLocator ||
 		par.DataType == oraTypes.VECTOR ||
-		par.DataType == oraTypes.JSON
+		par.DataType == oraTypes.JSONType
 }
 
 func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
@@ -415,7 +415,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 
 func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 	currentLobFetch := connection.connOption.Lob
-	connection.connOption.Lob = configurations.STREAM
+	connection.connOption.Lob = config.STREAM
 	defer func() {
 		connection.connOption.Lob = currentLobFetch
 	}()

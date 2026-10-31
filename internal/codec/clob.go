@@ -24,7 +24,7 @@ func (param *ClobParameter) Init() {
 
 }
 
-func (param *ClobParameter) Encode(input any, conn IConnection) (err error) {
+func (param *ClobParameter) Encode(input any, conn Conn) (err error) {
 	param.Init()
 
 	switch input := input.(type) {
@@ -73,7 +73,7 @@ func (param *ClobParameter) Encode(input any, conn IConnection) (err error) {
 	return
 }
 
-func (param *ClobParameter) Decode(conn IConnection) (any, error) {
+func (param *ClobParameter) Decode(conn Conn) (any, error) {
 	decoder := &types.Clob{}
 	decoder.SetStreamer(param.streamer)
 	decoder.SetBytes(param.BValue)

@@ -12,8 +12,8 @@ type VectorDataType int
 type VectorType int
 
 const (
-	VECTOR_SPARSE VectorType = iota
-	VECTOR_DENSE
+	VectorSparse VectorType = iota
+	VectorDense
 )
 
 type Vector struct {
@@ -163,7 +163,7 @@ func (vector *Vector) SetValue(input any) error {
 	vector.bValue = buffer.Bytes()
 	dataLen := uint64(len(vector.bValue))
 	if dataLen > 0 {
-		vector.loc = NewQuasiLocator(dataLen)
+		vector.loc = NewInlineLocator(dataLen)
 	} else {
 		vector.loc = nil
 	}
@@ -309,7 +309,7 @@ func (vector *Vector) Read(ctx context.Context) error {
 //	if v.Type != VECTOR_NIL || v.data != nil {
 //		return nil
 //	}
-//	if v.IsQuasi() {
+//	if v.IsInline() {
 //		return nil
 //	}
 //	if v.decoder == nil {

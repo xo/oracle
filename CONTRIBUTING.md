@@ -13,7 +13,7 @@ the open questions. Do not decide an open question on your own. Ask Ken.
 gofmt -l . && go vet ./... && go build ./... && go test ./...
 ```
 
-`gofmt -l .` must print nothing. Tests in `TestIssues` need a live Oracle
+`gofmt -l .` must print nothing. Tests in `integration` need a live Oracle
 database and skip without one.
 
 ## Testing against Oracle

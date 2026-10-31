@@ -30,7 +30,7 @@ var buffer = `00000000  00 00 01 93 06 00 00 00  00 00 10 17 30 77 d7 6c  |.....
 //func TestURowid(t *testing.T) {
 //	temp := extractBuffer(buffer)
 //	c := new(Connection)
-//	c.connOption = &configurations.ConnectionConfig{}
+//	c.connOption = &config.ConnectionConfig{}
 //	c.sStrConv = converters.NewStringConverter(871)
 //	c.session = network.NewSessionWithInputBufferForDebug(temp[10:])
 //	c.session.TTCVersion = 11

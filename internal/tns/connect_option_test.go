@@ -3,7 +3,7 @@ package tns
 import (
 	"testing"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 func TestExtractServers(t *testing.T) {
@@ -14,7 +14,7 @@ func TestExtractServers(t *testing.T) {
 )
 (CONNECT_DATA=(SERVICE_NAME=service)(SERVER=DEDICATED))
 )`
-	t.Log(configurations.ExtractServers(text))
+	t.Log(config.ExtractServers(text))
 	text = `(DESCRIPTION_LIST=(LOAD_BALANCE=off)(FAILOVER=on)
 (DESCRIPTION=(CONNECT_TIMEOUT=5)
 (ADDRESS=(PROTOCOL=TCP)(HOST=host_dguard)(PORT=1521))
@@ -25,7 +25,7 @@ func TestExtractServers(t *testing.T) {
 (CONNECT_DATA=(SERVICE_NAME=service)(SERVER=DEDICATED))
 )
 )`
-	t.Log(configurations.ExtractServers(text))
+	t.Log(config.ExtractServers(text))
 }
 
 func TestUpdateDatabaseInfo(t *testing.T) {
@@ -84,7 +84,7 @@ func TestUpdateDatabaseInfo(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			op := &configurations.ConnectionConfig{}
+			op := &config.ConnectionConfig{}
 			err := op.UpdateDatabaseInfo(tc.input)
 			if err != nil {
 				t.Fatalf("UpdateDatabaseInfo failed: %v", err)

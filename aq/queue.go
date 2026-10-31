@@ -28,7 +28,7 @@ type Queue interface {
 type queue struct {
 	Name        string
 	version     int
-	conn        IConnection
+	conn        Conn
 	messageType MessageType
 	udtName     string
 	toid        []byte
@@ -49,11 +49,11 @@ func CreateQueue(db Execer, name string, messageType MessageType, udtName string
 
 	switch messageType {
 	case RAW:
-		ret.toid = RAW_TOID
+		ret.toid = RawTOID
 	case JSON:
-		ret.toid = JSON_TOID
+		ret.toid = JSONTOID
 	case XML:
-		ret.toid = XMLTYPE_TOID
+		ret.toid = XMLTypeTOID
 	default:
 		if len(udtName) > 0 {
 			coder, err := ret.conn.GetParameterCoder(udtName)
@@ -105,7 +105,7 @@ func (qu *queue) NewMessage(data any) (*Message, error) {
 	case UDT:
 		encoder, err = qu.conn.GetParameterCoder(qu.udtName)
 	case JSON:
-		encoder, err = qu.conn.GetParameterCoder(types.JSON)
+		encoder, err = qu.conn.GetParameterCoder(types.JSONType)
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +229,7 @@ func (qu *queue) Enqueue(message *Message) error {
 	if err != nil {
 		return err
 	}
-	//if (this.isJsonQueue)
+	//if (this.isJSONQueue)
 	//{
 	//	int num2 = ((this.messageData != null) ? this.messageData.Length : 0);
 	//	byte[] array = TTCLob.CreateQuasiLocator((long)num2);

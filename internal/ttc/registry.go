@@ -10,7 +10,7 @@ import (
 
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/codec/oson"
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/types"
 )
 
@@ -63,19 +63,19 @@ func (driver *Registry) init() {
 	driver.oracleTypeCoder[types.IBFLOAT] = &codec.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
 	driver.oracleTypeCoder[types.IBDOUBLE] = &codec.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
 
-	driver.oracleTypeCoder[types.DATE] = &codec.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
-	driver.oracleTypeCoder[types.TIMESTAMP] = &codec.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStamp}
-	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &codec.DateParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampDTY] = &codec.DateParameter{DataType: types.TimeStampDTY, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampTZ_DTY] = &codec.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampLTZ] = &codec.DateParameter{DataType: types.TimeStampLTZ, MaxLen: types.MaxLenTimeStampTZ}
-	driver.oracleTypeCoder[types.TimeStampLTZ_DTY] = &codec.DateParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.oracleTypeCoder[types.DATE] = &codec.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimestamp}
+	driver.oracleTypeCoder[types.TIMESTAMP] = &codec.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimestamp}
+	driver.oracleTypeCoder[types.TIMESTAMPTZ] = &codec.DateParameter{DataType: types.TIMESTAMPTZ, MaxLen: types.MaxLenTimestampTZ}
+	driver.oracleTypeCoder[types.TimestampDTY] = &codec.DateParameter{DataType: types.TimestampDTY, MaxLen: types.MaxLenTimestampTZ}
+	driver.oracleTypeCoder[types.TimestampTZDTY] = &codec.DateParameter{DataType: types.TimestampTZDTY, MaxLen: types.MaxLenTimestampTZ}
+	driver.oracleTypeCoder[types.TimestampLTZ] = &codec.DateParameter{DataType: types.TimestampLTZ, MaxLen: types.MaxLenTimestampTZ}
+	driver.oracleTypeCoder[types.TimestampLTZDTY] = &codec.DateParameter{DataType: types.TimestampTZDTY, MaxLen: types.MaxLenTimestampTZ}
 
-	driver.oracleTypeCoder[types.INTERVALYM_DTY] = &codec.IntervalParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}
-	driver.oracleTypeCoder[types.INTERVALDS_DTY] = &codec.IntervalParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}
+	driver.oracleTypeCoder[types.IntervalYMDTY] = &codec.IntervalParameter{DataType: types.IntervalYMDTY, MaxLen: types.MaxLenIntervalYM}
+	driver.oracleTypeCoder[types.IntervalDSDTY] = &codec.IntervalParameter{DataType: types.IntervalDSDTY, MaxLen: types.MaxLenIntervalDS}
 
 	driver.oracleTypeCoder[types.VECTOR] = &codec.VectorParameter{}
-	driver.oracleTypeCoder[types.JSON] = &codec.JsonParameter{}
+	driver.oracleTypeCoder[types.JSONType] = &codec.JSONParameter{}
 	driver.oracleTypeCoder[types.OCIBlobLocator] = &codec.BlobParameter{}
 	driver.oracleTypeCoder[types.OCIClobLocator] = &codec.ClobParameter{}
 	driver.oracleTypeCoder[types.OCIFileLocator] = &codec.BFileParameter{}
@@ -93,9 +93,9 @@ func (driver *Registry) init() {
 	driver.nameTypeCoder["IBDOUBLE"] = &codec.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
 	driver.nameTypeCoder["VARCHAR2"] = &codec.StringParameter{}
 	driver.nameTypeCoder["NVARCHAR2"] = &codec.StringParameter{CharsetForm: 2}
-	driver.nameTypeCoder["TIMESTAMP"] = &codec.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimeStampTZ}
-	driver.nameTypeCoder["DATE"] = &codec.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimeStamp}
-	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &codec.DateParameter{DataType: types.TimeStampLTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}
+	driver.nameTypeCoder["TIMESTAMP"] = &codec.DateParameter{DataType: types.TIMESTAMP, MaxLen: types.MaxLenTimestampTZ}
+	driver.nameTypeCoder["DATE"] = &codec.DateParameter{DataType: types.DATE, MaxLen: types.MaxLenTimestamp}
+	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TIME ZONE"] = &codec.DateParameter{DataType: types.TimestampLTZDTY, MaxLen: types.MaxLenTimestampTZ}
 	driver.nameTypeCoder["RAW"] = &codec.RawParameter{}
 	driver.nameTypeCoder["BLOB"] = &codec.BlobParameter{}
 	driver.nameTypeCoder["CLOB"] = &codec.ClobParameter{}
@@ -229,7 +229,7 @@ func (drv *Registry) RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTyp
 
 // NewConnection returns a connection for config, not open yet, with the
 // coders and the types of drv.
-func (drv *Registry) NewConnection(config *configurations.ConnectionConfig) (*Connection, error) {
+func (drv *Registry) NewConnection(config *config.ConnectionConfig) (*Connection, error) {
 	conn, err := NewConnection(config)
 	if err != nil {
 		return nil, err

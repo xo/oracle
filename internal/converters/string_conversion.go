@@ -6,13 +6,6 @@ import (
 	"unsafe"
 )
 
-type IStringConverter interface {
-	Encode(string) []byte
-	Decode([]byte) string
-	GetLangID() int
-	Clone() IStringConverter
-}
-
 type StringConverter struct {
 	LangID    int
 	CharWidth int
@@ -55,7 +48,7 @@ func MaxBytePerChar(charsetID int) int {
 	}
 }
 
-func (conv *StringConverter) Clone() IStringConverter {
+func (conv *StringConverter) Clone() *StringConverter {
 	return &StringConverter{
 		LangID:    conv.LangID,
 		CharWidth: conv.CharWidth,

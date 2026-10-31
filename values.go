@@ -22,12 +22,12 @@ type RefCursor = ttc.RefCursor
 // Querier runs a query, as *sql.DB, *sql.Conn and *sql.Tx do.
 type Querier = ttc.Querier
 
-// TimeStampTZ is a time that binds as TIMESTAMP WITH TIME ZONE, where a
-// time.Time binds as TIMESTAMP. A nullable one is sql.Null[TimeStampTZ].
-type TimeStampTZ = types.TimeStampTZ
+// TimestampTZ is a time that binds as TIMESTAMP WITH TIME ZONE, where a
+// time.Time binds as TIMESTAMP. A nullable one is sql.Null[TimestampTZ].
+type TimestampTZ = types.TimestampTZ
 
 // NTSAuth authenticates a Windows user with NTS.
-type NTSAuth = auth.NTSAuthInterface
+type NTSAuth = auth.NTSAuthenticator
 
 // WrapRefCursor returns the rows of cursor, read through q.
 func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows, error) {
@@ -60,7 +60,7 @@ type BFile = types.BFile
 type Vector = types.Vector
 
 // JSON is a JSON value of Oracle 21c and later.
-type JSON = types.Json
+type JSON = types.JSON
 
 // Bool is a BOOLEAN of Oracle 23ai and later, or of PL/SQL.
 type Bool = types.Bool

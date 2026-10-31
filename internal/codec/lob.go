@@ -1,7 +1,7 @@
 package codec
 
 import (
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
 )
@@ -36,7 +36,7 @@ func (param *lobParameter) Write(session tns.SessionWriter) error {
 func (param *lobParameter) Read(session tns.SessionReader) error {
 	var locator types.Locator
 	var err error
-	if !(param.IsUDTPar || param.IsArrayPar) && param.streamer.GetLobStreamMode() == configurations.INLINE {
+	if !(param.IsUDTPar || param.IsArrayPar) && param.streamer.GetLobStreamMode() == config.INLINE {
 		// the following code is working when the lob is inline (default)
 		var maxSize int64
 		maxSize, err = session.GetInt64(4, true, true)

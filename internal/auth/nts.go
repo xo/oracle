@@ -7,12 +7,12 @@ import (
 	"github.com/xo/oracle/internal/auth/ntlmssp"
 )
 
-type NTSAuthInterface interface {
+type NTSAuthenticator interface {
 	NewNegotiateMessage(domain, machine string) ([]byte, error)
 	ProcessChallenge(chaMsgData []byte, user, password string) ([]byte, error)
 }
 
-var NTSAuth NTSAuthInterface = &NTSAuthDefault{}
+var NTSAuth NTSAuthenticator = &NTSAuthDefault{}
 
 type NTSAuthDefault struct{}
 

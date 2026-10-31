@@ -149,7 +149,7 @@ func getDate(col any) (time.Time, error) {
 	switch val := col.(type) {
 	case time.Time:
 		return val, nil
-	case oraTypes.TimeStampTZ:
+	case oraTypes.TimestampTZ:
 		return time.Time(val), nil
 	case string:
 		return time.Parse(time.RFC3339, val)
@@ -282,7 +282,7 @@ func getBytes(col any) ([]byte, error) {
 // database/sql must not convert first.
 func ownValue(v any) bool {
 	switch v.(type) {
-	case oraTypes.TimeStampTZ, *oraTypes.TimeStampTZ:
+	case oraTypes.TimestampTZ, *oraTypes.TimestampTZ:
 		return true
 	}
 	_, ok := oraTypes.OwnNull(v)

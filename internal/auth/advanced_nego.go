@@ -7,20 +7,20 @@ import (
 	"net"
 
 	"github.com/xo/oracle/internal/auth/security"
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/trace"
 )
 
 const version = uint32(0x17000000)
 
-// KerberosAuthInterface is an alias for configurations.KerberosAuthInterface, maintained for backwards compatibility.
-type KerberosAuthInterface = configurations.KerberosAuthInterface
+// KerberosAuthenticator is an alias for config.KerberosAuthenticator, maintained for backwards compatibility.
+type KerberosAuthenticator = config.KerberosAuthenticator
 
-var kerberosAuth KerberosAuthInterface = nil
+var kerberosAuth KerberosAuthenticator = nil
 
 // SetKerberosAuth Set Kerberos5 Authentication interface used for kerberos authentication
-func SetKerberosAuth(input KerberosAuthInterface) {
+func SetKerberosAuth(input KerberosAuthenticator) {
 	kerberosAuth = input
 }
 
@@ -29,8 +29,8 @@ type AdvNego struct {
 	authKerberos bool
 	authNTS      bool
 	comm         *AdvancedNegoComm
-	clientInfo   *configurations.ClientInfo
-	negoInfo     *configurations.AdvNegoServiceInfo
+	clientInfo   *config.ClientInfo
+	negoInfo     *config.AdvNegoServiceInfo
 	tracer       trace.Tracer
 	serviceList  []AdvNegoService
 	sessionKey   []byte
@@ -41,7 +41,7 @@ type AdvNego struct {
 	keyFolding   bool
 }
 
-func NewAdvNego(session *tns.Session, tracer trace.Tracer, config *configurations.ConnectionConfig) (*AdvNego, error) {
+func NewAdvNego(session *tns.Session, tracer trace.Tracer, config *config.ConnectionConfig) (*AdvNego, error) {
 	output := &AdvNego{
 		version:     version,
 		comm:        &AdvancedNegoComm{session: session},
@@ -316,7 +316,7 @@ func (nego *AdvNego) IsNewVersion(serviceType int) bool {
 	return isNew(nego.version)
 }
 
-func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthInterface, authServ *authService) error {
+func (nego *AdvNego) kerberosHandshake(kerberos KerberosAuthenticator, authServ *authService) error {
 	_, _, count, err := nego.readHeader()
 	if err != nil {
 		return err
@@ -488,7 +488,7 @@ func (nego *AdvNego) SetKeyFolding(key []byte, isExternalAuth, isSys bool) error
 	for i := 0; i < length; i++ {
 		nego.sessionKey[i] ^= key[i]
 	}
-	if nego.IsNewVersion(ENCRYPTION_SERVICE_ID) || nego.IsNewVersion(DATA_INTEGRITY_SERVICE_ID) {
+	if nego.IsNewVersion(EncryptionServiceID) || nego.IsNewVersion(DataIntegrityServiceID) {
 		length = min(len(key), len(nego.iv))
 		for i := 0; i < length; i++ {
 			nego.iv[i] ^= key[i]

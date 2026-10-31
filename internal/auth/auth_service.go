@@ -3,7 +3,7 @@ package auth
 import (
 	"errors"
 
-	"github.com/xo/oracle/internal/configurations"
+	"github.com/xo/oracle/internal/config"
 )
 
 type authService struct {
@@ -13,7 +13,7 @@ type authService struct {
 	active      bool
 }
 
-func newAuthService(ano *AdvNego, negoInfo *configurations.AdvNegoServiceInfo) (*authService, error) {
+func newAuthService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo) (*authService, error) {
 	output := &authService{
 		ano:         ano,
 		serviceType: 1,

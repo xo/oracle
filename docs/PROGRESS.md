@@ -46,9 +46,11 @@ hold 'abc', which also made the logon NLS query fail on 11g. That is fixed,
 which was sijms/go-ora#703. The tests pass on 11g and 26ai, and `TestIssues`
 on 26ai gives the same 42 passes and 3 failures.
 
-The `sql.Null` work is done (`ff69666`). The cleanup of step 11 is under way
-and staged: the code that was commented out, `internal/utils`,
-`internal/lazyinit`, the copy machinery and the `Ty` variables are gone.
-`DESIGN.md`, under Where the cleanup stands, lists it. The tests pass, and
-`TestIssues` on 26ai gives the same 42 passes and 3 failures. The renames, the
-interfaces and the move of `TestIssues` are next.
+The `sql.Null` work is done (`ff69666`), and the first part of the cleanup of
+step 11 is done (`d993e1c`). The renames are done and staged: no declared name
+has an underscore, the `I` and `Interface` names are gone, `Json` is `JSON`,
+`TimeStamp` is `Timestamp`, `internal/configurations` is `internal/config`, and
+`TestIssues` is `integration`. `DESIGN.md`, under Where the cleanup stands,
+lists what is left: the `Get` prefixes and the interfaces with one
+implementation. The tests pass, and `integration` on 26ai gives the same 42
+passes and 3 failures.

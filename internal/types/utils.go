@@ -10,8 +10,8 @@ const (
 	MaxLenBFloat      int64 = 0x4
 	MaxLenBDouble     int64 = 0x8
 	MaxLenDate        int64 = 0x7
-	MaxLenTimeStamp   int64 = 0xB
-	MaxLenTimeStampTZ int64 = 0xD
+	MaxLenTimestamp   int64 = 0xB
+	MaxLenTimestampTZ int64 = 0xD
 	MaxLenIntervalYM  int64 = 0x5
 	MaxLenIntervalDS  int64 = 0xB
 	MaxLenBFile       int64 = 4000

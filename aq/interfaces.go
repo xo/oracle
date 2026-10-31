@@ -10,7 +10,7 @@ import (
 )
 
 type (
-	IConnection interface {
+	Conn interface {
 		converters.StringCoder
 		GetSession() tns.SessionReadWriter
 		NewLobStreamer() types.LobStreamer

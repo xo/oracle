@@ -124,7 +124,7 @@ func TestNullArguments(t *testing.T) {
 		{sql.Null[time.Duration]{}, "INTERVAL DAY TO SECOND", "<nil> <nil>"},
 		{sql.Null[oracle.IntervalYM]{V: oracle.IntervalYM{Years: 1, Months: 2}, Valid: true}, "INTERVAL YEAR TO MONTH", "types.IntervalYM +01-02"},
 		{sql.Null[oracle.IntervalYM]{}, "INTERVAL YEAR TO MONTH", "<nil> <nil>"},
-		{sql.Null[oracle.TimeStampTZ]{}, "TIMESTAMP WITH TIME ZONE", "<nil> <nil>"},
+		{sql.Null[oracle.TimestampTZ]{}, "TIMESTAMP WITH TIME ZONE", "<nil> <nil>"},
 	}
 	for _, test := range tests {
 		var v any
@@ -138,16 +138,16 @@ func TestNullArguments(t *testing.T) {
 	}
 }
 
-// TestTimeStampTZBindsWithZone checks that a TimeStampTZ, and a valid
+// TestTimestampTZBindsWithZone checks that a TimestampTZ, and a valid
 // sql.Null of one, bind as TIMESTAMP WITH TIME ZONE, which DUMP shows as the
 // type 181, and keep the zone.
-func TestTimeStampTZBindsWithZone(t *testing.T) {
+func TestTimestampTZBindsWithZone(t *testing.T) {
 	db := openLive(t)
 	ctx := t.Context()
 	ts := time.Date(2024, 1, 2, 3, 4, 5, 0, time.FixedZone("", 7*60*60))
 	for _, arg := range []any{
-		oracle.TimeStampTZ(ts),
-		sql.Null[oracle.TimeStampTZ]{V: oracle.TimeStampTZ(ts), Valid: true},
+		oracle.TimestampTZ(ts),
+		sql.Null[oracle.TimestampTZ]{V: oracle.TimestampTZ(ts), Valid: true},
 	} {
 		var dump string
 		if err := db.QueryRowContext(ctx, "SELECT DUMP(:1) FROM dual", arg).Scan(&dump); err != nil {

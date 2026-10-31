@@ -32,7 +32,7 @@ type DataSet struct {
 	//currentRow      Row
 
 	//index           int
-	//parent          StmtInterface
+	//parent          parentStmt
 }
 
 func (dataSet *DataSet) currentResultSet() *ResultSet {
@@ -66,9 +66,9 @@ func (dataSet *DataSet) Close() error {
 	return nil
 }
 
-// Next_ act like Next in sql package return false if no other rows in dataset
-func (dataSet *DataSet) Next_() bool {
-	return dataSet.currentResultSet().Next_()
+// Advance act like Next in sql package return false if no other rows in dataset
+func (dataSet *DataSet) Advance() bool {
+	return dataSet.currentResultSet().Advance()
 }
 
 // Scan act like scan in sql package return row values to dest variable pointers

@@ -26,7 +26,7 @@ const (
 //	return ret
 //}
 //
-//func EncodeTimeStamp(ti time.Time, withTZ, sendAsLocalTime bool) []byte {
+//func EncodeTimestamp(ti time.Time, withTZ, sendAsLocalTime bool) []byte {
 //	value := ti
 //	if !sendAsLocalTime {
 //		value = ti.UTC()

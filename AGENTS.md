@@ -77,7 +77,7 @@ yourself and do not write it as though it were settled.
   back with no server. `testdata/exchanges/<release>/` holds the recordings,
   and `exchange_test.go` the scenarios. `docs/DESIGN.md`, under Testing, says
   how to record them again (D15).
-- `TestIssues` and `module_test` are the upstream integration tests. They need
+- `integration` and `module_test` are the upstream integration tests. They need
   a live database.
 
 ## Go conventions
