@@ -163,6 +163,33 @@ A decimal scans into a `*string`, a `*float64` or an `*int64` too. Both
 interval types bind as arguments. `docs/DESIGN.md`, under Values, holds the
 whole table.
 
+### Reading a LOB in pieces
+
+A CLOB scans into a `*string` and a BLOB into a `*[]byte`, which hold the
+whole value. To read a large value in pieces, fetch it as a locator with
+`lob_fetch=stream`, scan it into an `oracle.Clob` or an `oracle.Blob`, and
+read it with `NewReader`:
+
+```go
+rows, err := db.QueryContext(ctx, `SELECT doc FROM files`, oracle.WithLobFetch(oracle.LobFetchStream))
+// ...
+for rows.Next() {
+	var doc oracle.Clob
+	if err := rows.Scan(&doc); err != nil {
+		return err
+	}
+	if _, err := io.Copy(w, doc.NewReader(ctx)); err != nil {
+		return err
+	}
+}
+```
+
+Each piece is one round trip of 1 MiB, and `NewReaderSize` sets another
+size. A CLOB reads as UTF-8. Each read watches `ctx`. A LOB of a row reads
+until its rows close, and a read after that fails with
+`oracle.ErrRowsClosed`, because the connection of the rows can serve another
+caller by then. An `oracle.BFile` reads the same way once it is open.
+
 ## New Types
 
 ### VECTOR (Oracle 23ai)

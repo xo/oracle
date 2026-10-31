@@ -53,18 +53,11 @@ Step 1 also deleted the unit tests of functions that `v3` removed:
 that it tested. The vectors of `converters/other_types_test.go` moved to
 `internal/types/vectors_test.go`.
 
-### Take four upstream features
+### Delete the NLS query of a logon
 
-Build the requests of D21, each with a test. Step 9 built the key
-`skip_nls` (sijms/go-ora#611). The query that it skips reads settings that
-nothing uses, so delete it outright when the exchanges of every release can
-be recorded again, 19c among them. Step 9 also made a failed handshake try
-the next address (#619 and #707), and found the logon with an OCI IAM token
-(#530) in the code already, as `auth=token`, with no release to test it.
-Step 9 bounded the memory of a fetch of rows with LOB values (#664). Left:
-a reader of one LOB in pieces (#681 and #559), which needs a design that Ken
-agrees to first: the API, the size of a piece, and how long a locator stays
-valid once its rows are closed.
+`skip_nls` (sijms/go-ora#611) skips a query of the NLS settings that nothing
+reads. Delete the query outright when the exchanges of every release can be
+recorded again, 19c among them.
 
 ### Write four upstream pull requests again
 

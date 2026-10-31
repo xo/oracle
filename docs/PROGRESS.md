@@ -98,9 +98,12 @@ batch is NULL (#721), and a failed handshake tries the next address (#619,
 The ninth part of step 9 is done (`3ef13ad`, pushed). It builds the options
 of one statement of dbimp D109.
 
-The tenth part of step 9 is staged. A fetch of rows with LOB values holds
-the values of about 4 MiB, and `Next` loads a LOB one row at a time (#664).
-AES takes a zero IV on a server before 12c, where the driver panicked with
-encryption required (#729). dbmeta added `oracle-nne-26ai`, a server that
-requires encryption and checksums, and CI leaves it out. Left: a reader of
-one LOB in pieces (#681 and #559), which waits for Ken to agree to a design.
+The tenth part of step 9 is done (`284844c`, pushed). A fetch of rows with
+LOB values holds the values of about 4 MiB (#664), and AES takes a zero IV
+on a server before 12c (#729).
+
+The eleventh part of step 9 is staged. `Clob`, `Blob` and `BFile` have
+`NewReader(ctx)`, which reads a LOB in pieces of 1 MiB (#681 and #559, D22).
+`ScanColumn` gives the locator to an `oracle.Clob` or an `oracle.Blob`, and
+loads the value for any other destination. A read after the rows close
+fails with `ErrRowsClosed`. With this, D21 is done.

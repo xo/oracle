@@ -51,6 +51,15 @@ type Blob = types.Blob
 // BFile is a BFILE, a file that the server reads from an Oracle directory.
 type BFile = types.BFile
 
+// LobReader reads the value of a Clob, a Blob or a BFile in pieces, through
+// their NewReader. A LOB of a row reads until its rows close, and a read
+// after that fails with ErrRowsClosed (D22).
+type LobReader = types.LobReader
+
+// DefaultPieceSize is the size in bytes of the piece that a LobReader asks
+// the server for, unless NewReaderSize sets another.
+const DefaultPieceSize = types.DefaultPieceSize
+
 // Vector is a VECTOR of Oracle 23ai and later.
 type Vector = types.Vector
 

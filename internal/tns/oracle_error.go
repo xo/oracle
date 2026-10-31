@@ -26,6 +26,9 @@ const ErrNotSupported Error = "not supported"
 // ErrInvalidValue is a value that the driver cannot use.
 const ErrInvalidValue Error = "invalid value"
 
+// ErrRowsClosed is a read of a LOB of a row after its rows closed (D22).
+const ErrRowsClosed Error = "the rows of the LOB are closed"
+
 // authCodes are the codes of the errors that refuse a credential.
 var authCodes = []int{
 	1005,  // null password given

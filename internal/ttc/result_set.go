@@ -24,9 +24,11 @@ type ResultSet struct {
 	cols            *[]ParameterInfo
 	rows            []Row
 	currentRow      Row
-	index           int
-	parent          parentStmt
-	lastErr         error
+	// lazyLobs is true when ScanColumn loads the CLOBs and BLOBs of a row
+	lazyLobs bool
+	index    int
+	parent   parentStmt
+	lastErr  error
 }
 
 func (resultSet *ResultSet) load(session *tns.Session) error {
@@ -302,7 +304,7 @@ func (resultSet *ResultSet) Next(dest []driver.Value) error {
 
 	if noOfRowsToFetch > 0 && resultSet.index%noOfRowsToFetch < len(resultSet.rows) {
 		row := resultSet.rows[resultSet.index%noOfRowsToFetch]
-		if err := resultSet.parent.decodeRow(row); err != nil {
+		if err := resultSet.parent.decodeRow(row, resultSet.lazyLobs); err != nil {
 			return err
 		}
 		length := min(len(dest), len(row))

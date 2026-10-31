@@ -1,10 +1,12 @@
 package oracle_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -419,6 +421,70 @@ func TestNetworkEncryption(t *testing.T) {
 	if err := rows.Err(); err != nil || n != 100 {
 		t.Errorf("read %d rows, %v", n, err)
 	}
+}
+
+// TestLobReader is sijms/go-ora#681 and sijms/go-ora#559: a caller could
+// read a LOB only whole. NewReader reads it in pieces, a CLOB as UTF-8 with
+// pieces that split a surrogate pair, and a read after the rows close fails
+// (D22).
+func TestLobReader(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	createTable(t, db, "xo_oracle_lob_reader", "c CLOB, b BLOB")
+	text := strings.Repeat("a😀한", 5000)
+	data := make([]byte, 300_000)
+	for i := range data {
+		data[i] = byte(i * 7)
+	}
+	clob, err := oracle.CreateClob(ctx, db, text, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob, err := oracle.CreateBlob(ctx, db, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO xo_oracle_lob_reader VALUES (:1, :2)", clob, blob); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []oracle.LobFetch{oracle.LobFetchStream, oracle.LobFetchInline} {
+		rows, err := db.QueryContext(ctx, "SELECT c, b FROM xo_oracle_lob_reader", oracle.WithLobFetch(mode))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !rows.Next() {
+			t.Fatalf("%s: no row, %v", mode, rows.Err())
+		}
+		var c oracle.Clob
+		var b oracle.Blob
+		if err := rows.Scan(&c, &b); err != nil {
+			t.Fatalf("%s: %v", mode, err)
+		}
+		// 7 bytes is 3 characters of UTF-16, so pieces split the pairs
+		for _, size := range []int{7, 4096, oracle.DefaultPieceSize} {
+			got, err := io.ReadAll(c.NewReaderSize(ctx, size))
+			if err != nil || string(got) != text {
+				t.Errorf("%s: CLOB in pieces of %d: %d bytes of %d, %v", mode, size, len(got), len(text), err)
+			}
+			got, err = io.ReadAll(b.NewReaderSize(ctx, size*10))
+			if err != nil || !bytes.Equal(got, data) {
+				t.Errorf("%s: BLOB in pieces of %d: %d bytes of %d, %v", mode, size*10, len(got), len(data), err)
+			}
+		}
+		cancelled, cancel := context.WithCancel(ctx)
+		cancel()
+		if _, err := c.NewReader(cancelled).Read(make([]byte, 10)); mode == oracle.LobFetchStream && !errors.Is(err, context.Canceled) {
+			t.Errorf("%s: a cancelled read: %v", mode, err)
+		}
+		if err := rows.Close(); err != nil {
+			t.Fatal(err)
+		}
+		_, err = b.NewReader(ctx).Read(make([]byte, 10))
+		if mode == oracle.LobFetchStream && !errors.Is(err, oracle.ErrRowsClosed) {
+			t.Errorf("%s: a read after Close: %v, want ErrRowsClosed", mode, err)
+		}
+	}
+	usable(t, db)
 }
 
 // TestSkipNLS is sijms/go-ora#611: a logon ran a query of the NLS settings

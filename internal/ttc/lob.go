@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/config"
+	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
 )
 
@@ -28,6 +30,21 @@ type LobStream struct {
 	bNullO2U      bool
 	isNull        bool
 	sendSize      bool
+	// closed is true once the rows of the LOB closed. It is nil for a LOB
+	// that is not of a row.
+	closed *atomic.Bool
+}
+
+// usable returns an error when the LOB has no locator, or when its rows
+// closed, after which the connection can serve another caller (D22).
+func (lob *LobStream) usable() error {
+	if lob.sourceLocator == nil {
+		return errEmptyLocator
+	}
+	if lob.closed != nil && lob.closed.Load() {
+		return tns.ErrRowsClosed
+	}
+	return nil
 }
 
 func (lob *LobStream) initialize() {
@@ -58,8 +75,8 @@ func (lob *LobStream) StringCoder() charset.StringCoder {
 
 // getSize return lob size
 func (lob *LobStream) Size() (size int64, err error) {
-	if lob.sourceLocator == nil {
-		return 0, errEmptyLocator
+	if err := lob.usable(); err != nil {
+		return 0, err
 	}
 	lob.initialize()
 	lob.sendSize = true
@@ -82,8 +99,8 @@ func (lob *LobStream) Size() (size int64, err error) {
 }
 
 func (lob *LobStream) Read(offset, count int64) (data []byte, err error) {
-	if lob.sourceLocator == nil {
-		return nil, errEmptyLocator
+	if err := lob.usable(); err != nil {
+		return nil, err
 	}
 	if offset == 0 && count == 0 {
 		lob.conn.logger.Debug("read LOB data")
@@ -130,8 +147,8 @@ func (lob *LobStream) Write(data []byte) error {
 }
 
 func (lob *LobStream) Exists() (bool, error) {
-	if lob.sourceLocator == nil {
-		return false, errEmptyLocator
+	if err := lob.usable(); err != nil {
+		return false, err
 	}
 	lob.initialize()
 	lob.bNullO2U = true
@@ -219,8 +236,8 @@ func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (types.
 }
 
 func (lob *LobStream) Open(mode, opID int) error {
-	if lob.sourceLocator == nil {
-		return errEmptyLocator
+	if err := lob.usable(); err != nil {
+		return err
 	}
 	lob.conn.logger.Debug("open LOB", "mode", mode, "operation", opID)
 	if lob.sourceLocator.IsTemporary() {
@@ -247,8 +264,8 @@ func (lob *LobStream) Open(mode, opID int) error {
 }
 
 func (lob *LobStream) Close(opID int) error {
-	if lob.sourceLocator == nil {
-		return errEmptyLocator
+	if err := lob.usable(); err != nil {
+		return err
 	}
 	lob.conn.logger.Debug("close LOB")
 	lob.initialize()

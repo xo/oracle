@@ -214,6 +214,12 @@ nothing, so one call never has two watches. `CreateBlob`, `CreateClob` and
 
 `Next` loads the LOB values of a row as it returns the row, and not of every
 row of a fetch, so the driver holds the values of one row (sijms/go-ora#664).
+Under `database/sql`, which scans through `ScanColumn`, a CLOB or a BLOB is
+loaded there instead, and only for a destination that is not an
+`oracle.Clob` or an `oracle.Blob`. That destination gets the locator, which
+`NewReader` reads in pieces (D22). A locator of a row holds the closed flag
+of its `DataSet`, and each operation of its `LobStream` fails with
+`ErrRowsClosed` once the flag is set.
 A fetch that brings LOB or LONG values inside it, as `lob_fetch=inline`
 does, asks for one row first. Each later fetch asks for the rows that fill
 4 MiB with values the size of the last ones. A prefetch that the caller sets

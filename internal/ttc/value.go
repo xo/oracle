@@ -13,6 +13,7 @@ import (
 
 	"github.com/cockroachdb/apd/v3"
 
+	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/types"
 )
 
@@ -71,6 +72,7 @@ func (dataSet *DataSet) NextRow() error {
 	}
 	dataSet.row = dataSet.row[:n]
 	clear(dataSet.row)
+	dataSet.currentResultSet().lazyLobs = true
 	err := dataSet.Next(dataSet.row)
 	if err == io.EOF {
 		return io.EOF
@@ -84,7 +86,62 @@ func (dataSet *DataSet) ScanColumn(scanCtx driver.ScanContext, index int, dest a
 	if index < 0 || index >= len(dataSet.row) {
 		return fmt.Errorf("scanning column %d of a row of %d columns: %w", index, len(dataSet.row), io.ErrUnexpectedEOF)
 	}
-	return assign(scanCtx, dest, dataSet.row[index])
+	src, err := dataSet.lobValue(index, dest)
+	if err != nil {
+		return err
+	}
+	return assign(scanCtx, dest, src)
+}
+
+// rowLob is a LOB of a row that ScanColumn can load.
+type rowLob interface {
+	Streamer() types.LobStreamer
+	ReadMode() config.LobReadMode
+	Load() error
+	Value() (any, error)
+}
+
+// lobValue returns the value of column index for dest. A CLOB or a BLOB that
+// dest takes as a LOB stays a locator, which reads until the rows close
+// (D22). For another dest, it loads the value, as the read mode auto asks,
+// and keeps it in the row for a second Scan.
+func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
+	var lob rowLob
+	switch v := dataSet.row[index].(type) {
+	case *types.Clob:
+		lob = v
+	case *types.Blob:
+		lob = v
+	case *types.BFile:
+		dataSet.own(v.Streamer())
+		return v, nil
+	default:
+		return v, nil
+	}
+	dataSet.own(lob.Streamer())
+	switch dest.(type) {
+	case *types.Clob, *types.Blob:
+		return lob, nil
+	}
+	if lob.ReadMode() != config.LobReadModeAuto {
+		return lob, nil
+	}
+	if err := lob.Load(); err != nil {
+		return nil, err
+	}
+	v, err := lob.Value()
+	if err != nil {
+		return nil, err
+	}
+	dataSet.row[index] = v
+	return v, nil
+}
+
+// own makes the LOB of stream read only until the rows close (D22).
+func (dataSet *DataSet) own(stream types.LobStreamer) {
+	if s, ok := stream.(*LobStream); ok {
+		s.closed = &dataSet.closed
+	}
 }
 
 // assign stores src in dest. A *any receives the value as it is, and an

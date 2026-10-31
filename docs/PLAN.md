@@ -30,6 +30,7 @@ conclusion.
 | [D19](#d19-the-driver-reads-dbms_output) | Decided |
 | [D20](#d20-the-driver-reads-tnsnamesora-with-a-parser-of-its-own) | Decided |
 | [D21](#d21-four-upstream-features-are-taken) | Decided |
+| [D22](#d22-a-lob-is-read-in-pieces-until-its-rows-close) | Decided |
 
 ## Purpose
 
@@ -283,6 +284,22 @@ to skip the NLS query at connect (#611), a logon with an OCI IAM token
 another address (#707 and #619). He also asked that the refusal of a server
 that requires native network encryption (#729) be reproduced and fixed. The
 other features stay open.
+
+## D22. A LOB is read in pieces until its rows close
+
+Status: Decided.
+
+Ken decided on 2026-10-31 how a caller reads one LOB in pieces, for
+sijms/go-ora#681 and sijms/go-ora#559 (D21). `Blob`, `Clob` and `BFile` have
+`NewReader(ctx)`, which returns an `io.Reader`. Each read of the server
+watches `ctx`. A CLOB reader returns UTF-8. A reader asks for pieces of
+1 MiB, and `NewReaderSize` sets another size.
+
+A LOB of a row can be read until its rows close. A read after that fails
+with an error. A LOB reads through the connection of its rows, and after
+`rows.Close` `database/sql` can give that connection to another goroutine,
+so a later read would race with it. The `Clob.Read` of `go-ora` had that
+race.
 
 ## Open questions for Ken
 

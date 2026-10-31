@@ -33,7 +33,7 @@ type parentStmt interface {
 	hasMoreRows() bool
 	noOfRowsToFetch() int
 	fetch(resultSet *ResultSet) error
-	decodeRow(row Row) error
+	decodeRow(row Row, lazy bool) error
 	hasBLOB() bool
 	hasLONG() bool
 	read(resultSet *ResultSet) error
@@ -1827,8 +1827,9 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 // values that it returns, such as a LOB locator into its value. Next calls
 // it on each row as it returns the row, and not on each fetch, so that the
 // driver holds the loaded LOB values of one row and not of a whole fetch,
-// sijms/go-ora#664.
-func (stmt *defaultStmt) decodeRow(row Row) error {
+// sijms/go-ora#664. When lazy is true, it leaves a CLOB and a BLOB to
+// ScanColumn, which loads one only for a destination that is not a LOB.
+func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 	var err error
 	for colIndex := range stmt.columns {
 		if colIndex >= len(row) {
@@ -1874,7 +1875,7 @@ func (stmt *defaultStmt) decodeRow(row Row) error {
 				return err
 			}
 		case *types.Clob:
-			if val.ReadMode() == config.LobReadModeAuto {
+			if !lazy && val.ReadMode() == config.LobReadModeAuto {
 				if err = val.Load(); err != nil {
 					return err
 				}
@@ -1884,7 +1885,7 @@ func (stmt *defaultStmt) decodeRow(row Row) error {
 				}
 			}
 		case *types.Blob:
-			if val.ReadMode() == config.LobReadModeAuto {
+			if !lazy && val.ReadMode() == config.LobReadModeAuto {
 				if err = val.Load(); err != nil {
 					return err
 				}

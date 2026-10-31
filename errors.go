@@ -19,6 +19,9 @@ const (
 	// ErrNotSupported is a feature that the driver or the server does not
 	// have.
 	ErrNotSupported = tns.ErrNotSupported
+	// ErrRowsClosed is a read of a LOB of a row after its rows closed. The
+	// connection of the rows can serve another caller by then.
+	ErrRowsClosed = tns.ErrRowsClosed
 	// ErrConnectorClosed is a Connect after Close.
 	ErrConnectorClosed Error = "the connector is closed"
 	// ErrAuthentication is a server that refused the credential. A

@@ -81,8 +81,11 @@ and so asked for up to 65,537 rows and held every value at once. 300 rows
 of 1 MB CLOBs held 300 MB. A fetch with LOB values inside it is sized by
 the size of the values now, and a LOB fetched as a locator is loaded one
 row at a time, in `Next`. The same rows hold 5 MB inline and 7 MB
-streamed, and `TestLobRows` holds it. A reader of one LOB in pieces (#681
-and #559) waits for Ken. Ken decided to take #611, #530, #681, #559, #664,
+streamed, and `TestLobRows` holds it. `Clob`, `Blob` and `BFile` have
+`NewReader(ctx)`, which reads one LOB in pieces of 1 MiB (#681 and #559,
+D22). A read after the rows close fails with `ErrRowsClosed`, where
+`Clob.Read` raced with the next user of the connection. `TestLobReader`
+holds it, on 11g, 18c and 26ai. Ken decided to take #611, #530, #681, #559, #664,
 #707 and #619 (D21). The rest wait for Ken.
 
 sijms/go-ora#649 asks for smaller charset tables, which step 8 built. sijms/go-ora#653 (VECTOR) and sijms/go-ora#365 (Advanced Queuing) are in

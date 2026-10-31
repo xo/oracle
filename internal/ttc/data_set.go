@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"io"
 	"reflect"
+	"sync/atomic"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -20,6 +21,9 @@ type DataSet struct {
 	index      int
 	// row is the current row of NextRow, which ScanColumn reads
 	row []driver.Value
+	// closed is true once Close ran. A LOB that ScanColumn returns reads
+	// until then (D22).
+	closed atomic.Bool
 	//columnCount     int
 	//rowCount        int
 	//uACBufferLength int
@@ -52,6 +56,7 @@ func (dataSet *DataSet) Close() error {
 	if dataSet == nil {
 		return nil
 	}
+	dataSet.closed.Store(true)
 	var err error
 	for _, resultSet := range dataSet.resultSets {
 		err = resultSet.Close()
