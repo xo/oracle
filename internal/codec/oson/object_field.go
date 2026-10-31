@@ -70,14 +70,6 @@ func NewobjectField(objData map[string]any, header *header) (*objectField, error
 						return nil, err
 					}
 					field = &dateField{value: data}
-				case utils.TyNullTime:
-					data := types.Date{}
-					data.SetDataType(types.TIMESTAMPTZ)
-					err = data.SetValue(value)
-					if err != nil {
-						return nil, err
-					}
-					field = &dateField{value: data}
 				default:
 					return nil, fmt.Errorf("unsupported type: %s at key: %s", rValue.Type(), keyName)
 				}

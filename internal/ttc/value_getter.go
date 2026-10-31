@@ -18,6 +18,9 @@ func getValue(origVal driver.Value) (driver.Value, error) {
 	if origVal == nil {
 		return nil, nil
 	}
+	if v, ok := oraTypes.OwnNull(origVal); ok {
+		return v, nil
+	}
 	rOriginal := reflect.ValueOf(origVal)
 	if rOriginal.Kind() == reflect.Pointer && rOriginal.IsNil() {
 		return nil, nil
@@ -149,7 +152,7 @@ func getDate(col any) (time.Time, error) {
 		return val, nil
 	//case TimeStamp:
 	//	return time.Time(val), nil
-	case TimeStampTZ:
+	case oraTypes.TimeStampTZ:
 		return time.Time(val), nil
 	case string:
 		return time.Parse(time.RFC3339, val)
@@ -325,3 +328,14 @@ func getBytes(col any) ([]byte, error) {
 //	}
 //	return nil, nil
 //}
+
+// ownValue reports whether v is a value that the driver binds itself, which
+// database/sql must not convert first.
+func ownValue(v any) bool {
+	switch v.(type) {
+	case oraTypes.TimeStampTZ, *oraTypes.TimeStampTZ:
+		return true
+	}
+	_, ok := oraTypes.OwnNull(v)
+	return ok
+}

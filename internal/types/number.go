@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -580,6 +579,10 @@ func (number *Number) encodeString(input string) error {
 	return err
 }
 func (number *Number) SetValue(input any) error {
+	input, verr := ValueOf(input)
+	if verr != nil {
+		return verr
+	}
 	var err error
 	defer func(input *Number) {
 		if input.dataType == 0 {
@@ -616,50 +619,17 @@ func (number *Number) SetValue(input any) error {
 	//	tempValue = rValue.Float()
 	//	//return number.encodeFloat()
 	//}
-	switch rType {
-	case TyInt, TyInt8, TyInt16, TyInt32, TyInt64:
+	// by the kind, so that a named type such as type ID int64 binds too,
+	// which was sijms/go-ora#699
+	switch rValue.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		tempValue = rValue.Int()
-	case TyUint, TyUint8, TyUint16, TyUint32, TyUint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		tempValue = rValue.Uint()
-	case TyFloat32, TyFloat64:
+	case reflect.Float32, reflect.Float64:
 		tempValue = rValue.Float()
-	case TyString:
+	case reflect.String:
 		tempValue = rValue.String()
-	case TyNullByte:
-		temp := input.(sql.NullByte)
-		if !temp.Valid {
-			number.bValue = nil
-			return nil
-		}
-		tempValue = int64(temp.Byte)
-	case TyNullInt16:
-		temp := input.(sql.NullInt16)
-		if !temp.Valid {
-			number.bValue = nil
-			return nil
-		}
-		tempValue = int64(temp.Int16)
-	case TyNullInt32:
-		temp := input.(sql.NullInt32)
-		if !temp.Valid {
-			number.bValue = nil
-			return nil
-		}
-		tempValue = int64(temp.Int32)
-	case TyNullInt64:
-		temp := input.(sql.NullInt64)
-		if !temp.Valid {
-			number.bValue = nil
-			return nil
-		}
-		tempValue = temp.Int64
-	case TyNullFloat64:
-		temp := input.(sql.NullFloat64)
-		if !temp.Valid {
-			number.bValue = nil
-			return nil
-		}
-		tempValue = temp.Float64
 	default:
 		return fmt.Errorf("conversion of unsupported type %T to number", input)
 	}
@@ -818,6 +788,9 @@ func (number *Number) Scan(value any) error {
 }
 
 func (number *Number) CopyTo(dest any) error {
+	if ok, err := ScanExternal(dest, number.Value); ok {
+		return err
+	}
 	destValue := reflect.ValueOf(dest)
 	if destValue.Kind() != reflect.Pointer {
 		return errors.New("dest must be a pointer")
@@ -908,30 +881,6 @@ func (number *Number) CopyTo(dest any) error {
 			return err
 		}
 		*dst = v
-	case *sql.NullString:
-		dst.String = strVal
-		dst.Valid = true
-	case *sql.NullByte:
-		v, err := strconv.ParseUint(strVal, 10, 8)
-		if err != nil {
-			return err
-		}
-		dst.Valid = true
-		dst.Byte = uint8(v)
-	case *sql.NullInt64:
-		v, err := strconv.ParseInt(strVal, 10, 64)
-		if err != nil {
-			return err
-		}
-		dst.Int64 = v
-		dst.Valid = true
-	case *sql.NullFloat64:
-		v, err := strconv.ParseFloat(strVal, 64)
-		if err != nil {
-			return err
-		}
-		dst.Float64 = v
-		dst.Valid = true
 	case *Number:
 		*dst = *number
 	default:

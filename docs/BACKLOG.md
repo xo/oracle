@@ -42,31 +42,18 @@ Move each to the `Connector` or to the connection.
 reconnects after a bad connection. The driver logs nothing (D14). Send it to
 `Config.Logger`, or return the error.
 
+### Find the statement that answers ORA-01403 at logon
+
+Every release answers a statement at logon with `ORA-01403: no data found`,
+which nothing checks. The recorded exchanges show it. Find which statement it
+is, and return the error or stop running the statement (D14).
+sijms/go-ora#611 asks for an option to skip the NLS query.
+
 ### Finish the values of dates
 
 `TestTime` in `TestIssues` fails on 26ai: a timestamp comes back in UTC and
 without its fraction of a second. The table in `DESIGN.md`, under Values,
 says what each date type returns. Fix it with a test in `values_test.go`.
-
-### Size the OUT parameters again
-
-`ParameterInfo.encodeValue` in `internal/ttc/parameter_encode.go` ended in a block after its
-`return nil`, so it never ran. The block set `MaxCharLen` and `MaxLen` of an
-`NCHAR` or `RAW` OUT parameter from its size, and cleared `BValue` of every
-OUT parameter. Step 1 deleted it as dead code, which changed nothing. An OUT
-string with no size breaking the connection, sijms/go-ora#703, can be the
-fault that this block was written for. Look at it with that issue.
-
-### Read the NLS settings on 11g
-
-The recorded exchanges show that `GetNLS`, which runs at every logon, fails on
-11g with `ORA-06502: PL/SQL: numeric or value error: character string buffer
-too small`. `OpenWithContext` traces the error and goes on, so a connection to
-11g has no NLS settings, and the server sends two marker packets that the
-driver answers. Every release also answers a statement at logon with
-`ORA-01403: no data found`, which nothing checks. Find which statement it is.
-A design that logs nothing (D14) has to return such an error or not run the
-statement. sijms/go-ora#611 asks for an option to skip the NLS query.
 
 ### Write the integration tests again
 

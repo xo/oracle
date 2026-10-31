@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/converters"
 	oraTypes "github.com/xo/oracle/internal/types"
 )
 
@@ -639,7 +640,7 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	var err error
 	par.MaxLen = size
 	if par.Value == nil {
-		par.Value = sql.NullString{}
+		par.Value = sql.Null[string]{}
 	}
 	tempType := getType(par.Value)
 	tempValue, err := getValue(par.Value)
@@ -666,6 +667,11 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 				if err != nil {
 					connection.tracer.Printf("Error get parameter encoder for type %v: %v", reflect.TypeOf(tempValue), err)
 				}
+			}
+			if par.encoder == nil && tempValue == nil {
+				// a NULL of a type with no coder, such as an invalid
+				// sql.Null[T] of an uncommon T, binds as a NULL VARCHAR2
+				par.encoder, err = connection.GetParameterCoder(oraTypes.TyString)
 			}
 			if par.encoder == nil {
 				if tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice {
@@ -707,6 +713,21 @@ func (par *ParameterInfo) encodeValue(size int64, connection *Connection) error 
 	par.UpdateParameterInfo(par.encoder.GetParameterInfo())
 	if par.MaxLen < size {
 		par.MaxLen = size
+	}
+	if par.Direction != Input && par.DataType == oraTypes.NCHAR {
+		// the size of an OUT string is in characters, and the server sizes
+		// its buffer from the length in bytes divided by the bytes of a
+		// character, so the length must be that many bytes for each
+		// character. go-ora left this unreachable, and a string OUT of size
+		// 10 could not hold 'abc' on AL32UTF8, which was sijms/go-ora#703.
+		if par.MaxCharLen < size {
+			par.MaxCharLen = size
+		}
+		conv, err := connection.GetStringCoder(par.CharsetID, par.CharsetForm)
+		if err != nil {
+			return err
+		}
+		par.MaxLen = par.MaxCharLen * int64(converters.MaxBytePerChar(conv.GetLangID()))
 	}
 
 	//else {

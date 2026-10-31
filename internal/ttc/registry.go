@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/codec/oson"
@@ -88,7 +89,6 @@ func (driver *Registry) init() {
 	driver.oracleTypeCoder[types.REFCURSOR] = &codec.CursorParameter{}
 
 	driver.goTypeCoder[types.TyString] = &codec.StringParameter{}
-	driver.goTypeCoder[types.TyNullString] = &codec.StringParameter{}
 	driver.goTypeCoder[types.TyVarchar] = &codec.StringParameter{}
 
 	driver.goTypeCoder[types.TyBytes] = &codec.RawParameter{}
@@ -106,19 +106,36 @@ func (driver *Registry) init() {
 	driver.goTypeCoder[types.TyUint64] = &codec.NumberParameter{}
 	driver.goTypeCoder[types.TyFloat32] = &codec.NumberParameter{}
 	driver.goTypeCoder[types.TyFloat64] = &codec.NumberParameter{}
-	driver.goTypeCoder[types.TyNullByte] = &codec.NumberParameter{}
-	driver.goTypeCoder[types.TyNullInt16] = &codec.NumberParameter{}
-	driver.goTypeCoder[types.TyNullInt32] = &codec.NumberParameter{}
-	driver.goTypeCoder[types.TyNullInt64] = &codec.NumberParameter{}
-	driver.goTypeCoder[types.TyNullFloat64] = &codec.NumberParameter{}
 	driver.goTypeCoder[types.TyNumber] = &codec.NumberParameter{}
 
 	driver.goTypeCoder[types.TyBoolean] = &codec.BoolParameter{}
 
 	driver.goTypeCoder[types.TyTime] = &codec.DateParameter{}
+	// the nullable types, so that a NULL binds with the type of its value,
+	// which an OUT argument needs. Any other nullable type binds as its value,
+	// and a NULL of it as a NULL VARCHAR2.
+	for _, t := range []reflect.Type{
+		reflect.TypeFor[sql.NullString](), reflect.TypeFor[sql.Null[string]](),
+	} {
+		driver.goTypeCoder[t] = &codec.StringParameter{}
+	}
+	for _, t := range []reflect.Type{
+		reflect.TypeFor[sql.NullByte](), reflect.TypeFor[sql.NullInt16](), reflect.TypeFor[sql.NullInt32](),
+		reflect.TypeFor[sql.NullInt64](), reflect.TypeFor[sql.NullFloat64](),
+		reflect.TypeFor[sql.Null[int]](), reflect.TypeFor[sql.Null[int32]](), reflect.TypeFor[sql.Null[int64]](),
+		reflect.TypeFor[sql.Null[uint64]](), reflect.TypeFor[sql.Null[float32]](), reflect.TypeFor[sql.Null[float64]](),
+	} {
+		driver.goTypeCoder[t] = &codec.NumberParameter{}
+	}
+	for _, t := range []reflect.Type{reflect.TypeFor[sql.NullTime](), reflect.TypeFor[sql.Null[time.Time]]()} {
+		driver.goTypeCoder[t] = &codec.DateParameter{}
+	}
+	driver.goTypeCoder[reflect.TypeFor[sql.Null[types.TimeStampTZ]]()] = &codec.DateParameter{BasicParameter: codec.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
+	driver.goTypeCoder[reflect.TypeFor[sql.Null[time.Duration]]()] = &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}}
+	driver.goTypeCoder[reflect.TypeFor[sql.Null[types.IntervalYM]]()] = &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}}
+	driver.goTypeCoder[types.TyTimeStampTZ] = &codec.DateParameter{BasicParameter: codec.BasicParameter{DataType: types.TimeStampTZ_DTY, MaxLen: types.MaxLenTimeStampTZ}}
 	driver.goTypeCoder[types.TyDuration] = &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.INTERVALDS_DTY, MaxLen: types.MaxLenIntervalDS}}
 	driver.goTypeCoder[types.TyIntervalYM] = &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.INTERVALYM_DTY, MaxLen: types.MaxLenIntervalYM}}
-	driver.goTypeCoder[types.TyNullTime] = &codec.DateParameter{}
 	driver.goTypeCoder[types.TyDate] = &codec.DateParameter{}
 
 	driver.goTypeCoder[types.TyInterval] = &codec.IntervalParameter{}

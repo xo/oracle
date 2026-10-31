@@ -39,11 +39,11 @@ blocks a connection, P2 is a fault with a workaround.
 | sijms/go-ora#771 | P1 | XMLType is NULL on Autonomous Database, whose flag word is 0x8014, and a value over about 254 bytes hangs | Test the flag bits, not equality. sijms/go-ora#770 does this in `v2` | Not located in `v3` yet |
 | sijms/go-ora#692 | P1 | Two databases with different `NLS_CHARACTERSET` in one process garble text | Keep the charset per connection | Open |
 | sijms/go-ora#702 | P1 | The context deadline is not kept in `PrepareContext` and `ExecContext` | Set a deadline on the network connection | Fixed in step 5, unless the reporter saw another cause. The deadline breaks a query and an exec in about one second, on 11g, 21c and 26ai |
-| sijms/go-ora#703 | P1 | `INSERT ... RETURNING` into a string through `sql.Out` with no size breaks the connection | Give a default size, or return an error that does not break the connection | Open |
+| sijms/go-ora#703 | P1 | `INSERT ... RETURNING` into a string through `sql.Out` with no size breaks the connection | Give a default size, or return an error that does not break the connection | Fixed. An OUT string gets a buffer of its size in characters. `TestNullOutArguments` holds it, and the logon NLS query of 11g no longer fails |
 | sijms/go-ora#762 | P2 | `DataSet.Close` on a nil `*DataSet` panics | Return early on a nil receiver | Open |
 | sijms/go-ora#624 | P2 | Panic, slice bounds out of range in `Session.GetInt64` | Check the length before slicing | Open |
 | sijms/go-ora#695 | P2 | Index out of range in a batch insert | Check that every parameter array has the batch length | Open |
-| sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Open |
+| sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Fixed for numbers. `Number.SetValue` reads the kind of a value, so a named integer type binds |
 | sijms/go-ora#671 | P2 | `RefCursor.Query` on a cursor the procedure never opened breaks the connection | Return an error before the round trip | Open |
 | sijms/go-ora#698 | P2 | A `MERGE` that violates a key returns a timeout and not ORA-00001 | Needs a trace | Open |
 | sijms/go-ora#729 | P2 | A server that requires native network encryption or checksums refuses the client with ORA-12269 | Implement the negotiation | Open |

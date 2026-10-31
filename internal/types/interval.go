@@ -137,6 +137,10 @@ func (interval *Interval) encodeDS(d time.Duration) {
 // SetValue sets the interval from an IntervalYM, a time.Duration or another
 // Interval.
 func (interval *Interval) SetValue(input any) error {
+	input, verr := ValueOf(input)
+	if verr != nil {
+		return verr
+	}
 	switch data := input.(type) {
 	case nil:
 		interval.bValue = nil

@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 )
@@ -12,6 +11,10 @@ type Bool struct {
 }
 
 func (bl *Bool) SetValue(input any) error {
+	input, verr := ValueOf(input)
+	if verr != nil {
+		return verr
+	}
 	if input == nil {
 		bl.bValue = nil
 		return nil
@@ -54,6 +57,9 @@ func (bl *Bool) Scan(input any) error {
 }
 
 func (bl *Bool) CopyTo(dest driver.Value) error {
+	if ok, err := ScanExternal(dest, bl.Value); ok {
+		return err
+	}
 	val, err := bl.Value()
 	if err != nil {
 		return err
@@ -66,13 +72,6 @@ func (bl *Bool) CopyTo(dest driver.Value) error {
 			*dst = val.(bool)
 		} else {
 			*dst = false
-		}
-	case *sql.NullBool:
-		if val != nil {
-			dst.Bool = val.(bool)
-			dst.Valid = true
-		} else {
-			dst.Valid = false
 		}
 	case *int:
 		if val != nil && val.(bool) {

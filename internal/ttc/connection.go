@@ -1299,7 +1299,9 @@ var insertQueryBracketsRegexp = lazyinit.NewLazyInit(func() (any, error) {
 //}
 
 func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
-	if _, ok := nv.Value.(driver.Valuer); ok {
+	// database/sql converts a driver.Valuer, such as sql.Null[T], to its
+	// value, except the few that the driver binds itself
+	if _, ok := nv.Value.(driver.Valuer); ok && !ownValue(nv.Value) {
 		return driver.ErrSkip
 	}
 

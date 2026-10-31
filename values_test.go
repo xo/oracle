@@ -3,6 +3,7 @@ package oracle_test
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,5 +103,100 @@ func TestBindIntervals(t *testing.T) {
 		t.Errorf("day to second as text: %v", err)
 	} else if text != "-000000002 03:04:05.000006000" {
 		t.Errorf("day to second as text: got %q", text)
+	}
+}
+
+// TestNullArguments binds sql.Null[T], valid and not, and reads each back.
+func TestNullArguments(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	tests := []struct {
+		arg  any
+		cast string
+		want string
+	}{
+		{sql.Null[int64]{V: 5, Valid: true}, "NUMBER(10)", "int64 5"},
+		{sql.Null[int64]{}, "NUMBER(10)", "<nil> <nil>"},
+		{sql.Null[string]{V: "x", Valid: true}, "VARCHAR2(10)", "string x"},
+		{sql.Null[string]{}, "VARCHAR2(10)", "<nil> <nil>"},
+		{sql.NullString{String: "y", Valid: true}, "VARCHAR2(10)", "string y"},
+		{sql.Null[time.Duration]{V: 90 * time.Minute, Valid: true}, "INTERVAL DAY TO SECOND", "time.Duration 1h30m0s"},
+		{sql.Null[time.Duration]{}, "INTERVAL DAY TO SECOND", "<nil> <nil>"},
+		{sql.Null[oracle.IntervalYM]{V: oracle.IntervalYM{Years: 1, Months: 2}, Valid: true}, "INTERVAL YEAR TO MONTH", "types.IntervalYM +01-02"},
+		{sql.Null[oracle.IntervalYM]{}, "INTERVAL YEAR TO MONTH", "<nil> <nil>"},
+		{sql.Null[oracle.TimeStampTZ]{}, "TIMESTAMP WITH TIME ZONE", "<nil> <nil>"},
+	}
+	for _, test := range tests {
+		var v any
+		if err := db.QueryRowContext(ctx, "SELECT CAST(:1 AS "+test.cast+") FROM dual", test.arg).Scan(&v); err != nil {
+			t.Errorf("%#v: %v", test.arg, err)
+			continue
+		}
+		if got := fmt.Sprintf("%T %v", v, v); got != test.want {
+			t.Errorf("%#v: got %s, want %s", test.arg, got, test.want)
+		}
+	}
+}
+
+// TestTimeStampTZBindsWithZone checks that a TimeStampTZ, and a valid
+// sql.Null of one, bind as TIMESTAMP WITH TIME ZONE, which DUMP shows as the
+// type 181, and keep the zone.
+func TestTimeStampTZBindsWithZone(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	ts := time.Date(2024, 1, 2, 3, 4, 5, 0, time.FixedZone("", 7*60*60))
+	for _, arg := range []any{
+		oracle.TimeStampTZ(ts),
+		sql.Null[oracle.TimeStampTZ]{V: oracle.TimeStampTZ(ts), Valid: true},
+	} {
+		var dump string
+		if err := db.QueryRowContext(ctx, "SELECT DUMP(:1) FROM dual", arg).Scan(&dump); err != nil {
+			t.Errorf("%#v: %v", arg, err)
+			continue
+		}
+		if !strings.HasPrefix(dump, "Typ=181 ") {
+			t.Errorf("%#v: bound as %s, want Typ=181", arg, dump)
+		}
+		var got time.Time
+		if err := db.QueryRowContext(ctx, "SELECT :1 FROM dual", arg).Scan(&got); err != nil {
+			t.Errorf("%#v: %v", arg, err)
+			continue
+		}
+		if !got.Equal(ts) {
+			t.Errorf("%#v: got %v, want %v", arg, got, ts)
+		}
+	}
+}
+
+// TestNullOutArguments reads OUT arguments of PL/SQL into sql.Null[T] and an
+// sql.NullString.
+func TestNullOutArguments(t *testing.T) {
+	db := openLive(t)
+	var (
+		n   sql.Null[int64]
+		nul sql.Null[int64]
+		s   sql.Null[string]
+		old sql.NullString
+		d   sql.Null[time.Time]
+	)
+	_, err := db.ExecContext(t.Context(), "BEGIN :1 := 42; :2 := NULL; :3 := 'abc'; :4 := 'def'; :5 := DATE '2024-01-02'; END;",
+		oracle.Out{Dest: &n}, oracle.Out{Dest: &nul}, oracle.Out{Dest: &s, Size: 10}, oracle.Out{Dest: &old, Size: 10}, oracle.Out{Dest: &d})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !n.Valid || n.V != 42 {
+		t.Errorf("sql.Null[int64]: got %+v", n)
+	}
+	if nul.Valid {
+		t.Errorf("sql.Null[int64] of NULL: got %+v", nul)
+	}
+	if !s.Valid || s.V != "abc" {
+		t.Errorf("sql.Null[string]: got %+v", s)
+	}
+	if !old.Valid || old.String != "def" {
+		t.Errorf("sql.NullString: got %+v", old)
+	}
+	if !d.Valid || !d.V.Equal(time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("sql.Null[time.Time]: got %+v", d)
 	}
 }

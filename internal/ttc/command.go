@@ -1401,9 +1401,9 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "varchar":
-			fieldVal := &sql.NullString{}
+			fieldVal := &sql.Null[string]{}
 			if !hasNullValue {
-				fieldVal.String, fieldVal.Valid = getString(fieldValue), true
+				fieldVal.V, fieldVal.Valid = getString(fieldValue), true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "nvarchar":
@@ -1419,9 +1419,9 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 			//}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "date":
-			fieldVal := &sql.NullTime{}
+			fieldVal := &sql.Null[time.Time]{}
 			if !hasNullValue {
-				fieldVal.Time, err = getDate(fieldValue)
+				fieldVal.V, err = getDate(fieldValue)
 				if err != nil {
 					err = typeErr
 					return
@@ -1443,7 +1443,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 		//	}
 		//	tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
 		case "timestamptz":
-			fieldVal := &NullTimeStampTZ{}
+			fieldVal := &sql.Null[oraTypes.TimeStampTZ]{}
 			if !hasNullValue {
 				var tempDate time.Time
 				tempDate, err = getDate(fieldValue)
@@ -1451,7 +1451,7 @@ func (stmt *Stmt) structPar(parValue driver.Value, parIndex int) (processedPars 
 					err = typeErr
 					return
 				}
-				fieldVal.TimeStampTZ = TimeStampTZ(tempDate)
+				fieldVal.V = oraTypes.TimeStampTZ(tempDate)
 				fieldVal.Valid = true
 			}
 			tempPar, err = stmt.NewParam(name, fieldVal, size, dir)
@@ -1925,7 +1925,9 @@ func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
-	if _, ok := nv.Value.(driver.Valuer); ok {
+	// database/sql converts a driver.Valuer, such as sql.Null[T], to its
+	// value, except the few that the driver binds itself
+	if _, ok := nv.Value.(driver.Valuer); ok && !ownValue(nv.Value) {
 		return driver.ErrSkip
 	}
 	return nil

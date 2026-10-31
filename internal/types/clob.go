@@ -237,6 +237,9 @@ func CreateClob(ctx context.Context, db *sql.DB, input any, useNClob bool) (*Clo
 //	}
 
 func (clob *Clob) CopyTo(dest driver.Value) error {
+	if ok, err := ScanExternal(dest, clob.Value); ok {
+		return err
+	}
 	temp, err := clob.Value()
 	if err != nil {
 		return err
@@ -247,13 +250,6 @@ func (clob *Clob) CopyTo(dest driver.Value) error {
 			*dst = ""
 		} else {
 			*dst = temp.(string)
-		}
-	case *sql.NullString:
-		if temp == nil {
-			dst.Valid = false
-		} else {
-			dst.Valid = true
-			dst.String = temp.(string)
 		}
 	case *[]byte:
 		if temp == nil {

@@ -34,13 +34,17 @@ package exports 31 names.
 Step 5 is done (`3982ceb`). `context.AfterFunc` breaks a call when its context
 ends, and a transaction keeps no context, which fixed sijms/go-ora#767.
 
-Step 6 is done and staged. A `NUMBER` is an `int64` or an `*apd.Decimal` by its
-column type (D16), a `BINARY_FLOAT` is a `float64`, and the intervals are
-`IntervalYM` and `time.Duration`, decoded and encoded right for the first time.
-`DataSet` implements `RowsColumnScanner`. `types` moved to `internal/types`,
-and `values.go` names the types a caller uses. `values_test.go` passes on 26ai,
-and `TestIssues` gives the same 42 passes and 3 failures.
+Step 6 is done (`c95385a`). A `NUMBER` is an `int64` or an `*apd.Decimal` by
+its column type, the intervals decode right, and `DataSet` implements
+`RowsColumnScanner`.
 
-The next step is the one Ken asked about: drop `NullTimeStampTZ` and the
-special cases of the `sql.NullX` types, so that `sql.Null[T]` binds and scans
-everywhere. Step 7 then moves JSON and OSON to `encoding/json/v2`.
+Ken asked on 2026-10-31 to use `sql.Null[T]` and drop the driver's own nullable
+types. That is done and staged. `NullTimeStampTZ` is gone, `TimeStampTZ` binds
+as `TIMESTAMP WITH TIME ZONE` for the first time, and the per-type cases of the
+`sql.NullX` types are gone. On the way, an OUT string of size 10 could not
+hold 'abc', which also made the logon NLS query fail on 11g. That is fixed,
+which was sijms/go-ora#703. The tests pass on 11g and 26ai, and `TestIssues`
+on 26ai gives the same 42 passes and 3 failures.
+
+The next step is the cleanup of names, folders, interfaces and `reflect` that
+Ken asked for. Step 7 then moves JSON and OSON to `encoding/json/v2`.

@@ -96,17 +96,14 @@ func (blob *Blob) Read(ctx context.Context) error {
 	return err
 }
 func (blob *Blob) CopyTo(dest driver.Value) error {
+	if ok, err := ScanExternal(dest, blob.Value); ok {
+		return err
+	}
 	switch dst := dest.(type) {
 	case *[]byte:
 		*dst = blob.bValue
 	case *string:
 		*dst = string(blob.bValue)
-	case *sql.NullString:
-		if blob.bValue == nil {
-			*dst = sql.NullString{Valid: false}
-		} else {
-			*dst = sql.NullString{String: string(blob.bValue), Valid: true}
-		}
 	default:
 		return fmt.Errorf("cannot copy blob to variable of type %T ", dest)
 	}

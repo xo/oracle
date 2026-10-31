@@ -353,9 +353,25 @@ A decimal is an `*apd.Decimal` from `github.com/cockroachdb/apd/v3`, a new one
 for each value, as in dbimp D33 (D16). `NUMBER` holds 38 digits, which neither
 `float64` nor `int64` holds.
 
-A nullable value is `sql.Null[T]`. The driver accepts the old `sql.NullString`
-types because `database/sql` hands their value through `driver.Valuer`, but the
-driver defines none.
+A nullable value is `sql.Null[T]`, and the driver defines no nullable type of
+its own. `NullTimeStampTZ` is gone, and `sql.Null[TimeStampTZ]` takes its
+place. The driver handles every nullable type through two interfaces, with no
+case for each one:
+
+- An argument that is a `driver.Valuer` goes through its `Value` method. A
+  value type of the driver unwraps one with `types.ValueOf`, which a field of
+  a user defined type needs too.
+- A destination that is an `sql.Scanner` takes the plain value through `Scan`,
+  with `types.ScanExternal`.
+
+Three nullable types are the exception, because `sql.Null[T].Value` converts a
+`time.Duration` to an `int64` and refuses an `IntervalYM` and a `TimeStampTZ`.
+`types.OwnNull` reads `sql.Null[time.Duration]`, `sql.Null[IntervalYM]` and
+`sql.Null[TimeStampTZ]` itself.
+
+A NULL binds with the type of its value, which an OUT argument needs, for
+`sql.NullX` and for `sql.Null[T]` of the common types. A NULL of any other
+type binds as a NULL `VARCHAR2`.
 
 JSON and OSON (the binary JSON of Oracle) are read and written with
 `encoding/json/v2` and `encoding/json/jsontext`.
@@ -457,6 +473,76 @@ An integration test reads `ORACLE_DSN` and skips when it is empty. CI sets it
 from `dbrun dsn --json` for every release (D7). `TestIssues` becomes these
 tests, one for each upstream issue that this design fixes, named for the issue.
 
+## Idiomatic names and structure
+
+Ken asked on 2026-10-31 that the internal packages read as idiomatic Go, with
+names that agree inside and outside the module. The code of `go-ora` carries
+the conventions of other languages. An inventory after step 6 found this, and
+each item names its fix.
+
+### Folders and packages
+
+| Today | Fix |
+| --- | --- |
+| `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration_test`, one file for each area and not for each upstream issue. A test names its issue in a comment |
+| `internal/utils` | Delete. `Max` is the built in `max`. `CreateQuasiLocator`, `GetValue`, `GetType` and the `Ty` variables repeat code of `internal/types` and `internal/ttc`. `ExtractTag` moves to the code of user defined types |
+| `internal/lazyinit` | Delete. `sync.OnceValue` does the same |
+| `internal/converters` | `internal/charset`, the charsets, and the NUMBER and date encoders into `internal/types` (step 8) |
+| `internal/configurations` | `internal/config` |
+| `internal/types` | Stays, as the package of the Oracle values |
+| `internal/trace` | Goes with D14, when `Config.Logger` replaces it |
+
+### Names
+
+| Today | Fix |
+| --- | --- |
+| `IConnection`, `IStringConverter` | No `I` prefix. An interface is named for what it does, and is defined where it is used, with the methods that the user calls. `IConnection` becomes the few methods that a coder calls |
+| `NTSAuthInterface`, `KerberosAuthInterface`, `PacketInterface`, `StmtInterface`, `DialerContext` | No `Interface` suffix. `DialerContext` and `KerberosAuthInterface` repeat `oracle.Dialer` and `oracle.Kerberos` |
+| `GetInt`, `GetByte`, `GetClr`, `GetMaxLen` and the other `Get` methods | No `Get` prefix: `Int`, `Byte`, `CLR`, `MaxLen` |
+| `TNS_TYPE_REP_UNIVERSAL`, `MAX_LEN_TIMESTAMP`, `TimeStampTZ_DTY`, `LobReadMode_AUTO` | Mixed caps, with no underscore. The Oracle type IDs become constants of a named type |
+| `Json`, `TimeStampTZ` | `JSON`, `TimestampTZ`. An initialism keeps one case, and timestamp is one word |
+| `TyInt`, `TyNullString` and the other 52 `Ty` variables | Delete. A type switch replaces each map that is keyed by `reflect.Type` |
+| `NewQuasiLocator`, `IsQuasi` | `inlineLocator`. A quasi locator is a LOB locator that the driver makes for a value that came inline, so the LOB code reads it with no round trip |
+
+### Interfaces
+
+24 interfaces exist. An interface stays when a caller supplies an
+implementation, such as `oracle.Dialer`, `oracle.Kerberos` and `oracle.Querier`,
+or when it breaks an import cycle with no other way. Every other one goes, and
+its user takes the concrete type: `AdvNegoService`, `AdvancedNegotiator`,
+`OracleNetworkEncryption`, `OracleNetworkDataIntegrity`, `TerminalReader`,
+`ValueStreamReader`, `ValueStreamWriter`, `ValueStreamer`, `SessionReadWriter`,
+`StmtInterface`, `OracleType`, `JsonCoder`, `JsonEncoder` and `JsonDecoder`.
+`SessionReader` and `SessionWriter` stay only while `internal/codec` and
+`internal/types` cannot import `internal/tns`, and the move of the coders into
+`internal/ttc` removes that need.
+
+### Reflection
+
+`reflect` appears 295 times in `internal/ttc`, 158 in `internal/types`, 48 in
+`internal/utils` and 42 in OSON. Most of it repeats `database/sql`:
+
+- `types.RCopy`, `copyx.go` and the `CopyTo` method of each value type assign
+  a value to a destination of any type. `sql.ConvertAssign` does that, and
+  rows use it through `RowsColumnScanner` already. OUT arguments use it too,
+  and these go.
+- The maps of coders keyed by `reflect.Type`, and the `Ty` variables, choose a
+  coder for an argument. A type switch over the Go types that the driver binds
+  does it, after `database/sql` converts a `driver.Valuer` and a named type
+  with `driver.DefaultParameterConverter`.
+- The kind switches of `internal/utils` go with that.
+
+Two uses stay, each in one file: the mapping of a user defined type to a
+struct by its `udt` tags, which `encoding/json` does with `reflect` too, and an
+array bind of a slice of any element type. OSON loses its own mapping of
+structs in step 7, because `encoding/json/v2` does it.
+
+### Dead code
+
+7,553 lines of `internal/ttc`, `internal/types`, `internal/codec` and
+`internal/tns` are code that is commented out. Delete them. Git history keeps
+them.
+
 ## The order of the work
 
 Each step leaves a driver that builds and passes its tests.
@@ -480,5 +566,11 @@ Each step leaves a driver that builds and passes its tests.
 10. Tell the consumers about the package name and the keys of the DSN. They are
     `dburl`, `usql` and `dbmeta`. `dburl` staged a scheme on 2026-10-31 that
     passes the query through, and it rechecks when the parser of step 4 lands.
+11. Make the names and the structure idiomatic, as the section above says.
+    It runs before step 7, so that JSON and the charsets move into the new
+    layout, in this order: delete the dead code, delete `internal/utils` and
+    `internal/lazyinit`, replace the copy machinery with `sql.ConvertAssign`,
+    replace the maps keyed by `reflect.Type`, remove the interfaces, rename,
+    and move `TestIssues` to `integration`.
 
 Steps 4 to 6 change what a caller sees. Nothing is tagged until they are done.

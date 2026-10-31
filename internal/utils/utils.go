@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"reflect"
@@ -50,15 +49,7 @@ var (
 	//TyBlob            = reflect.TypeOf((*Blob)(nil)).Elem()
 	//TyBFile           = reflect.TypeOf((*BFile)(nil)).Elem()
 	//TyVector          = reflect.TypeOf((*Vector)(nil)).Elem()
-	TyNullByte    = reflect.TypeFor[sql.NullByte]()
-	TyNullInt16   = reflect.TypeFor[sql.NullInt16]()
-	TyNullInt32   = reflect.TypeFor[sql.NullInt32]()
-	TyNullInt64   = reflect.TypeFor[sql.NullInt64]()
-	TyNullFloat64 = reflect.TypeFor[sql.NullFloat64]()
-	TyNullBool    = reflect.TypeFor[sql.NullBool]()
-	TyNullString  = reflect.TypeFor[sql.NullString]()
 	//TyNullNVarChar    = reflect.TypeOf((*NullNVarChar)(nil)).Elem()
-	TyNullTime = reflect.TypeFor[sql.NullTime]()
 	//TyNullTimeStamp   = reflect.TypeOf((*NullTimeStamp)(nil)).Elem()
 	//TyNullTimeStampTZ = reflect.TypeOf((*NullTimeStampTZ)(nil)).Elem()
 	//TyRefCursor       = reflect.TypeOf((*RefCursor)(nil)).Elem()
@@ -98,16 +89,6 @@ func IsFloat(input reflect.Type) bool {
 
 func IsNumber(input reflect.Type) bool {
 	return IsInteger(input) || IsFloat(input)
-}
-func IsNullNumber(input reflect.Type) bool {
-	switch input {
-	case TyNullBool, TyNullByte, TyNullInt16, TyNullInt32, TyNullInt64:
-		fallthrough
-	case TyNullFloat64:
-		return true
-	default:
-		return false
-	}
 }
 func GetValue(origVal driver.Value) (driver.Value, error) {
 	if origVal == nil {

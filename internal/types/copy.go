@@ -112,6 +112,15 @@ func RCopy(dest reflect.Value, src any) (err error) {
 		dest.Set(reflect.ValueOf(src))
 		return
 	}
+	// a nullable type of database/sql, or any other scanner that is not a
+	// type of this package, takes the value through Scan
+	if dest.CanAddr() {
+		if _, ora := src.(OracleType); !ora {
+			if ok, err := ScanExternal(dest.Addr().Interface(), func() (any, error) { return src, nil }); ok {
+				return err
+			}
+		}
+	}
 
 	switch src := src.(type) {
 	case string:

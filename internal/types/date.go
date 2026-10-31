@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"errors"
@@ -111,6 +110,10 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 }
 
 func (date *Date) SetValue(input any) (err error) {
+	input, verr := ValueOf(input)
+	if verr != nil {
+		return verr
+	}
 	defer func(input *Date) {
 		if input.dataType == 0 {
 			input.dataType = DATE
@@ -143,22 +146,13 @@ func (date *Date) SetValue(input any) (err error) {
 			date.dataType = data.dataType
 			return date.SetValue(temp)
 		}
+	case TimeStampTZ:
+		date.dataType = TimeStampTZ_DTY
+		date.bValue, err = date.encode(time.Time(data))
 	case time.Time:
 		date.bValue, err = date.encode(data)
 	case *time.Time:
 		date.bValue, err = date.encode(*data)
-	case sql.NullTime:
-		if data.Valid {
-			date.bValue, err = date.encode(data.Time)
-		} else {
-			date.bValue = nil
-		}
-	case *sql.NullTime:
-		if data.Valid {
-			date.bValue, err = date.encode(data.Time)
-		} else {
-			date.bValue = nil
-		}
 	default:
 		err = fmt.Errorf("cannot set value of type %T into date/time", input)
 	}
@@ -231,6 +225,9 @@ func (date *Date) Scan(value any) (err error) {
 }
 
 func (date *Date) CopyTo(dest driver.Value) (err error) {
+	if ok, err := ScanExternal(dest, date.Value); ok {
+		return err
+	}
 	value, err := date.Value()
 	if err != nil {
 		return err
@@ -239,12 +236,6 @@ func (date *Date) CopyTo(dest driver.Value) (err error) {
 	case *time.Time:
 		if value != nil {
 			*dst = value.(time.Time)
-		}
-	case *sql.NullTime:
-		if value != nil {
-			*dst = sql.NullTime{Valid: true, Time: value.(time.Time)}
-		} else {
-			*dst = sql.NullTime{Valid: false}
 		}
 	default:
 		return fmt.Errorf("cannot copy Date to variable of type %T", dest)

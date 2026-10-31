@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 
@@ -25,6 +24,10 @@ func (str *String) Value() (any, error) {
 }
 
 func (str *String) SetValue(input any) error {
+	input, verr := ValueOf(input)
+	if verr != nil {
+		return verr
+	}
 	if input == nil {
 		str.bValue = nil
 		return nil
@@ -59,18 +62,6 @@ func (str *String) SetValue(input any) error {
 		str.bValue = str.Conv.Encode(data)
 	case *string:
 		str.bValue = str.Conv.Encode(*data)
-	case sql.NullString:
-		if data.Valid {
-			str.bValue = str.Conv.Encode(data.String)
-		} else {
-			str.bValue = nil
-		}
-	case *sql.NullString:
-		if data.Valid {
-			str.bValue = str.Conv.Encode(data.String)
-		} else {
-			str.bValue = nil
-		}
 	default:
 		return fmt.Errorf("cannot set value of type %T into string", input)
 	}
@@ -90,6 +81,9 @@ func (str *String) Scan(input any) error {
 //}
 
 func (str *String) CopyTo(dest driver.Value) (err error) {
+	if ok, err := ScanExternal(dest, str.Value); ok {
+		return err
+	}
 	value, err := str.Value()
 	if err != nil {
 		return err
@@ -100,13 +94,6 @@ func (str *String) CopyTo(dest driver.Value) (err error) {
 			*dst = value.(string)
 		} else {
 			*dst = ""
-		}
-	case *sql.NullString:
-		if value != nil {
-			dst.String = value.(string)
-			dst.Valid = true
-		} else {
-			dst.Valid = false
 		}
 	case *[]byte:
 		if value != nil {
