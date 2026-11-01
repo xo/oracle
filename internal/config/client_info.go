@@ -11,6 +11,9 @@ type ClientInfo struct {
 	OSUserName  string
 	OSPassword  string
 	HostName    string
+	// Terminal is the terminal that the logon reports, or HostName when it
+	// is empty
+	Terminal    string
 	DomainName  string
 	DriverName  string
 	PID         int
@@ -34,4 +37,12 @@ func getCurrentUser() *user.User {
 		temp, _ := user.Current()
 		return temp
 	}
+}
+
+// TerminalName returns the terminal that the logon reports.
+func (info ClientInfo) TerminalName() string {
+	if info.Terminal != "" {
+		return info.Terminal
+	}
+	return info.HostName
 }

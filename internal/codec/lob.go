@@ -4,6 +4,7 @@ import (
 	"github.com/xo/oracle/internal/config"
 	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
+	"reflect"
 )
 
 type lobParameter struct {
@@ -16,6 +17,18 @@ func (param *lobParameter) SetLobStreamer(streamer types.LobStreamer) {
 }
 
 func (param *lobParameter) Write(session tns.SessionWriter) error {
+	if param.IsUDTPar {
+		// an attribute of an object is its locator with the length of the
+		// image, as a RAW is, and a NULL is 0xFF, as python-oracledb writes
+		// them. go-ora put a length of 4 bytes first and wrote a NULL as the
+		// NULL of an object, and the server refused it with ORA-03101
+		if len(param.BValue) == 0 {
+			session.PutBytes(0xFF)
+			return nil
+		}
+		session.PutFixedClr(param.BValue)
+		return nil
+	}
 	if len(param.BValue) > 0 {
 		if !param.IsArrayPar {
 			session.PutUint(len(param.BValue), 4, true, true)
@@ -89,4 +102,10 @@ func (param *lobParameter) Read(session tns.SessionReader) error {
 	}
 	param.streamer.SetLocator(locator)
 	return nil
+}
+
+// isNilPointer reports whether v is a nil pointer of any type.
+func isNilPointer(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Pointer && rv.IsNil()
 }

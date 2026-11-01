@@ -48,13 +48,32 @@ blocks a connection, P2 is a fault with a workaround.
 | sijms/go-ora#698 | P2 | A `MERGE` that violates a key returns a timeout and not ORA-00001 | Needs a trace | Fixed in step 9. On 11g, which is before TTC 7, the driver read the errors of an array DML as three empty fields, so a batch that failed waited for bytes that never came. 26ai returned ORA-00001 already. `TestSummaryArrayDMLError` holds the 11g reply, and `TestBatchError` holds it on 11g and 26ai |
 | sijms/go-ora#655 | P1 | A `TIMESTAMP WITH LOCAL TIME ZONE` is wrong when `DBTIMEZONE` is a region, and the zone `+00:00` is not `time.UTC` | Read the zone of the database right | Fixed in step 9. The negotiation of data types sends a region in the form of a `TIMESTAMP WITH TIME ZONE`, and the driver read it as an offset of 121 hours, so a value of a database in `Europe/London` read five days off. An offset of zero is `time.UTC` now. The issue also asks for the value in the zone of the session. The driver gives the same instant in the zone of the database, as DESIGN says, since it learns the zone of the session only by a query. `TestDBTimeZone` holds the images, and `TestLocalTimeZone` holds the values on 11g with `+00:00`, `-05:00` and `Europe/London` |
 | sijms/go-ora#672 | P2 | A `DATE` reads in a fixed offset, so a date in winter gets the offset of summer | Read a `DATE` in UTC, as DESIGN says | Fixed in step 9. The driver gave a `DATE` and a `TIMESTAMP` the offset of `SYSTIMESTAMP`, which a query at each logon read. They are in UTC now, the wall clock of the value, and the query is gone. sijms/go-ora#687 asks for the zone of the server, which a fixed offset cannot give, and is the same fault. sijms/go-ora#568 compares a `DATE` with a bind, which works, since a bind sends its wall clock. `TestLocalTimeZone` holds all three |
+| sijms/go-ora#697 | P1 | A statement run again fails with ORA-03146, invalid buffer length for a TTC field | Send the bind option of DML RETURNING every time | Fixed in step 9. A `RETURNING` statement that ran again with an argument changed from a value to NULL, or from NULL to a value, sent its binds again without the option that the server needs for the binds of RETURNING, and 18c and 26ai refused it with ORA-03146, and 11g closed the connection. python-oracledb sends that option for each execute of PL/SQL and of RETURNING. `TestRebind` in `integration` holds it, the case 1022 of python-oracledb, on 11g, 18c and 26ai |
 | sijms/go-ora#729 | P2 | A server that requires native network encryption or checksums refuses the client with ORA-12269 | Implement the negotiation | Fixed in step 9 (D21). The refusal did not reproduce: on `oracle-nne-26ai`, whose server requires AES256 and SHA256, the driver negotiates both, with the client at any level. With `encryption=required` on 11g, the driver panicked: it gave AES the IV of 20 bytes that a server before the new version sends, which the 12.1 report in the issue also points at. AES takes an IV of zeros there, as in `v2`. `TestNetworkEncryption` requires both services from the client and finds both in `V$SESSION_CONNECT_INFO`, on 11g, 18c, 26ai and `oracle-nne-26ai` |
 
 ## Faults that need a reproduction first
 
-sijms/go-ora#724 and sijms/go-ora#697 (a malformed TTC packet), sijms/go-ora#706
-and sijms/go-ora#700 (EOF under load), sijms/go-ora#615 and sijms/go-ora#673.
-Each needs a test against a release that `dbrun` starts before it is a fault. Step 9 reproduced
+Ken asked on 2026-11-01 to finish the open issues (D27). Step 9 tried each
+one that this section listed:
+
+- sijms/go-ora#700 and sijms/go-ora#706 (EOF under load) reproduced. With 150
+  connections on 26ai Free, over its limit of sessions, the server closed
+  some connections in the middle of the logon, and the driver returned a bare
+  EOF. Each other failure was ORA-12516 or ORA-00018. With 50 connections on
+  26ai and 40 on 11g, inserts and calls that return a CLOB, 245,000 of them,
+  all passed. The error now says that the server closed the connection during
+  the logon, and wraps `io.EOF`. `TestConnectClosedDuringLogon` holds it.
+- sijms/go-ora#724 and sijms/go-ora#673 (a malformed packet from the queries
+  of an exporter) did not reproduce. Eleven queries of `v$session`,
+  `v$sysstat`, `v$sysmetric`, `v$waitclassmetric`, `v$resource_limit`,
+  `gv$sql` and others ran 20 times each through prepared statements on 11g,
+  18c, 26ai and `oracle-adb-19c`. Both reports came with go-ora v2.9.0, before
+  sijms/go-ora#776, a row of untyped NULLs, which step 9 fixed.
+- sijms/go-ora#615 (wrong rows with `FETCH NEXT :n ROWS ONLY`) did not
+  reproduce. A prepared query with three binds and a bound `FETCH NEXT` gave
+  the right rows 300 times on 18c, 26ai and `oracle-adb-19c`.
+
+Step 9 reproduced
 sijms/go-ora#683, #687, #672, #655 and #568, which the table above and the
 section below hold. It did not reproduce sijms/go-ora#704: in the root
 container of 18c and 26ai, `SELECT * FROM CONTAINERS(DUAL)` returns a row for
@@ -68,8 +87,9 @@ and neither gets ORA-12564. sijms/go-ora#680 is the cipher
 Go 1.22, because it has no forward secrecy. A caller that needs it names it in
 the `CipherSuites` of `Config.TLS`.
 
-sijms/go-ora#697 reports a malformed packet for a BLOB over 50 KB in a
-`MERGE`. That did not reproduce. A `[]byte` longer than the longest `RAW`
+sijms/go-ora#697 reports a malformed packet, ORA-03146, for statements run
+again, and for a BLOB over 50 KB in a `MERGE`. The packet reproduced, and the
+table above holds it. The BLOB in a `MERGE` did not. A `[]byte` longer than the longest `RAW`
 binds as a `LONG RAW`, and a string longer than the longest `VARCHAR2` as a
 `LONG`, and the server refuses either in a `SELECT` of a `MERGE` with
 ORA-01461, on 11g, 18c and 26ai. `CreateBlob` and `CreateClob` bind a
@@ -104,7 +124,20 @@ streamed, and `TestLobRows` holds it. `Clob`, `Blob` and `BFile` have
 D22). A read after the rows close fails with `ErrRowsClosed`, where
 `Clob.Read` raced with the next user of the connection. `TestLobReader`
 holds it, on 11g, 18c and 26ai. Ken decided to take #611, #530, #681, #559, #664,
-#707 and #619 (D21). The rest wait for Ken.
+#707 and #619 (D21).
+
+D27 settles the rest. #584 is built: `Client.Terminal` names the terminal of
+the session, and `Client.Host` and `Client.User` reach `v$session` as the
+machine and the user, where only the connect packet carried them.
+`TestClientInSession` holds it. #560 needs the bequeath protocol of a local
+Oracle Client, which a driver over the network cannot speak. #640 asks for
+settings that `database/sql` has, `SetMaxOpenConns`, `SetConnMaxLifetime`
+and a context for the wait, except a minimum of open connections, which
+`database/sql` has not. #618 is TimesTen, which speaks a protocol of its own.
+#403 is a logon to ASM, which `privilege=sysasm` makes and which no `dbrun`
+release can test. #666 (scrollable cursors) and #777 (Transparent Application
+Continuity) are not built now, and `DRIVERS.md` holds what each other driver
+offers for them.
 
 sijms/go-ora#649 asks for smaller charset tables, which step 8 built. sijms/go-ora#653 (VECTOR) and sijms/go-ora#365 (Advanced Queuing) are in
 the `v3` code already, as `types.Vector` and the `aq` package.

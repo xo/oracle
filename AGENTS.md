@@ -27,6 +27,7 @@ every other agent read the same rules. Edit this file, not that one.
 | looking for work that is known and not done | [docs/BACKLOG.md](docs/BACKLOG.md) |
 | testing against a database | the `dbrun` rule below, then `../dbmeta/docs/DBRUN.md` |
 | looking at an upstream issue or pull request | [docs/UPSTREAM.md](docs/UPSTREAM.md) |
+| comparing this driver with the other Oracle drivers | [docs/DRIVERS.md](docs/DRIVERS.md) |
 | installing or updating an agent skill | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | resuming a session that ended | [docs/PROGRESS.md](docs/PROGRESS.md) |
 | looking for what the driver does | [README.md](README.md) |

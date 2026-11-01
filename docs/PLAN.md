@@ -34,6 +34,9 @@ conclusion.
 | [D23](#d23-no-test-runs-on-19c) | Decided. Amends D17 |
 | [D24](#d24-a-long-value-binds-as-a-temporary-lob-in-plsql-only) | Decided |
 | [D25](#d25-a-collection-of-a-basic-type-binds-through-a-named-type-or-object) | Decided |
+| [D26](#d26-no-two-phase-commit-and-no-sessionless-transactions) | Decided |
+| [D27](#d27-the-open-upstream-issues-are-finished) | Decided |
+| [D28](#d28-the-tests-of-python-oracledb-are-written-again) | Decided |
 
 ## Purpose
 
@@ -346,6 +349,42 @@ package also exports `Object`, which names the type at the bind, as
 `go_ora.Object` did, for a basic type with no named Go type. Registering a
 `[]time.Time` or a `[][]byte` as the collection would take those types from
 every bind of the connector, PL/SQL arrays among them.
+
+## D26. No two-phase commit and no sessionless transactions
+
+Status: Decided.
+
+Ken decided on 2026-11-01 not to build two-phase commit (XA) or the
+sessionless transactions of 23ai. No caller of the driver needs them, a
+`sql.Tx` belongs to one connection from its start to its end, and Go has no
+transaction manager to use XA. `DRIVERS.md` compares the features of the
+other Oracle drivers, so that a later decision can start there.
+
+## D27. The open upstream issues are finished
+
+Status: Decided.
+
+Ken asked on 2026-11-01 to finish the open issues of `sijms/go-ora`. Each
+fault that waited for a reproduction was tried on the releases that `dbrun`
+starts, and `UPSTREAM.md` holds the result of each. Of the features that
+waited for Ken, the terminal of the session (sijms/go-ora#584) is built. The
+others are not built: `/ as sysdba` and TimesTen cannot be built over the
+network, the settings of a pool belong to `database/sql`, ASM needs only
+`privilege=sysasm`, and scrollable cursors and Transparent Application
+Continuity wait for a caller. Ken can reopen any of them.
+
+## D28. The tests of python-oracledb are written again
+
+Status: Decided.
+
+Ken decided on 2026-11-01 that the tests of python-oracledb that test what
+this driver does are written again here, in Go, as the tests of go-ora were.
+Those are the cases of `tnsnames.ora` and descriptors, of statements that run
+again, of DML RETURNING, of batches, of LOBs and of the types. The tests of
+pools, data frames, hooks, SODA, two-phase commit and the API of Python are
+left out. python-oracledb is under the UPL 1.0 and the Apache License 2.0.
+Each test here is written again from the cases, and its comment names the
+file and the number of the test that it follows.
 
 ## Open questions for Ken
 

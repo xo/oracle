@@ -628,7 +628,7 @@ func (conn *Connection) doAuth() error {
 		if len(conn.connOption.UserID) > 0 {
 			conn.session.PutString(conn.connOption.UserID)
 		}
-		conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientInfo.HostName, 0)
+		conn.session.PutKeyValString("AUTH_TERMINAL", conn.connOption.ClientInfo.TerminalName(), 0)
 		conn.session.PutKeyValString("AUTH_PROGRAM_NM", conn.connOption.ClientInfo.ProgramName, 0)
 		conn.session.PutKeyValString("AUTH_MACHINE", conn.connOption.ClientInfo.HostName, 0)
 		conn.session.PutKeyValString("AUTH_PID", fmt.Sprintf("%d", conn.connOption.ClientInfo.PID), 0)

@@ -235,7 +235,7 @@ func (obj *AuthObject) Write() error {
 		appendKeyVal("AUTH_PBKDF2_SPEEDY_KEY", obj.ESpeedyKey, 0)
 		index++
 	}
-	appendKeyVal("AUTH_TERMINAL", connOption.ClientInfo.HostName, 0)
+	appendKeyVal("AUTH_TERMINAL", connOption.ClientInfo.TerminalName(), 0)
 	index++
 	appendKeyVal("AUTH_PROGRAM_NM", connOption.ClientInfo.ProgramName, 0)
 	index++

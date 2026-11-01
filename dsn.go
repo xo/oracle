@@ -110,13 +110,17 @@ type Kerberos interface {
 	Authenticate(server, service string) ([]byte, error)
 }
 
-// Client is what the connect packet says about the client. An empty field
-// takes the value of this process: the path of the program, the name of the
-// host, and the user of the operating system.
+// Client is what the connect packet and the logon say about the client. An
+// empty field takes the value of this process: the path of the program, the
+// name of the host, and the user of the operating system. The logon sends
+// Host as the machine and User as the user of the operating system, which
+// v$session shows, and Terminal as its terminal, which is Host when it is
+// empty, sijms/go-ora#584.
 type Client struct {
-	Program string
-	Host    string
-	User    string
+	Program  string
+	Host     string
+	User     string
+	Terminal string
 }
 
 // Config is the configuration of one database. ParseDSN fills it from a DSN,

@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"regexp"
 	"strconv"
@@ -56,43 +57,77 @@ type DatabaseInfo struct {
 	connStr         string
 }
 
-func ExtractServers(connStr string) (addresses []ServerAddr, err error) {
-	var connectionAddressRegexp *regexp.Regexp
-	connectionAddressRegexp, err = regexp.Compile(`(?i)\(\s*ADDRESS\s*=\s*(\(\s*(HOST)\s*=\s*([\w\.\-\:]+)\s*\)\s*|\(\s*(PORT)\s*=\s*([0-9]+)\s*\)\s*|\(\s*(COMMUNITY)\s*=\s*([\w.-]+)\s*\)\s*|\(\s*(PROTOCOL)\s*=\s*(\w+)\s*\)\s*)+\s*\)`)
-	if err != nil {
-		return nil, err
-	}
-
-	addresses = make([]ServerAddr, 0, 5)
-	matches := connectionAddressRegexp.FindAllStringSubmatch(connStr, -1)
-	for _, match := range matches {
-		server := ServerAddr{
-			Port: 1521,
+// ExtractServers returns the address of each ADDRESS of the descriptor
+// connStr, in order, at any depth. An address keeps HOST, PORT and PROTOCOL,
+// and a PORT it lacks is 1521. go-ora matched an address with a regular
+// expression that took no other key, so an address with HTTPS_PROXY or
+// SEND_BUF_SIZE was dropped.
+func ExtractServers(connStr string) ([]ServerAddr, error) {
+	var addresses []ServerAddr
+	var err error
+	walkDescriptor(connStr, func(key string, values map[string]string) {
+		if err != nil || key != "ADDRESS" {
+			return
 		}
-		for x := 2; x < len(match); x++ {
-			if strings.ToUpper(match[x]) == "PROTOCOL" {
-				x++
-				server.Protocol = match[x]
-				continue
-			}
-			if strings.ToUpper(match[x]) == "PORT" {
-				x++
-				server.Port, err = strconv.Atoi(match[x])
-				if err != nil {
-					return nil, err
-				}
-				continue
-			}
-			if strings.ToUpper(match[x]) == "HOST" {
-				x++
-				server.Addr = match[x]
+		server := ServerAddr{Port: 1521, Protocol: values["PROTOCOL"], Addr: values["HOST"]}
+		if port, ok := values["PORT"]; ok {
+			if server.Port, err = strconv.Atoi(port); err != nil {
+				err = fmt.Errorf("reading the port %q of %s: %w", port, server.Addr, err)
+				return
 			}
 		}
-		if len(server.Addr) > 0 {
+		if server.Addr != "" {
 			addresses = append(addresses, server)
 		}
+	})
+	return addresses, err
+}
+
+// walkDescriptor calls f with the upper case key of each group of the
+// descriptor s, such as ADDRESS for (ADDRESS=(HOST=h)(PORT=1)), and the
+// values of its groups that hold a value, keyed by the upper case of their
+// keys, in the order in which the groups close.
+func walkDescriptor(s string, f func(key string, values map[string]string)) {
+	type group struct {
+		key    string
+		values map[string]string
 	}
-	return addresses, nil
+	var stack []group
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			eq := strings.IndexAny(s[i+1:], "=()")
+			if eq < 0 || s[i+1+eq] != '=' {
+				continue
+			}
+			key := strings.ToUpper(strings.TrimSpace(s[i+1 : i+1+eq]))
+			i += eq + 1
+			// a value runs to the parenthesis that closes the group, and a
+			// group with no value holds other groups
+			rest := strings.TrimLeft(s[i+1:], " \t\n\r")
+			if !strings.HasPrefix(rest, "(") {
+				end := strings.IndexByte(s[i+1:], ')')
+				if end < 0 {
+					return
+				}
+				value := strings.Trim(strings.TrimSpace(s[i+1:i+1+end]), `"`)
+				if len(stack) > 0 {
+					stack[len(stack)-1].values[key] = value
+				}
+				f(key, nil)
+				i += end + 1
+				continue
+			}
+			stack = append(stack, group{key: key, values: map[string]string{}})
+		case ')':
+			if len(stack) == 0 {
+				continue
+			}
+			g := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			f(g.key, g.values)
+		}
+	}
 }
 
 func (info *DatabaseInfo) UpdateDatabaseInfo(connStr string) (err error) {

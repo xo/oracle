@@ -1,7 +1,10 @@
 package oracle
 
 import (
+	"context"
 	"errors"
+	"io"
+	"net"
 	"net/url"
 	"reflect"
 	"strings"
@@ -276,5 +279,41 @@ func TestConnectionConfigAlias(t *testing.T) {
 		if _, err := cfg.connectionConfig(); err == nil {
 			t.Errorf("%s: no error", dsn)
 		}
+	}
+}
+
+// closingDialer dials a connection that takes each write and ends each read,
+// as a server at its limit of sessions can.
+type closingDialer struct{}
+
+func (closingDialer) DialContext(context.Context, string, string) (net.Conn, error) {
+	client, _ := net.Pipe()
+	return closedConn{client}, nil
+}
+
+// closedConn is a connection whose far end closed after the client wrote.
+type closedConn struct {
+	net.Conn
+}
+
+func (closedConn) Write(b []byte) (int, error) { return len(b), nil }
+
+func (closedConn) Read([]byte) (int, error) { return 0, io.EOF }
+
+// TestConnectClosedDuringLogon is sijms/go-ora#700: a server that closed the
+// connection during the logon gave a bare EOF.
+func TestConnectClosedDuringLogon(t *testing.T) {
+	cfg, err := ParseDSN("oracle://u:p@h/s?connect_timeout=5s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Dialer = closingDialer{}
+	c, err := NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Connect(t.Context())
+	if !errors.Is(err, io.EOF) || !strings.Contains(err.Error(), "closed the connection during the logon") {
+		t.Errorf("got %v", err)
 	}
 }

@@ -316,6 +316,17 @@ The other keys:
 A user named `SYS` gets no privilege by its name. The DSN names it with
 `privilege=sysdba`.
 
+`tnsnames.ora` follows the rules that python-oracledb tests. An entry can be
+a descriptor or an Easy Connect string, `[tcp://]host[:port][/service]`,
+which becomes a descriptor. An entry that comes later, in the file or in a
+file that `IFILE` includes, replaces an earlier one. Text before an entry
+that is no entry is skipped, and an `IFILE` that includes a file that
+includes it is an error. A descriptor is read by walking its parentheses, and
+each `ADDRESS` keeps its `HOST`, `PORT` and `PROTOCOL` and ignores its other
+keys, where go-ora matched an address with a regular expression and dropped
+one with `HTTPS_PROXY` or `SEND_BUF_SIZE`. `TestLookupAliasCases` and
+`TestDescriptors` in `internal/config` hold the cases of python-oracledb.
+
 ## Options
 
 A statement takes options as dbimp D109 sets them out. An option comes from the
@@ -427,13 +438,18 @@ through a named Go element type, such as `type Name string`, or through
 `database/sql` converts one only at the top of a statement.
 
 The values of a call are decoded while its reply is read, when no LOB can
-load. After the call, the driver loads each CLOB and BLOB of an OUT value:
-the value, the elements of a collection, and the LOB fields of an object. An
-object with a LOB attribute panicked, and an OUT collection of CLOBs gave the
-locators as text. A LOB attribute read into a `string` or a `[]byte` field
-is an error, since the field was filled while the reply was read.
-`TestBasicCollections` and `TestObjectLobAttributes` in `integration` hold
-it.
+load. After the call, the driver loads each CLOB and BLOB of an OUT value
+and of the elements of a collection. An object with a LOB attribute is
+decoded as a pending object, which holds its struct and the fields still to
+fill, and these are filled after the reply, for an OUT value after the call
+and for a row in `Next`, at any depth of objects. A LOB attribute fills an
+`oracle.Clob`, an `oracle.Blob`, a `string` or a `[]byte` field. In the image
+of an object, a LOB attribute is its locator with the length of the image,
+and a NULL is `0xFF`, as python-oracledb writes them. go-ora wrote a length of
+4 bytes first, which the server refused with ORA-03101. An object with a LOB
+attribute panicked on a read, and an OUT collection of CLOBs gave the
+locators as text. `TestBasicCollections` and `TestObjectLobAttributes` in
+`integration` hold it.
 
 The type of a column decides the Go type, and the value never does, so every
 row of a column has the same type. `COUNT(*)` is a `NUMBER` with no precision,
@@ -549,6 +565,34 @@ The code uses these, where each fits:
 - `reflect.TypeFor[T]()`, in place of `reflect.TypeOf((*T)(nil)).Elem()`.
 
 The `go fix` of Go 1.27 does most of the mechanical part. The rest is review.
+
+## Statements that run again
+
+A prepared statement keeps its cursor on the server, and runs it again with
+no parse. The server keeps the types in which the cursor fetched its
+columns. When a view or a table under the cursor changes the type of a
+column, the server parses again and sends a new describe with the rows. It
+converts a new type to the old type of the fetch when it can, and the rows
+come in the old type: a CLOB that was a string or a LONG comes as a LONG, a
+BLOB that was a RAW comes as a LONG RAW, and a string that was a CLOB of the
+inline mode comes as a LONG. The driver reads each column so, as
+python-oracledb does. When the server cannot convert, it fails the execute
+with ORA-00932 or ORA-01007, and the driver closes the cursor and runs the
+query once more, with a parse. go-ora kept the flags of LOB and LONG columns
+from the first run and read the new rows in their new types, so 14 of 18
+changes failed. `TestTypeChanges` in `integration` holds the cases of
+python-oracledb.
+
+The driver sends the binds of a statement again when one grows or changes
+type. For DML RETURNING it sends the option of PL/SQL binds every time, as
+python-oracledb does, where go-ora left it out then, and the server refused
+the execute with ORA-03146 (sijms/go-ora#697). `RETURNING` is found with word
+boundaries, so `RETURNING(id)INTO` is DML RETURNING too. The server cuts a
+value of RETURNING to the size of its OUT, and sends the length that it had,
+and the driver returns an error for it, where go-ora returned the cut value.
+An `UPDATE` of no row gives each OUT of RETURNING a NULL. `TestRebind` and
+`TestReturning` hold it. A RETURNING of more than one row is an error, as the
+driver returns no array.
 
 ## Testing
 

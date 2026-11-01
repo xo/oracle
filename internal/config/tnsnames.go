@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -13,35 +14,47 @@ var ErrNoAlias = errors.New("no such alias in tnsnames.ora")
 
 // LookupAlias returns the connect descriptor that the tnsnames.ora of the
 // folder dir names alias, such as (DESCRIPTION=(ADDRESS=...)). An alias is
-// found with no regard to case. The file can include others with IFILE.
+// found with no regard to case. The file can include others with IFILE, and
+// an entry that comes later, in the file or in a file that it includes,
+// replaces an earlier one, as in python-oracledb. An entry can be an easy
+// connect string, host:port/service, which becomes a descriptor.
 func LookupAlias(dir, alias string) (string, error) {
-	entries, err := readTNSNames(filepath.Join(dir, "tnsnames.ora"), 0)
-	if err != nil {
+	entries := map[string]string{}
+	if err := readTNSNames(filepath.Join(dir, "tnsnames.ora"), entries, nil); err != nil {
 		return "", err
 	}
-	if desc, ok := entries[strings.ToUpper(alias)]; ok {
+	desc, ok := entries[strings.ToUpper(alias)]
+	if !ok {
+		return "", fmt.Errorf("finding %q in %s: %w", alias, dir, ErrNoAlias)
+	}
+	if strings.HasPrefix(desc, "(") {
 		return desc, nil
 	}
-	return "", fmt.Errorf("finding %q in %s: %w", alias, dir, ErrNoAlias)
+	return easyConnect(desc)
 }
 
-// readTNSNames reads the entries of the tnsnames.ora at name, keyed by the
-// upper case of each alias. depth limits the IFILE chain.
-func readTNSNames(name string, depth int) (map[string]string, error) {
-	if depth > 8 {
-		return nil, fmt.Errorf("reading %s: too many IFILE levels", name)
+// readTNSNames reads the entries of the tnsnames.ora at name into entries,
+// keyed by the upper case of each alias. chain holds the files that include
+// this one, so that a file that includes itself, at any depth, is an error.
+func readTNSNames(name string, entries map[string]string, chain []string) error {
+	abs, err := filepath.Abs(name)
+	if err != nil {
+		return err
 	}
+	if slices.Contains(chain, abs) {
+		return fmt.Errorf("reading %s: IFILE includes a file that includes it", name)
+	}
+	chain = append(chain, abs)
 	b, err := os.ReadFile(name)
 	if err != nil {
-		return nil, fmt.Errorf("reading tnsnames.ora: %w", err)
+		return fmt.Errorf("reading tnsnames.ora: %w", err)
 	}
-	entries := map[string]string{}
 	src := stripComments(string(b))
 	for pos := 0; pos < len(src); {
 		eq := strings.IndexByte(src[pos:], '=')
 		if eq < 0 {
 			if strings.TrimSpace(src[pos:]) != "" {
-				return nil, fmt.Errorf("reading %s: %q has no value", name, strings.TrimSpace(src[pos:]))
+				return fmt.Errorf("reading %s: %q has no value", name, strings.TrimSpace(src[pos:]))
 			}
 			break
 		}
@@ -51,10 +64,11 @@ func readTNSNames(name string, depth int) (map[string]string, error) {
 			pos++
 		}
 		var value string
+		names = aliasNames(names)
 		if pos < len(src) && src[pos] == '(' {
 			end, err := closing(src, pos)
 			if err != nil {
-				return nil, fmt.Errorf("reading %s, at %s: %w", name, names, err)
+				return fmt.Errorf("reading %s, at %s: %w", name, names, err)
 			}
 			value, pos = src[pos:end+1], end+1
 		} else {
@@ -71,24 +85,64 @@ func readTNSNames(name string, depth int) (map[string]string, error) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(filepath.Dir(name), path)
 			}
-			included, err := readTNSNames(path, depth+1)
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range included {
-				if _, ok := entries[k]; !ok {
-					entries[k] = v
-				}
+			if err := readTNSNames(path, entries, chain); err != nil {
+				return err
 			}
 			continue
 		}
 		for alias := range strings.SplitSeq(names, ",") {
-			if alias = strings.ToUpper(strings.TrimSpace(alias)); alias != "" {
+			if alias = strings.ToUpper(strings.TrimSpace(alias)); alias != "" && !strings.ContainsAny(alias, " \t") {
 				entries[alias] = compact(value)
 			}
 		}
 	}
-	return entries, nil
+	return nil
+}
+
+// aliasNames returns the names of an entry from the text before its =. The
+// names can run over lines, each ending in a comma, and a line before them
+// that does not end in one is not part of the entry, as python-oracledb
+// skips text that is no entry.
+func aliasNames(text string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	start := len(lines) - 1
+	for start > 0 && strings.HasSuffix(strings.TrimSpace(lines[start-1]), ",") {
+		start--
+	}
+	return strings.Join(lines[start:], "\n")
+}
+
+// easyConnect returns the descriptor of an easy connect string,
+// [tcp://|tcps://]host[:port][/service], with port 1521 when it names none.
+func easyConnect(s string) (string, error) {
+	protocol := "TCP"
+	if p, rest, ok := strings.Cut(s, "://"); ok {
+		protocol, s = strings.ToUpper(p), rest
+	}
+	s, _, _ = strings.Cut(s, "?")
+	hostPort, service, _ := strings.Cut(s, "/")
+	host, port := hostPort, "1521"
+	if strings.HasPrefix(hostPort, "[") {
+		// an IPv6 address
+		end := strings.IndexByte(hostPort, ']')
+		if end < 0 {
+			return "", fmt.Errorf("reading the easy connect string %q: the address is not closed", s)
+		}
+		host = hostPort[1:end]
+		if p, ok := strings.CutPrefix(hostPort[end+1:], ":"); ok {
+			port = p
+		}
+	} else if h, p, ok := strings.Cut(hostPort, ":"); ok {
+		host, port = h, p
+	}
+	if host == "" {
+		return "", fmt.Errorf("reading the easy connect string %q: it names no host", s)
+	}
+	desc := fmt.Sprintf("(DESCRIPTION=(ADDRESS=(PROTOCOL=%s)(HOST=%s)(PORT=%s))", protocol, host, port)
+	if service != "" {
+		desc += fmt.Sprintf("(CONNECT_DATA=(SERVICE_NAME=%s))", service)
+	}
+	return desc + ")", nil
 }
 
 // stripComments removes each comment, which runs from a # to the end of its

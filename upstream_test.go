@@ -731,3 +731,33 @@ func TestFailover(t *testing.T) {
 		}
 	}
 }
+
+// TestClientInSession is sijms/go-ora#584: a caller names the terminal of
+// the session, and the host and the user of the client reach v$session,
+// where only the connect packet carried them.
+func TestClientInSession(t *testing.T) {
+	dsn := os.Getenv("ORACLE_DSN")
+	if dsn == "" {
+		t.Skip("ORACLE_DSN is empty")
+	}
+	cfg, err := oracle.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Client = oracle.Client{Host: "go-host", User: "go-user", Terminal: "go-term"}
+	c, err := oracle.NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := sql.OpenDB(c)
+	defer db.Close()
+	var machine, osuser, terminal string
+	err = db.QueryRowContext(t.Context(), `SELECT machine, osuser, terminal FROM v$session
+		WHERE sid = SYS_CONTEXT('USERENV', 'SID')`).Scan(&machine, &osuser, &terminal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if machine != "go-host" || osuser != "go-user" || terminal != "go-term" {
+		t.Errorf("got the machine %q, the user %q and the terminal %q", machine, osuser, terminal)
+	}
+}

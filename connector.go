@@ -109,6 +109,12 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	if err := conn.OpenWithContext(ctx); err != nil {
+		if errors.Is(err, io.EOF) {
+			// a server at its limit of sessions can close the connection
+			// in the middle of the logon, and go-ora returned a bare EOF,
+			// sijms/go-ora#700
+			return nil, fmt.Errorf("connecting: the server closed the connection during the logon: %w", err)
+		}
 		return nil, err
 	}
 	if err := c.reg.InitFromConn(conn, c.params); err != nil {
@@ -250,6 +256,13 @@ func (cfg Config) connectionConfig() (*config.ConnectionConfig, error) {
 	}
 	conn.ProgramName = cfg.Program
 	conn.Cid = cfg.Client.cid()
+	if cfg.Client.Host != "" {
+		conn.HostName = cfg.Client.Host
+	}
+	if cfg.Client.User != "" {
+		conn.OSUserName = cfg.Client.User
+	}
+	conn.Terminal = cfg.Client.Terminal
 	if cfg.Wallet != "" {
 		if err := conn.LoadWallet(cfg.Wallet, cfg.WalletPassword); err != nil {
 			return nil, fmt.Errorf("reading the wallet: %w", err)
@@ -290,7 +303,7 @@ func (l ServiceLevel) level() int {
 // cid returns the client identity of the connect packet, or "" when no field
 // is set, so that the protocol code fills in this process.
 func (cl Client) cid() string {
-	if cl == (Client{}) {
+	if cl.Program == "" && cl.Host == "" && cl.User == "" {
 		return ""
 	}
 	if cl.Program == "" && len(os.Args) > 0 {

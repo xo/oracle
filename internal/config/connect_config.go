@@ -236,7 +236,9 @@ func (config *ConnectionConfig) Validate() error {
 			}
 		}
 	}
-	config.HostName, _ = os.Hostname()
+	if config.HostName == "" {
+		config.HostName, _ = os.Hostname()
+	}
 
 	config.ProgramPath = os.Args[0]
 	if config.ProgramName == "" {

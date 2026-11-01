@@ -351,6 +351,7 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 	case 0x84:
 		retObj := reflect.New(param.typ)
 		var value any
+		var fills []func(load bool) error
 		for _, field := range param.fields {
 			attrib := param.attribs[field].Copy()
 			attrib.SetParentSession(param.PSession)
@@ -368,17 +369,36 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 			if idx, ok := param.activeFields[field]; ok {
 				dest := retObj.Elem().Field(idx).Addr().Interface()
 				// a LOB attribute holds a locator, and the decode runs while
-				// the reply is read, when no LOB can load. A string or a
-				// []byte field would get nothing, so only a LOB field takes
-				// one, and it loads after the call
-				if _, ok := value.(types.Lob); ok && !isLobDest(dest) {
-					return nil, fmt.Errorf("reading the attribute %s: a CLOB or a BLOB of an object reads only into an oracle.Clob or an oracle.Blob: %w", field, tns.ErrNotSupported)
+				// the reply is read, when no LOB can load, so its field is
+				// filled after the reply, as is the field of an object that
+				// holds one
+				switch v := value.(type) {
+				case *types.Clob, *types.Blob:
+					lob := v.(types.Lob)
+					fills = append(fills, func(load bool) error {
+						if load {
+							if err := lob.Load(); err != nil {
+								return err
+							}
+						}
+						return copyValue(dest, lob)
+					})
+					continue
+				case *pendingObject:
+					fills = append(fills, v.fills...)
+					fills = append(fills, func(bool) error {
+						return copyValue(dest, v.ptr.Elem().Interface())
+					})
+					continue
 				}
 				err = copyValue(dest, value)
 				if err != nil {
 					return nil, err
 				}
 			}
+		}
+		if len(fills) > 0 {
+			return &pendingObject{ptr: retObj, fills: fills}, nil
 		}
 		return retObj.Elem().Interface(), nil
 	case 0xFD, 0xFF:
@@ -429,11 +449,31 @@ func (param *ObjectParameter) Read(session tns.SessionReader) error {
 	return err
 }
 
-// isLobDest reports whether dest, a pointer to a field, takes a LOB.
-func isLobDest(dest any) bool {
-	switch dest.(type) {
-	case *types.Clob, **types.Clob, *types.Blob, **types.Blob, *types.BFile, **types.BFile:
-		return true
+// pendingObject is an object with a LOB attribute, whose fields are filled
+// after the reply is read. resolve fills them.
+type pendingObject struct {
+	ptr   reflect.Value
+	fills []func(load bool) error
+}
+
+// resolveObjects returns v with each pendingObject in it filled, loading its
+// LOBs when load is true. v is a value, or the elements of a collection.
+func resolveObjects(v any, load bool) (any, error) {
+	switch v := v.(type) {
+	case *pendingObject:
+		for _, fill := range v.fills {
+			if err := fill(load); err != nil {
+				return nil, err
+			}
+		}
+		return v.ptr.Elem().Interface(), nil
+	case []any:
+		for i, item := range v {
+			var err error
+			if v[i], err = resolveObjects(item, load); err != nil {
+				return nil, err
+			}
+		}
 	}
-	return false
+	return v, nil
 }

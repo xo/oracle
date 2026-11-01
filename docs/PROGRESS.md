@@ -125,7 +125,7 @@ and as a temporary LOB past that (D24), where the driver bound a `LONG` over
 ORA-01483. `UPSTREAM.md` records #635, #688, #680 and #697, which did not
 reproduce.
 
-The fourteenth part of step 9 is staged. The integration tests that step 1
+The fourteenth part of step 9 is done (`2db0d89`, pushed). The integration tests that step 1
 deleted are written again on the new API, in `collections_test.go`,
 `lobs_test.go`, `objects_test.go` and `named_types_test.go`. `gorm_test.go`
 and `issue_363_test.go` test `gorm` and `xorm`, and do not come back. The
@@ -140,6 +140,30 @@ tests found five faults, which are fixed:
 - With `lob_fetch=stream`, a NULL CLOB or BLOB scanned into a string or a
   `[]byte` failed, which the eleventh part brought in.
 
-`Object` names a type at a bind (D25). A LOB attribute read as text, and a
-bind of an object with one, are in `BACKLOG.md`.
+`Object` names a type at a bind (D25).
+
+The fifteenth part of step 9 is staged. A CLOB or a BLOB attribute of an
+object reads into a `string` or a `[]byte` field, in an OUT value, a
+collection, a row and an object inside another, and an object with one binds,
+where the server refused it with ORA-03101. A nil `*oracle.Clob` or
+`*oracle.Blob` binds as NULL, where it panicked.
+
+The sixteenth part of step 9 is staged. It finishes the open issues of
+go-ora (D27) and starts the tests of python-oracledb (D28):
+
+- A prepared query whose column changed type under it failed in 14 of 18
+  cases. It reads the type that the cursor fetched, and parses again on
+  ORA-00932 (`TestTypeChanges`).
+- A RETURNING that ran again with other binds failed with ORA-03146, which
+  was sijms/go-ora#697. An OUT of RETURNING too small for its value got a cut
+  value, an UPDATE of no row failed, and `RETURNING(id)INTO` was not found
+  (`TestRebind`, `TestReturning`).
+- An address of a descriptor with a key other than HOST, PORT and PROTOCOL
+  was dropped, and `tnsnames.ora` took no Easy Connect entry, kept the first
+  of two entries, and read text that is no entry as an alias.
+- A logon that the server closed returns an error that says so, which was
+  sijms/go-ora#700. `Client.Terminal` names the terminal of the session
+  (sijms/go-ora#584).
+- `DRIVERS.md` compares the features of the Oracle drivers, and D26 records
+  that two-phase commit and sessionless transactions are not built.
 

@@ -2,5 +2,3 @@ Secure =
   (DESCRIPTION=
     (ADDRESS=(PROTOCOL=TCPS)(HOST=sec.example.com)(PORT=2484))
     (CONNECT_DATA=(SERVICE_NAME=secure)))
-# ORCL here does not replace the one of the file that includes this one
-ORCL = (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=other)(PORT=1))(CONNECT_DATA=(SERVICE_NAME=other)))

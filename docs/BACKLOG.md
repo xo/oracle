@@ -26,15 +26,26 @@ column, `JSON_SERIALIZE(CAST(:1 AS JSON))` works, and 26ai returns it. Find
 whether the driver can send the bind so that 21c accepts it, as python-oracledb
 does, or record it as a fault of 21c.
 
-### Bind and read a LOB attribute of an object as text
+### Write the tests of python-oracledb again
 
-An object with a CLOB or a BLOB attribute reads into an `oracle.Clob` or an
-`oracle.Blob` field, which loads after the call. A `string` or a `[]byte`
-field is an error, because the decode fills the field while the reply is
-read. A bind of such an object fails with ORA-03101 on 26ai. go-ora panicked
-on the read. Load the LOBs of an object before its fields are filled, and
-write a LOB attribute as python-oracledb does. `TestObjectLobAttributes`
-holds what works.
+D28 asks for the tests of python-oracledb that test what this driver does.
+Written: `tnsnames.ora` (`test_1500_tnsnames.py`), descriptors
+(`test_1300_connect_params.py`), statements that change type
+(`test_2500_type_changes.py`), runs with other binds (`test_1000_execute.py`
+and `test_2000_char.py`), and DML RETURNING of one row
+(`test_2200_dml_returning.py`). Left, in the order of their value:
+`cursor/test_1200_executemany.py` (batches and their errors),
+`data_types/test_1500_lobs.py` (sizes of LOBs and the order of binds),
+`data_types/test_1800_number.py` (the bounds of NUMBER),
+`data_types/test_1900_dbobject.py` (an object of every type),
+`cursor/test_1400_callproc.py`, `data_types/test_1600_longs.py`, and the
+other files of `data_types`.
+
+### Return the rows of a RETURNING of more than one row
+
+A RETURNING that touches more than one row fails with an error, because an
+OUT takes one value. python-oracledb returns an array for each OUT. Find a
+form for `database/sql`, such as an OUT of a slice, and ask Ken.
 
 ### Tell dburl when the first tag exists
 

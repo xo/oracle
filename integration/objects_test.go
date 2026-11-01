@@ -1,8 +1,8 @@
 package integration
 
 import (
+	"context"
 	"database/sql"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -157,24 +157,38 @@ type lobDocText struct {
 	Data []byte `udt:"DATA"`
 }
 
-// TestObjectLobAttributes reads objects whose attributes are a CLOB and a
-// BLOB. The read panicked, because an attribute had no LOB streamer. A LOB
-// field loads after the call, and a string or a []byte field gets an error,
-// since the decode runs while the reply is read, when no LOB can load.
+type lobDocBox struct {
+	Name string     `udt:"NAME"`
+	Doc  lobDocText `udt:"DOC"`
+}
+
+// TestObjectLobAttributes reads and binds objects whose attributes are a
+// CLOB and a BLOB, alone, in a collection, in a row and inside another
+// object. A read panicked, because an attribute had no LOB streamer, and a
+// bind failed with ORA-03101, because an attribute was written with a
+// length of 4 bytes before its locator. The decode runs while the reply is
+// read, when no LOB can load, so the fields of such an object are filled
+// after the reply.
 func TestObjectLobAttributes(t *testing.T) {
 	db, err := getDB(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	drop := func() { execCmd(db, "DROP TYPE go_lob_docs", "DROP TYPE go_lob_doc") }
+	drop := func() {
+		execCmd(db, "DROP TABLE go_lob_doc_table PURGE", "DROP TYPE go_lob_box", "DROP TYPE go_lob_docs", "DROP TYPE go_lob_doc")
+	}
 	drop()
 	err = execCmd(db, "CREATE TYPE go_lob_doc AS OBJECT (id NUMBER, body CLOB, data BLOB)",
-		"CREATE TYPE go_lob_docs AS TABLE OF go_lob_doc")
+		"CREATE TYPE go_lob_docs AS TABLE OF go_lob_doc",
+		"CREATE TYPE go_lob_box AS OBJECT (name VARCHAR2(20), doc go_lob_doc)",
+		"CREATE TABLE go_lob_doc_table (id NUMBER, doc go_lob_doc)")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer drop()
+	long := strings.Repeat("x", 5000)
+	// into oracle.Clob and oracle.Blob fields
 	if err := oracle.RegisterType(db, "go_lob_doc", "go_lob_docs", lobDoc{}); err != nil {
 		t.Fatal(err)
 	}
@@ -183,13 +197,11 @@ func TestObjectLobAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := out.Body.Value()
-	if err != nil || body != strings.Repeat("x", 5000) {
-		t.Errorf("body: got %d characters, %v", len(body.(string)), err)
+	if body, err := out.Body.Value(); err != nil || body != long {
+		t.Errorf("an oracle.Clob: got %v, %v", body, err)
 	}
-	data, err := out.Data.Value()
-	if err != nil || string(data.([]byte)) != "abc" {
-		t.Errorf("data: got %v, %v", data, err)
+	if data, err := out.Data.Value(); err != nil || string(data.([]byte)) != "abc" {
+		t.Errorf("an oracle.Blob: got %v, %v", data, err)
 	}
 	var outs []lobDoc
 	_, err = db.Exec("BEGIN :1 := go_lob_docs(go_lob_doc(1, 'short', NULL), go_lob_doc(2, NULL, NULL)); END;", oracle.Out{Dest: &outs})
@@ -202,7 +214,7 @@ func TestObjectLobAttributes(t *testing.T) {
 	if body, err := outs[1].Body.Value(); err != nil || body != nil {
 		t.Errorf("a NULL CLOB: got %v, %v", body, err)
 	}
-	// the same type, read into a string and a []byte, is an error
+	// into string and []byte fields, on a database of its own registry
 	db2, err := getDB(t)
 	if err != nil {
 		t.Fatal(err)
@@ -211,9 +223,41 @@ func TestObjectLobAttributes(t *testing.T) {
 	if err := oracle.RegisterType(db2, "go_lob_doc", "", lobDocText{}); err != nil {
 		t.Fatal(err)
 	}
+	if err := oracle.RegisterType(db2, "go_lob_box", "", lobDocBox{}); err != nil {
+		t.Fatal(err)
+	}
 	var text lobDocText
-	_, err = db2.Exec("BEGIN :1 := go_lob_doc(1, 'x', NULL); END;", oracle.Out{Dest: &text})
-	if !errors.Is(err, oracle.ErrNotSupported) {
-		t.Errorf("a string field: got %v, want ErrNotSupported", err)
+	_, err = db2.Exec("BEGIN :1 := go_lob_doc(1, RPAD('x', 5000, 'x'), UTL_RAW.CAST_TO_RAW('abc')); END;", oracle.Out{Dest: &text})
+	if err != nil || text.Body != long || string(text.Data) != "abc" {
+		t.Errorf("a string and a []byte: got %d characters and %q, %v", len(text.Body), text.Data, err)
+	}
+	var box lobDocBox
+	_, err = db2.Exec("BEGIN :1 := go_lob_box('box', go_lob_doc(2, 'inner', NULL)); END;", oracle.Out{Dest: &box})
+	if err != nil || box.Name != "box" || box.Doc.Body != "inner" || box.Doc.Data != nil {
+		t.Errorf("an object in an object: got %+v, %v", box, err)
+	}
+	// a bind, of text and of LOBs, which the server refused
+	var s string
+	_, err = db2.Exec("DECLARE d go_lob_doc := :1; BEGIN :2 := DBMS_LOB.GETLENGTH(d.body) || ':' || DBMS_LOB.GETLENGTH(d.data); END;",
+		lobDocText{3, long, []byte{1, 2}}, oracle.Out{Dest: &s, Size: 100})
+	if err != nil || s != "5000:2" {
+		t.Errorf("a bind of text: got %q, %v", s, err)
+	}
+	if _, err := db2.Exec("INSERT INTO go_lob_doc_table VALUES (1, :1)", lobDocText{4, long, []byte{5}}); err != nil {
+		t.Fatal(err)
+	}
+	// a row
+	var row lobDocText
+	if err := db2.QueryRow("SELECT doc FROM go_lob_doc_table WHERE id = 1").Scan(&row); err != nil || row.Body != long || string(row.Data) != "\x05" {
+		t.Errorf("a row: got %d characters and %v, %v", len(row.Body), row.Data, err)
+	}
+	clob, err := oracle.CreateClob(context.Background(), db, "from a locator", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec("DECLARE d go_lob_doc := :1; BEGIN :2 := d.body || ':' || NVL(TO_CHAR(DBMS_LOB.GETLENGTH(d.data)), 'null'); END;",
+		lobDoc{ID: 5, Body: *clob}, oracle.Out{Dest: &s, Size: 100})
+	if err != nil || s != "from a locator:null" {
+		t.Errorf("a bind of an oracle.Clob: got %q, %v", s, err)
 	}
 }

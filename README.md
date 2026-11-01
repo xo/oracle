@@ -127,6 +127,10 @@ A user named `SYS` gets no privilege by its name. Write `privilege=sysdba`.
 The server reads a user name in upper case unless the name is quoted, as in
 SQL. A user created as `"scott"` logs on as `oracle://%22scott%22:pass@host/service`.
 
+`Config.Client` names the program, the host, the user and the terminal that
+`v$session` shows for the session. An empty field takes the value of the
+process.
+
 `ParseDSN` returns a `Config`. A caller that needs more than a DSN can say,
 such as a `*tls.Config`, a `Dialer` or a `*slog.Logger`, changes the `Config`
 and opens the database with a connector:
@@ -317,8 +321,8 @@ _, err = db.Exec("BEGIN :1 := :2; END;",
     oracle.Object{Name: "DATE_LIST", Value: []time.Time{time.Now()}})
 ```
 
-A CLOB or a BLOB attribute of an object reads into an `oracle.Clob` or an
-`oracle.Blob` field, which loads after the call.
+A CLOB or a BLOB attribute of an object reads into a `string`, a `[]byte`, an
+`oracle.Clob` or an `oracle.Blob` field, and binds from any of them.
 
 ## Session parameters
 

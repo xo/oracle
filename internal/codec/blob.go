@@ -19,6 +19,9 @@ func (param *BlobParameter) Init() {
 }
 func (param *BlobParameter) Encode(input any, conn Conn) (err error) {
 	param.Init()
+	if isNilPointer(input) {
+		return nil
+	}
 	encoder := &types.Blob{}
 	encoder.SetDataType(param.DataType)
 	err = encoder.SetValue(input)

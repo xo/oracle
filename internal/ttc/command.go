@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -316,7 +317,10 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 	return rs.rowsAffected, nil
 }
 
-var sqlQueryReturnStatementRegexp = regexp.MustCompile(`(\bRETURNING\b|\bRETURN\b)\s+.*\s+\bINTO\b`)
+// sqlQueryReturnStatementRegexp finds RETURNING ... INTO, which go-ora found
+// only with spaces around the list, so RETURNING(id)INTO was a statement with
+// no RETURNING, and the server refused its binds with ORA-03146
+var sqlQueryReturnStatementRegexp = regexp.MustCompile(`(?s)\bRETURN(ING)?\b.*\bINTO\b`)
 
 // NewStmt create new stmt and set its connection properties
 func NewStmt(text string, conn *Connection) *Stmt {
@@ -355,7 +359,7 @@ func NewStmt(text string, conn *Connection) *Stmt {
 		stmt.stmtType = OTHERS
 	}
 
-	if stmt.stmtType != PLSQL {
+	if stmt.stmtType == DML {
 		stmt._hasReturnClause = sqlQueryReturnStatementRegexp.MatchString(uCmdText)
 	}
 	return stmt
@@ -529,7 +533,11 @@ func (stmt *Stmt) getExeOption() int {
 	}
 	if len(stmt.Pars) > 0 && !stmt.define {
 		op |= 0x8
-		if stmt.stmtType == PLSQL || (stmt._hasReturnClause && !stmt.reSendParDef) {
+		// the binds of PL/SQL and of DML RETURNING, as python-oracledb
+		// sends them. go-ora left it out for RETURNING when it sent the
+		// binds of a statement again, and the server refused the
+		// execute with ORA-03146, sijms/go-ora#697
+		if stmt.stmtType == PLSQL || stmt._hasReturnClause {
 			op |= 0x400
 		}
 	}
@@ -684,6 +692,30 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, resultSet *ResultSet) error
 	return stmt.read(resultSet)
 }
 
+// adjustFetchType gives col, a column of a cursor that the server
+// described again, the type in which the server sends it. A cursor keeps the
+// type in which it fetched a column, and the server converts a new type to
+// it. A CLOB that was a string or a LONG comes as a LONG, in the charset of
+// the old column, and a BLOB that was a RAW comes as a LONG RAW, as
+// python-oracledb reads them. A string or a RAW that was an inline LOB comes
+// as a LONG or a LONG RAW, which the define of the LOB asked for. A type the server cannot convert fails with
+// ORA-00932, and the query parses again.
+func adjustFetchType(col, previous *ParameterInfo) {
+	switch {
+	case col.DataType == types.OCIClobLocator && slices.Contains([]uint16{types.CHAR, types.NCHAR, types.LONG, types.LongVarChar}, previous.DataType):
+		col.DataType = types.LONG
+		col.CharsetForm, col.CharsetID = previous.CharsetForm, previous.CharsetID
+	case col.DataType == types.OCIBlobLocator && slices.Contains([]uint16{types.RAW, types.LongRaw, types.LongVarRaw}, previous.DataType):
+		col.DataType = types.LongRaw
+	// the define of an inline LOB, which fetched it as a LONG, holds for a
+	// string that the column becomes, in the charset of the string
+	case slices.Contains([]uint16{types.CHAR, types.NCHAR}, col.DataType) && previous.DataType == types.LongVarChar:
+		col.DataType = types.LONG
+	case col.DataType == types.RAW && previous.DataType == types.LongRaw:
+		col.DataType = types.LongRaw
+	}
+}
+
 // read this is common read for stmt it read much information related to
 // columns, dataset information, output parameter information, rows values
 // and at the end summary object about this operation
@@ -729,8 +761,10 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 							return errors.New("more than one row affected with return clause")
 						}
 						if num == 0 {
+							// no row, so the value is NULL. go-ora cleared the
+							// destination, and the copy after it failed
 							stmt.Pars[x].BValue = nil
-							stmt.Pars[x].Value = nil
+							stmt.Pars[x].oPrimValue = nil
 						} else {
 							err = stmt.calculateParameterValue(&stmt.Pars[x])
 							if err != nil {
@@ -902,11 +936,19 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			if resultSet.columnCount > 0 {
 				_, err = session.ReadByte() // session.ReadInt(1, false, false)
 			}
+			// a describe comes with a parse, and with an execute after which
+			// the server parsed again, as when a view changed the type of a
+			// column. The flags hold what the new columns hold
+			previous := stmt.columns
 			stmt.columns = make([]ParameterInfo, resultSet.columnCount)
+			stmt._hasLONG, stmt._hasBLOB = false, false
 			for x := 0; x < resultSet.columnCount; x++ {
 				err = stmt.columns[x].load(stmt.connection)
 				if err != nil {
 					return err
+				}
+				if x < len(previous) {
+					adjustFetchType(&stmt.columns[x], &previous[x])
 				}
 				if stmt.columns[x].isLongType() {
 					stmt._hasLONG = true
@@ -1022,9 +1064,17 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if param.DataType != types.XMLType && param.ArraySize > 0 {
 		return nil
 	}
-	_, err = stmt.connection.session.ReadInt(2, true, true)
+	// the length of the value before the server cut it to the size of the
+	// OUT, or 0. go-ora read it and returned the cut value, as
+	// python-oracledb does not
+	length, err := stmt.connection.session.ReadInt(4, true, true)
 	if err != nil {
 		return err
+	}
+	// only a string or a RAW is cut. After an object, 11g sends the length
+	// of its image there
+	if length > 0 && param.oPrimValue != nil && slices.Contains([]uint16{types.NCHAR, types.CHAR, types.RAW}, param.DataType) {
+		return fmt.Errorf("reading an OUT value: the server cut a value of length %d to the size of the OUT, %d: %w", length, param.MaxCharLen, tns.ErrInvalidValue)
 	}
 	return nil
 }
@@ -1480,8 +1530,13 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 			if par.ArraySize > 0 {
 			} else {
 				// check if LobReadMode is auto so auto read all lobs
-				if stmt.connection.connOption.LobReadMode == config.LobReadModeAuto {
-					par.oPrimValue, err = loadLobs(par.oPrimValue)
+				auto := stmt.connection.connOption.LobReadMode == config.LobReadModeAuto
+				par.oPrimValue, err = resolveObjects(par.oPrimValue, auto)
+				if err != nil {
+					return nil, err
+				}
+				if auto {
+					err = loadLobs(par.oPrimValue)
 					if err != nil {
 						return nil, err
 					}
@@ -1705,6 +1760,7 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 		}
 	}
 
+	parsed := stmt.parse
 	dataSet, err := stmt._query()
 	if errors.Is(err, tns.ErrConnReset) {
 		err = stmt.connection.read()
@@ -1712,6 +1768,20 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 		if session.Summary != nil {
 			stmt.cursorID = session.Summary.CursorID
 		}
+	}
+	// the server refuses to run a cursor again when a column changed type
+	// under it, as when a view changed. The cursor closes, and the query
+	// parses again, once, as python-oracledb does
+	var oerr *tns.OracleError
+	if !parsed && stmt.stmtType == SELECT && errors.As(err, &oerr) && (oerr.ErrCode == 932 || oerr.ErrCode == 1007) {
+		logger.Debug("parse the query again", "error", err)
+		if err = stmt.Close(); err != nil {
+			return nil, err
+		}
+		stmt.cursorID, stmt.columns = 0, nil
+		stmt.parse, stmt.execute, stmt.define = true, true, false
+		stmt._hasLONG, stmt._hasBLOB = false, false
+		dataSet, err = stmt._query()
 	}
 	if err != nil {
 		if isBadConn(err) {
@@ -1826,6 +1896,13 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 			break
 		}
 		switch val := row[colIndex].(type) {
+		case *pendingObject, []any:
+			// an object with a LOB attribute, alone or in a collection
+			auto := stmt.connection.connOption.LobReadMode == config.LobReadModeAuto
+			row[colIndex], err = resolveObjects(val, auto)
+			if err != nil {
+				return err
+			}
 		case *RefCursor:
 			row[colIndex], err = val.Query()
 			if err != nil {
@@ -1889,59 +1966,23 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 	return nil
 }
 
-// loadLobs loads v when it is a LOB, each LOB of v when it is the elements
-// of a collection, and each LOB field of v when it is an object, and returns
-// v. The values of a call are decoded while the reply is read, when no LOB
-// can load, so an OUT collection of CLOBs held the locators of its elements,
-// and a string read one as its text.
-func loadLobs(v any) (any, error) {
+// loadLobs loads v when it is a LOB, and each LOB of v when it is the
+// elements of a collection. The values of a call are decoded while the reply
+// is read, when no LOB can load, so an OUT collection of CLOBs held the
+// locators of its elements, and a string read one as its text. The LOBs of
+// an object load as resolveObjects fills it.
+func loadLobs(v any) error {
 	switch v := v.(type) {
 	case types.Lob:
-		return v, v.Load()
+		return v.Load()
 	case []any:
-		for i, item := range v {
-			var err error
-			if v[i], err = loadLobs(item); err != nil {
-				return nil, err
-			}
-		}
-		return v, nil
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Struct {
-		return v, nil
-	}
-	// the fields of a copy can be addressed, and a LOB loads through a
-	// pointer
-	obj := reflect.New(rv.Type()).Elem()
-	obj.Set(rv)
-	for i := range obj.NumField() {
-		field := obj.Field(i)
-		if !field.CanSet() {
-			continue
-		}
-		var lob types.Lob
-		switch f := field.Addr().Interface().(type) {
-		case *types.Clob:
-			lob = f
-		case *types.Blob:
-			lob = f
-		case **types.Clob:
-			if *f != nil {
-				lob = *f
-			}
-		case **types.Blob:
-			if *f != nil {
-				lob = *f
-			}
-		}
-		if lob != nil {
-			if err := lob.Load(); err != nil {
-				return nil, err
+		for _, item := range v {
+			if err := loadLobs(item); err != nil {
+				return err
 			}
 		}
 	}
-	return obj.Interface(), nil
+	return nil
 }
 
 // Query execute a query command and return dataset object in form of driver.Rows interface

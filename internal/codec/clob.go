@@ -26,6 +26,10 @@ func (param *ClobParameter) Init() {
 
 func (param *ClobParameter) Encode(input any, conn Conn) (err error) {
 	param.Init()
+	if isNilPointer(input) {
+		// a nil *Clob, as a field of an object, is a NULL
+		return nil
+	}
 
 	switch input := input.(type) {
 	case types.String:
