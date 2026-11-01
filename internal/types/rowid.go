@@ -23,7 +23,10 @@ func (rowid RowID) Value() (any, error) {
 	case ROWID:
 		return string(rowid.decode()), nil
 	case UROWID:
-		if len(rowid.bValue) > 0 && rowid.bValue[0] == 1 {
+		if len(rowid.bValue) == 0 {
+			return nil, nil
+		}
+		if rowid.bValue[0] == 1 {
 			return string(rowid.physicalRawIDToByteArray(rowid.bValue)), nil
 		}
 		return string(rowid.logicalRawIDToByteArray(rowid.bValue)), nil
@@ -78,55 +81,31 @@ func (rowid *RowID) physicalRawIDToByteArray(data []byte) []byte {
 	return rowid.decode()
 }
 
+// logicalRawIDToByteArray returns the text of a logical UROWID, which an
+// index organized table has: a * and the bytes after the first in base 64,
+// with no padding, as python-oracledb writes it. go-ora left the first byte
+// zero and wrote each group of four over the last, so the server refused
+// the text with ORA-01410.
 func (rowid *RowID) logicalRawIDToByteArray(data []byte) []byte {
-	length1 := len(data)
-	num1 := length1 / 3
-	num2 := length1 % 3
-	num3 := num1 * 4
-	num4 := 0
-	if num2 > 1 {
-		num4 = 3
-	} else {
-		num4 = num2
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	if len(data) == 0 {
+		return nil
 	}
-	length2 := num3 + num4
-	var output []byte = nil
-	if length2 > 0 {
-		KGRDIndByteChar := []byte{65, 42, 45, 40, 41}
-		buffer := []byte{
-			65, 66, 67, 68, 69, 70, 71, 72,
-			73, 74, 75, 76, 77, 78, 79, 80,
-			81, 82, 83, 84, 85, 86, 87, 88,
-			89, 90, 97, 98, 99, 100, 101, 102,
-			103, 104, 105, 106, 107, 108, 109, 110,
-			111, 112, 113, 114, 115, 116, 117, 118,
-			119, 120, 121, 122, 48, 49, 50, 51,
-			52, 53, 54, 55, 56, 57, 43, 47,
+	output := []byte{'*'}
+	in := data[1:]
+	for len(in) > 0 {
+		output = append(output, alphabet[in[0]>>2])
+		if len(in) == 1 {
+			output = append(output, alphabet[(in[0]&0x3)<<4])
+			break
 		}
-		output = make([]byte, length2)
-		srcIndex := 0
-		dstIndex := 1
-		output[dstIndex] = KGRDIndByteChar[data[srcIndex]-1]
-		length1 -= 1
-		srcIndex++
-		dstIndex++
-		for length1 > 0 {
-			output[dstIndex] = buffer[data[srcIndex]>>2]
-			if length1 == 1 {
-				output[dstIndex+1] = buffer[(data[srcIndex]&3)<<4]
-				break
-			}
-			output[dstIndex+1] = buffer[(data[srcIndex]&3)<<4|(data[srcIndex+1]&0xF0)>>4]
-			if length1 == 2 {
-				output[dstIndex+2] = buffer[(data[srcIndex+1]&0xF)<<2]
-				break
-			}
-			output[dstIndex+2] = buffer[(data[srcIndex+1]&0xF)<<2|(data[srcIndex+2]&0xC0)>>6]
-			output[dstIndex+3] = buffer[data[srcIndex+2]&63]
-			length1 -= 3
-			srcIndex += 3
-			dstIndex += 3
+		output = append(output, alphabet[(in[0]&0x3)<<4|in[1]>>4])
+		if len(in) == 2 {
+			output = append(output, alphabet[(in[1]&0xf)<<2])
+			break
 		}
+		output = append(output, alphabet[(in[1]&0xf)<<2|in[2]>>6], alphabet[in[2]&0x3f])
+		in = in[3:]
 	}
 	return output
 }

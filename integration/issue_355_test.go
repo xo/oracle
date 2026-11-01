@@ -9,7 +9,7 @@ import (
 
 func TestIssue355(t *testing.T) {
 	var createPackage = func(db *sql.DB) error {
-		return execCmd(db, `CREATE OR REPLACE PACKAGE GOORA_TEMP IS
+		return execCmd(db, `CREATE OR REPLACE PACKAGE GOORA_355_PKG IS
 	TYPE VARCHAR2TABLE_T IS TABLE OF VARCHAR2(32767) INDEX BY BINARY_INTEGER;
 	PROCEDURE TEST_PROC_STRING(
 		STRING_IN IN VARCHAR2
@@ -23,8 +23,8 @@ func TestIssue355(t *testing.T) {
 	PROCEDURE TEST_PROC_BYTEARRAY(
 		BYTEARRAY_IN IN RAW
 	);
-END GOORA_TEMP;`,
-			`CREATE OR REPLACE PACKAGE BODY GOORA_TEMP IS
+END GOORA_355_PKG;`,
+			`CREATE OR REPLACE PACKAGE BODY GOORA_355_PKG IS
 	PROCEDURE TEST_PROC_STRING(
 		STRING_IN IN VARCHAR2
 	) IS
@@ -52,30 +52,30 @@ END GOORA_TEMP;`,
 	BEGIN
 		NULL;
 	END;
-END GOORA_TEMP;`)
+END GOORA_355_PKG;`)
 	}
 	var dropPackage = func(db *sql.DB) error {
-		return execCmd(db, "DROP PACKAGE GOORA_TEMP")
+		return execCmd(db, "DROP PACKAGE GOORA_355_PKG")
 	}
 	var callString = func(db *sql.DB, input string) error {
-		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRING(:1); END;", input)
+		_, err := db.Exec("BEGIN GOORA_355_PKG.TEST_PROC_STRING(:1); END;", input)
 		return err
 	}
 	var callStringArray = func(db *sql.DB, input []string) error {
 		var output sql.NullInt64
-		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY2(:1, :2); END;", input, oracle.Out{Dest: &output})
+		_, err := db.Exec("BEGIN GOORA_355_PKG.TEST_PROC_STRINGARRAY2(:1, :2); END;", input, oracle.Out{Dest: &output})
 		return err
 	}
 	var callStringPointerArray = func(db *sql.DB, input []*string) error {
-		_, err := db.Exec("BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY(:1); END;", input)
+		_, err := db.Exec("BEGIN GOORA_355_PKG.TEST_PROC_STRINGARRAY(:1); END;", input)
 		return err
 	}
 	var callSQLNullStringArray = func(db *sql.DB, input []sql.NullString) error {
-		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC_STRINGARRAY(:1); END;`, input)
+		_, err := db.Exec(`BEGIN GOORA_355_PKG.TEST_PROC_STRINGARRAY(:1); END;`, input)
 		return err
 	}
 	var callByteArray = func(db *sql.DB, input []byte) error {
-		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC_BYTEARRAY(:1); END;`, input)
+		_, err := db.Exec(`BEGIN GOORA_355_PKG.TEST_PROC_BYTEARRAY(:1); END;`, input)
 		return err
 	}
 	db, err := getDB(t)

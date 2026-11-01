@@ -37,6 +37,9 @@ func (param *RowIDParameter) Encode(input any, _ Conn) error {
 }
 
 func (param *RowIDParameter) Decode(_ Conn) (any, error) {
+	if len(param.BValue) == 0 {
+		return nil, nil
+	}
 	decoder := &types.RowID{}
 	*decoder = param.rowid
 	decoder.SetBytes(param.BValue)
@@ -56,8 +59,11 @@ func (param *RowIDParameter) Read(session tns.SessionReader) error {
 			return err
 		}
 		if length == 0 {
+			// a NULL, which go-ora read as the ROWID of zeros
+			param.BValue = nil
 			return nil
 		}
+		param.BValue = []byte{length}
 		param.rowid.Rba, err = session.ReadInt64(4, true, true)
 		if err != nil {
 			return err

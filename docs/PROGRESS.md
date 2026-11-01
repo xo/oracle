@@ -182,7 +182,7 @@ python-oracledb (D28), and they found these faults, which are fixed:
   no error, and 1e-130 read as 0.
 - An NCLOB of stream mode read in pieces skipped half of each piece.
 
-The eighteenth part of step 9 is staged. 19c is tested again, and its
+The eighteenth part of step 9 is done (`efa15cf`, pushed). 19c is tested again, and its
 exchanges are recorded again (D29), since dbmeta starts it in 30 seconds.
 Both suites pass on it. The object tests of python-oracledb found these
 faults, which are fixed:
@@ -196,4 +196,12 @@ faults, which are fixed:
   one, so a bind of the inner collection hung.
 - An `XMLType` attribute did not read, and an object that is an OUT sent the
   zero value of its destination.
+
+The nineteenth part of step 9 is staged. The ORA-00600 [kkxcmp0] of a
+package did not come back in 60 runs on 18c and 19c, and each test now
+compiles a package of its own name, where two pairs of tests replaced one
+package. The tests of LONG, ROWID, procedures, NCLOB with RETURNING and
+negative intervals of python-oracledb are written again, and found that a
+logical UROWID read as text that the server refused, and a NULL ROWID read as
+a ROWID of zeros. Both are fixed.
 

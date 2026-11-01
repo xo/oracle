@@ -35,19 +35,12 @@ Written: `tnsnames.ora` (`test_1500_tnsnames.py`), descriptors
 and `test_2000_char.py`), DML RETURNING of one row
 (`test_2200_dml_returning.py`), batches of DML (`test_1200_executemany.py`),
 the sizes of LOBs and the order of their binds (`test_1500_lobs.py`), and the
-bounds of NUMBER (`test_1800_number.py`), and objects
-(`test_1900_dbobject.py`). Left, in the order of their value:
-`cursor/test_1400_callproc.py`, `data_types/test_1600_longs.py`, and the
-other files of `data_types`.
-
-### Find the ORA-00600 of a package that compiles
-
-`TestClientCharsetWithStringArray` on 18c and `TestIssue355` on 19c each
-failed once with ORA-00600 [kkxcmp0: new exceptions], while the server
-compiled a package, and passed when they ran again. Both create and drop
-`GOORA_TEMP_PKG`. Find whether the driver sends something that the compiler
-trips on, or whether it is a fault of the server, and give each test a
-package of its own name.
+bounds of NUMBER (`test_1800_number.py`), objects
+(`test_1900_dbobject.py`), LONG (`test_1600_longs.py`), ROWID
+(`test_3400_rowid.py`), and cases of `test_1400_callproc.py`,
+`test_2000_char.py` and the intervals. Left, in the order of their value:
+the other files of `data_types`: dates and timestamps, NCHAR, BOOLEAN, JSON
+and VECTOR, which `values_test.go` covers in part.
 
 ### Return the rows of a RETURNING of more than one row
 

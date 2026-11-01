@@ -13,16 +13,16 @@ func TestClientCharset(t *testing.T) {
 	var createPackage = func(db *sql.DB) error {
 		return execCmd(db,
 			// create package
-			`CREATE OR REPLACE PACKAGE GOORA_TEMP IS
+			`CREATE OR REPLACE PACKAGE GOORA_CHARSET_PKG IS
 	TYPE VARCHAR2TABLE_T IS TABLE OF VARCHAR2(32767) INDEX BY BINARY_INTEGER;
 	PROCEDURE TEST_PROC(
 		STRING_ARRAY_IN IN VARCHAR2TABLE_T,
 		STRING_OUT OUT VARCHAR2
 	);
-END GOORA_TEMP;`,
+END GOORA_CHARSET_PKG;`,
 
 			// create package body
-			`CREATE OR REPLACE PACKAGE BODY GOORA_TEMP IS
+			`CREATE OR REPLACE PACKAGE BODY GOORA_CHARSET_PKG IS
 	PROCEDURE TEST_PROC(
 		STRING_ARRAY_IN IN VARCHAR2TABLE_T,
 		STRING_OUT OUT VARCHAR2
@@ -32,17 +32,17 @@ END GOORA_TEMP;`,
 			STRING_OUT := STRING_OUT || STRING_ARRAY_IN(i);
 		END LOOP;
 	END;
-END GOORA_TEMP;`,
+END GOORA_CHARSET_PKG;`,
 		)
 	}
 
 	var dropPackage = func(db *sql.DB) error {
-		return execCmd(db, "DROP PACKAGE GOORA_TEMP")
+		return execCmd(db, "DROP PACKAGE GOORA_CHARSET_PKG")
 	}
 
 	var callProc = func(db *sql.DB, stringsIn []string) error {
 		var stringOut string
-		_, err := db.Exec(`BEGIN GOORA_TEMP.TEST_PROC(:1, :2); END;`, stringsIn,
+		_, err := db.Exec(`BEGIN GOORA_CHARSET_PKG.TEST_PROC(:1, :2); END;`, stringsIn,
 			oracle.Out{Dest: &stringOut, Size: 256})
 		if err != nil {
 			return err

@@ -513,6 +513,13 @@ itself, so a bind of the inner collection hung. `TestObjectAllTypes`,
 `TestNestedCollections` and `TestObjectXMLType` hold the cases of
 python-oracledb, on 11g, 18c, 19c and 26ai.
 
+A logical UROWID, which an index organized table has, reads as a `*` and the
+base 64 of its bytes after the first, as python-oracledb writes it. go-ora
+left the first byte zero and wrote each group of four characters over the
+last, so the server refused the text with ORA-01410. A NULL ROWID or UROWID
+reads as NULL, where go-ora read the ROWID of zeros, `AAAAAAAAAAAAAAAAAA`.
+`TestRowIDs` holds the cases of python-oracledb.
+
 A nullable value is `sql.Null[T]`, and the driver defines no nullable type of
 its own. `NullTimeStampTZ` is gone, and `sql.Null[TimestampTZ]` takes its
 place. The driver handles every nullable type through two interfaces, with no
