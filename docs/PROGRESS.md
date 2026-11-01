@@ -142,13 +142,13 @@ tests found five faults, which are fixed:
 
 `Object` names a type at a bind (D25).
 
-The fifteenth part of step 9 is staged. A CLOB or a BLOB attribute of an
+The fifteenth part of step 9 is done (`922cd35`, pushed). A CLOB or a BLOB attribute of an
 object reads into a `string` or a `[]byte` field, in an OUT value, a
 collection, a row and an object inside another, and an object with one binds,
 where the server refused it with ORA-03101. A nil `*oracle.Clob` or
 `*oracle.Blob` binds as NULL, where it panicked.
 
-The sixteenth part of step 9 is staged. It finishes the open issues of
+The sixteenth part of step 9 is done (`922cd35`, pushed). It finishes the open issues of
 go-ora (D27) and starts the tests of python-oracledb (D28):
 
 - A prepared query whose column changed type under it failed in 14 of 18
@@ -166,4 +166,19 @@ go-ora (D27) and starts the tests of python-oracledb (D28):
   (sijms/go-ora#584).
 - `DRIVERS.md` compares the features of the Oracle drivers, and D26 records
   that two-phase commit and sessionless transactions are not built.
+
+The seventeenth part of step 9 is staged. It writes more of the tests of
+python-oracledb (D28), and they found these faults, which are fixed:
+
+- A batch went on past a row that failed, and stored the rows after it,
+  because the driver asked for the errors of a batch.
+- A batch kept the type of a row for the next, so a decimal after an `int`
+  went as text labeled NUMBER, and the server stored NULL. A mix of types
+  that cannot share one is an error.
+- A decimal bound as text, which the server read with the decimal point of
+  the session. It binds as a NUMBER now.
+- A NUMBER with an exponent in its text, such as `9.9E+125`, bound as another
+  number. A value past the range of NUMBER, an infinity and a NaN bound with
+  no error, and 1e-130 read as 0.
+- An NCLOB of stream mode read in pieces skipped half of each piece.
 

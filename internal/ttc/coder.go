@@ -2,6 +2,7 @@ package ttc
 
 import (
 	"database/sql"
+	"github.com/cockroachdb/apd/v3"
 	"time"
 
 	"github.com/xo/oracle/internal/codec"
@@ -20,7 +21,7 @@ func builtinCoder(v any) codec.OracleParameterCoder {
 	case []byte, types.Raw:
 		return &codec.RawParameter{}
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64,
-		types.Number,
+		types.Number, *apd.Decimal, apd.Decimal,
 		sql.NullByte, sql.NullInt16, sql.NullInt32, sql.NullInt64, sql.NullFloat64,
 		sql.Null[int], sql.Null[int32], sql.Null[int64], sql.Null[uint64], sql.Null[float32], sql.Null[float64]:
 		return &codec.NumberParameter{}

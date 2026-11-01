@@ -1,13 +1,14 @@
 package types
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/cockroachdb/apd/v3"
 )
 
 type Number struct {
@@ -24,54 +25,70 @@ func (number *Number) MaxLen() int64 {
 		return MaxLenNumber
 	}
 }
+
+// isZero reports whether the NUMBER is 0, the one byte 0x80. A NUMBER of two
+// bytes that starts with 0x80 is near 1e-130, which go-ora read as 0.
 func (number *Number) isZero() bool {
-	return len(number.bValue) > 0 && number.bValue[0] == 0x80
+	return len(number.bValue) == 1 && number.bValue[0] == 0x80
 }
 
-func (number *Number) encode(mantissa []byte, exp int, negative bool) ([]byte, error) {
-	trailingZeros := 0
-	for i := len(mantissa) - 1; i >= 0 && mantissa[i] == '0'; i-- {
-		trailingZeros++
+// encodeDecimal returns the NUMBER of s, the text of a decimal such as -1.5,
+// 2e10 or 9.9E+125. A NUMBER is a byte of exponent and up to 20 digits of
+// base 100, and holds values from 1e-130 to below 1e126, as python-oracledb
+// writes them. A value out of that range, an infinity and a NaN are errors,
+// where go-ora sent bytes that the server read as another number, and read
+// an E as a digit.
+func encodeDecimal(s string) ([]byte, error) {
+	d, _, err := apd.NewFromString(strings.TrimSpace(s))
+	if err != nil {
+		return nil, fmt.Errorf("reading %q as a NUMBER: %w", s, err)
 	}
-	mantissa = mantissa[:len(mantissa)-trailingZeros]
-	if len(mantissa) == 0 {
+	if d.Form != apd.Finite {
+		return nil, fmt.Errorf("binding %s: a NUMBER holds no infinity and no NaN", s)
+	}
+	if d.IsZero() {
 		return []byte{0x80}, nil
 	}
-	if exp%2 == 0 {
-		mantissa = append([]byte{'0'}, mantissa...)
+	digits := d.Coeff.String()
+	exp := int(d.Exponent)
+	trimmed := strings.TrimRight(digits, "0")
+	exp += len(digits) - len(trimmed)
+	digits = trimmed
+	// p is the count of digits before the decimal point, which the digits
+	// of base 100 align to
+	p := len(digits) + exp
+	if p%2 != 0 {
+		digits, p = "0"+digits, p+1
 	}
-	mantissaLen := len(mantissa)
-	size := 1 + (mantissaLen+1)/2
-	if negative && mantissaLen < 21 {
-		size++
+	if len(digits)%2 != 0 {
+		digits += "0"
 	}
-	bValue := make([]byte, size)
-
-	for i := 0; i < mantissaLen; i += 2 {
-		b := 10 * (mantissa[i] - '0')
-		if i < mantissaLen-1 {
-			b += mantissa[i+1] - '0'
-		}
-		if negative {
-			b = 100 - b
-		}
-		bValue[1+i/2] = b + 1
+	if len(digits) > 40 {
+		return nil, fmt.Errorf("binding %s: a NUMBER holds 40 digits", s)
 	}
-
-	if negative && mantissaLen < 21 {
-		bValue[len(bValue)-1] = 0x66
+	exp100 := p/2 - 1
+	if exp100 > 62 || exp100 < -65 {
+		return nil, fmt.Errorf("binding %s: a NUMBER holds values from 1e-130 to below 1e126", s)
 	}
-
-	if exp < 0 {
-		exp--
-	}
-	exp = (exp / 2) + 1
-	if negative {
-		bValue[0] = byte(exp+64) ^ 0x7f
+	n := len(digits) / 2
+	b := make([]byte, 0, n+2)
+	if d.Negative {
+		b = append(b, byte(62-exp100))
 	} else {
-		bValue[0] = byte(exp+64) | 0x80
+		b = append(b, byte(exp100+193))
 	}
-	return bValue, nil
+	for i := range n {
+		v := (digits[2*i]-'0')*10 + digits[2*i+1] - '0'
+		if d.Negative {
+			b = append(b, 101-v)
+		} else {
+			b = append(b, v+1)
+		}
+	}
+	if d.Negative && n < 20 {
+		b = append(b, 102)
+	}
+	return b, nil
 }
 
 func (number *Number) decode() (strNum string, exp int, negative bool, err error) {
@@ -257,23 +274,17 @@ func (number *Number) Value() (any, error) {
 }
 
 func (number *Number) encodeInt(input int64) error {
-	mantissa := []byte(strconv.FormatInt(input, 10))
-	negative := mantissa[0] == '-'
-	if negative {
-		mantissa = mantissa[1:]
-	}
 	var err error
-	exp := len(mantissa) - 1
-	number.bValue, err = number.encode(mantissa, exp, negative)
+	number.bValue, err = encodeDecimal(strconv.FormatInt(input, 10))
 	return err
 }
+
 func (number *Number) encodeUint(input uint64) error {
-	mantissa := []byte(strconv.FormatUint(input, 10))
-	exponent := len(mantissa) - 1
 	var err error
-	number.bValue, err = number.encode(mantissa, exponent, false)
+	number.bValue, err = encodeDecimal(strconv.FormatUint(input, 10))
 	return err
 }
+
 func (number *Number) encodeFloat64(input float64) error {
 	number.bValue = make([]byte, MaxLenBDouble)
 	temp := math.Float64bits(input)
@@ -299,63 +310,20 @@ func (number *Number) encodeFloat32(input float32) error {
 	return nil
 }
 func (number *Number) encodeFloat(input float64) error {
-	if input == 0.0 {
-		number.bValue = []byte{128}
-		return nil
+	if math.IsNaN(input) || math.IsInf(input, 0) {
+		return fmt.Errorf("binding %v: a NUMBER holds no infinity and no NaN", input)
 	}
-	var (
-		exponent int
-		err      error
-	)
-	mantissa := []byte(strconv.FormatFloat(input, 'e', -1, 64))
-	if i := bytes.Index(mantissa, []byte{'e'}); i >= 0 {
-		exponent, err = strconv.Atoi(string(mantissa[i+1:]))
-		if err != nil {
-			return err
-		}
-		mantissa = mantissa[:i]
-	}
-
-	negative := mantissa[0] == '-'
-	if negative {
-		mantissa = mantissa[1:]
-	}
-
-	if i := bytes.Index(mantissa, []byte{'.'}); i >= 0 {
-		mantissa = append(mantissa[:i], mantissa[i+1:]...)
-	}
-	number.bValue, err = number.encode(mantissa, exponent, negative)
+	var err error
+	number.bValue, err = encodeDecimal(strconv.FormatFloat(input, 'g', -1, 64))
 	return err
 }
+
 func (number *Number) encodeString(input string) error {
-	mantissa := []byte(input)
-	negative := mantissa[0] == '-'
-	if negative {
-		mantissa = mantissa[1:]
-	}
-	var (
-		exp int
-		err error
-	)
-	isFloat := false
-	if i := bytes.Index(mantissa, []byte{'e'}); i >= 0 {
-		exp, err = strconv.Atoi(string(mantissa[i+1:]))
-		if err != nil {
-			return err
-		}
-		mantissa = mantissa[:i]
-	}
-	if i := bytes.Index(mantissa, []byte{'.'}); i >= 0 {
-		mantissa = append(mantissa[:i], mantissa[i+1:]...)
-		exp += i - 1
-		isFloat = true
-	}
-	if !isFloat {
-		exp += len(mantissa) - 1
-	}
-	number.bValue, err = number.encode(mantissa, exp, negative)
+	var err error
+	number.bValue, err = encodeDecimal(input)
 	return err
 }
+
 func (number *Number) SetValue(input any) error {
 	input, verr := ValueOf(input)
 	if verr != nil {

@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"github.com/cockroachdb/apd/v3"
 	"reflect"
 	"strconv"
 	"time"
@@ -229,6 +230,11 @@ func basicValue(v any) (any, error) {
 func ownValue(v any) bool {
 	switch v.(type) {
 	case types.TimestampTZ, *types.TimestampTZ:
+		return true
+	case *apd.Decimal, apd.Decimal:
+		// a decimal binds as a NUMBER. As the text that database/sql made
+		// of it, the server read it with the NLS_NUMERIC_CHARACTERS of the
+		// session
 		return true
 	}
 	_, ok := types.OwnNull(v)

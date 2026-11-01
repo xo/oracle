@@ -32,11 +32,10 @@ D28 asks for the tests of python-oracledb that test what this driver does.
 Written: `tnsnames.ora` (`test_1500_tnsnames.py`), descriptors
 (`test_1300_connect_params.py`), statements that change type
 (`test_2500_type_changes.py`), runs with other binds (`test_1000_execute.py`
-and `test_2000_char.py`), and DML RETURNING of one row
-(`test_2200_dml_returning.py`). Left, in the order of their value:
-`cursor/test_1200_executemany.py` (batches and their errors),
-`data_types/test_1500_lobs.py` (sizes of LOBs and the order of binds),
-`data_types/test_1800_number.py` (the bounds of NUMBER),
+and `test_2000_char.py`), DML RETURNING of one row
+(`test_2200_dml_returning.py`), batches of DML (`test_1200_executemany.py`),
+the sizes of LOBs and the order of their binds (`test_1500_lobs.py`), and the
+bounds of NUMBER (`test_1800_number.py`). Left, in the order of their value:
 `data_types/test_1900_dbobject.py` (an object of every type),
 `cursor/test_1400_callproc.py`, `data_types/test_1600_longs.py`, and the
 other files of `data_types`.

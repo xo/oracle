@@ -1,6 +1,7 @@
 package ttc
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"database/sql/driver"
@@ -515,9 +516,6 @@ func (stmt *Stmt) getExeOption() int {
 	op := 0
 	if stmt.stmtType == PLSQL || stmt._hasReturnClause {
 		op |= 0x40000
-	}
-	if stmt.arrayBindCount > 1 {
-		op |= 0x80000
 	}
 	if stmt.connection.autoCommit && (stmt.stmtType == DML || stmt.stmtType == PLSQL) {
 		op |= 0x100
@@ -1453,9 +1451,15 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				maxLen := int64(0)
 				maxCharLen := int64(0)
 				dataType := uint16(0)
+				seen := map[uint16]bool{}
+				nullType := uint16(0)
 				arrayValues := make([][]byte, stmt.arrayBindCount)
 				for y := 0; y < stmt.arrayBindCount; y++ {
 					par.Value = tempVal.Index(y).Interface()
+					// each row takes the type of its own value. go-ora kept
+					// the type of the row before, and a decimal went as
+					// text labeled NUMBER, which the server stored as NULL
+					par.DataType = 0
 					err = par.encodeValue(0, stmt)
 					if err != nil {
 						return nil, err
@@ -1468,17 +1472,36 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					}
 					// here I can take the binary value and store it into array
 					arrayValues[y] = par.BValue
-					if len(par.BValue) == 0 && par.DataType == types.NCHAR {
+					// a NULL takes the type of the other rows, and a batch of
+					// NULLs alone the type of its NULLs
+					if len(par.BValue) == 0 {
+						nullType = par.DataType
 						continue
 					}
 					dataType = par.DataType
+					seen[dataType] = true
+				}
+				// a batch binds one type for each argument
+				switch {
+				case len(seen) <= 1:
+				case onlyTypes(seen, types.NCHAR, types.LONG, types.LongVarChar):
+					// short and long strings go as LONG
+					dataType = types.LongVarChar
+				case onlyTypes(seen, types.RAW, types.LongRaw):
+					dataType = types.LongRaw
+				case onlyTypes(seen, types.DATE, types.TIMESTAMP):
+					// a time with a fraction is a TIMESTAMP, and one with
+					// none a DATE, which a TIMESTAMP holds
+					dataType = types.TIMESTAMP
+				default:
+					return nil, fmt.Errorf("binding the batch argument %d: its values have different types: %w", x+1, tns.ErrInvalidValue)
 				}
 				// save arrayValues into primitive
 				par.iPrimValue = arrayValues
 				par.MaxLen = maxLen
 				par.MaxCharLen = maxCharLen
-				if int(dataType) == 0 {
-					dataType = types.NCHAR
+				if dataType == 0 {
+					dataType = cmp.Or(nullType, types.NCHAR)
 				}
 				par.DataType = dataType
 			} else {
@@ -1697,7 +1720,9 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 	if pos >= 0 && pos < len(stmt.Pars) {
 		originalPar := stmt.Pars[pos]
-		if par.MaxLen > originalPar.MaxLen {
+		// the server holds the type of each bind, so one that changes goes
+		// again with its definition
+		if par.MaxLen > originalPar.MaxLen || par.DataType != originalPar.DataType {
 			stmt.reSendParDef = true
 		}
 		// resend parameter definition when string/[]byte length change from long to short and vice versa
@@ -1964,6 +1989,16 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 		}
 	}
 	return nil
+}
+
+// onlyTypes reports whether each type of seen is one of allowed.
+func onlyTypes(seen map[uint16]bool, allowed ...uint16) bool {
+	for t := range seen {
+		if !slices.Contains(allowed, t) {
+			return false
+		}
+	}
+	return true
 }
 
 // loadLobs loads v when it is a LOB, and each LOB of v when it is the

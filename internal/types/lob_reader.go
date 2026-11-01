@@ -143,9 +143,12 @@ func (clob *Clob) NewReader(ctx context.Context) *LobReader {
 // NewReaderSize is NewReader with pieces of about size bytes. The server
 // counts a piece in characters, which can each be more than one byte.
 func (clob *Clob) NewReaderSize(ctx context.Context, size int) *LobReader {
+	// a CLOB of variable width, and an NCLOB in AL16UTF16, come as UTF-16,
+	// whose offsets count units of 2 bytes. An NCLOB counted in bytes read
+	// every other piece
 	utf16 := false
 	if !clob.IsNil() {
-		utf16 = clob.Locator().IsVarWidthChar()
+		utf16 = clob.Locator().IsVarWidthChar() || clob.Conv != nil && (clob.Conv.LangID == 2000 || clob.Conv.LangID == 2002)
 	}
 	return newLobReader(ctx, clob.stream, size, clob.Conv, utf16, func() ([]byte, error) {
 		v, err := clob.Value()

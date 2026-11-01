@@ -469,6 +469,33 @@ A decimal is an `*apd.Decimal` from `github.com/cockroachdb/apd/v3`, a new one
 for each value, as in dbimp D33 (D16). `NUMBER` holds 38 digits, which neither
 `float64` nor `int64` holds.
 
+A decimal binds as a `NUMBER`. `database/sql` turned one into its text, which
+the server read with the `NLS_NUMERIC_CHARACTERS` of the session, so 24.5
+failed where the decimal point is a comma. Each number that binds as a
+`NUMBER` goes through its decimal text, as python-oracledb writes it: a byte of
+exponent and up to 20 digits of base 100, from 1e-130 to below 1e126. A value
+past that range, an infinity and a NaN are errors. go-ora read the `E` of the
+text of a decimal as a digit, let the exponent byte overflow, and sent
+infinity and NaN, and the server returned another number, or on 11g bytes of
+its own memory. It read the NUMBER of 1e-130, `80 02`, as 0, because a NUMBER
+that starts with `80` is 0 only when it is that one byte. `TestEncodeDecimal`,
+`TestNumberBounds` and `TestDecimalBind` hold it.
+
+A batch binds one type for each argument. Each row takes the type of its own
+value, where go-ora kept the type of the row before, so a decimal went as text
+labeled `NUMBER` after a row of an `int`, and the server stored NULL. A NULL
+takes the type of the other rows, and a batch of NULLs alone the type of its
+NULLs. Short and long strings in one argument bind as `LONG`, short and long
+`[]byte` as `LONG RAW`, a `DATE` and a `TIMESTAMP` as `TIMESTAMP`, and any
+other mix is an error. A statement that runs again sends the definition of
+its binds again when the type of one changed, where go-ora did so only for a
+few pairs of types, and a batch of NUMBER after a batch of NULLs went as
+text. A batch stops at the first row that
+fails, as python-oracledb runs one: go-ora asked for the errors of a batch,
+option `0x80000`, and the server went on past the row, so rows after an
+ORA-00001 were stored and the caller got the error alone. `TestBatches` holds
+the cases of python-oracledb.
+
 A nullable value is `sql.Null[T]`, and the driver defines no nullable type of
 its own. `NullTimeStampTZ` is gone, and `sql.Null[TimestampTZ]` takes its
 place. The driver handles every nullable type through two interfaces, with no

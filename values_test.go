@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -699,6 +700,77 @@ func TestPLSQLLongValues(t *testing.T) {
 			if err != nil || l != int64(n) {
 				t.Errorf("a VARCHAR2 of %d bytes: got %d, %v", n, l, err)
 			}
+		}
+	}
+	usable(t, db)
+}
+
+// TestDecimalBind binds an *apd.Decimal as a NUMBER. It went as the text
+// that database/sql made of it, which the server read with the
+// NLS_NUMERIC_CHARACTERS of the session, so 24.5 failed where the decimal
+// point is a comma. In a batch it went as that text labeled NUMBER after a
+// row of an int, and the server stored NULL.
+func TestDecimalBind(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	if _, err := db.ExecContext(ctx, "ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ',.'"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Exec("ALTER SESSION SET NLS_NUMERIC_CHARACTERS = '.,'") })
+	d, _, _ := apd.NewFromString("24.5")
+	var got *apd.Decimal
+	if err := db.QueryRowContext(ctx, "SELECT :1 + 1 FROM dual", d).Scan(&got); err != nil || got.String() != "25.5" {
+		t.Errorf("got %v, %v", got, err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT :1 + 1 FROM dual", *d).Scan(&got); err != nil || got.String() != "25.5" {
+		t.Errorf("a value: got %v, %v", got, err)
+	}
+}
+
+// TestNumberBounds binds numbers at and past the bounds of NUMBER, which
+// holds 38 digits from 1e-130 to below 1e126. It holds the cases of
+// tests/data_types/test_1800_number.py of python-oracledb (1805, 1806, 1827,
+// 1828), written again here. A value past the bounds is an error, and never
+// a wrong number.
+func TestNumberBounds(t *testing.T) {
+	db := openLive(t)
+	ctx := t.Context()
+	dec := func(s string) *apd.Decimal {
+		d, _, err := apd.NewFromString(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	for _, test := range []struct {
+		in   any
+		want string
+	}{
+		{int64(6088343244), "6088343244"},
+		{int64(math.MaxInt64), "9223372036854775807"},
+		{int64(math.MinInt64), "-9223372036854775808"},
+		{uint64(math.MaxUint64), "18446744073709551615"},
+		{dec("-9999999999999999999"), "-9999999999999999999"},
+		{dec("9.99999999999999e+125"), "999999999999999" + strings.Repeat("0", 111)},
+		{dec("-9.99999999999999e+125"), "-999999999999999" + strings.Repeat("0", 111)},
+		{0.0, "0"},
+		{1e-130, "1E-130"},
+		{-1e-130, "-1E-130"},
+		{dec("12345678901234567890123456789012345678"), "12345678901234567890123456789012345678"},
+	} {
+		var got *apd.Decimal
+		if err := db.QueryRowContext(ctx, "SELECT :1 FROM dual", test.in).Scan(&got); err != nil {
+			t.Errorf("%v: %v", test.in, err)
+			continue
+		}
+		if got.Text('f') != strings.ToUpper(test.want) && got.String() != test.want {
+			t.Errorf("%v: got %s", test.in, got)
+		}
+	}
+	for _, in := range []any{1e126, -1e126, math.Inf(1), math.Inf(-1), math.NaN(), dec("1e126"), dec("-1e126"), dec("Infinity"), dec("NaN")} {
+		var got sql.Null[string]
+		if err := db.QueryRowContext(ctx, "SELECT TO_CHAR(:1) FROM dual", in).Scan(&got); err == nil {
+			t.Errorf("%v: got %q and no error", in, got.V)
 		}
 	}
 	usable(t, db)
