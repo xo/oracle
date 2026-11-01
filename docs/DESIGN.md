@@ -402,8 +402,22 @@ zone database of Go lacks makes a read of such a value fail with an error.
 `TestLocalTimeZone` holds it, on 11g with `+00:00`, `-05:00` and
 `Europe/London`.
 
-A `bool` binds as a `BOOLEAN` on 23ai and later, and as the `NUMBER` 1 or 0
-before, whose SQL has no `BOOLEAN`. `go-ora` bound no `bool`.
+A `bool` binds as a `BOOLEAN` on 23ai and later, and in PL/SQL from 12.1,
+as python-oracledb binds one. In SQL before 23ai, which has no `BOOLEAN`, it
+binds as the `NUMBER` 1 or 0. `go-ora` bound no `bool`. A `BOOLEAN` bind has
+the size 4, and a NULL one is `0xFD 1`, as python-oracledb writes them. With
+the size 1, 18c never answered a block with a `BOOLEAN` IN and a `BOOLEAN`
+OUT. A NULL `BOOLEAN` OUT of PL/SQL before 23ai is a byte of 0 with the
+length -1, which reads as NULL.
+
+A `time.Time` OUT binds as a `TIMESTAMP`, so that it takes the fraction of a
+`TIMESTAMP`. A NULL `RAW`, `LONG RAW` or `BLOB` reads as NULL, where go-ora
+returned a nil `[]byte` in an `any`, which `sql.Null[[]byte]` took as valid.
+An OUT string sends its size in bytes and no count of characters, as
+python-oracledb does. With the count that go-ora sent, an OUT of PL/SQL held
+32,767 bytes divided by the bytes of a character, 8,191 on AL32UTF8. 11g
+holds one to that size in any case. `TestVarTypes` holds a value and a NULL
+of each type, OUT and IN OUT, for the types of `test_2000_var.py`.
 
 A string longer than the longest `VARCHAR2` binds as a `LONG`. 11g and 18c
 convert one to the UTF-16 of a `CLOB` one packet at a time, and stored U+FFFD

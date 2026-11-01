@@ -29,6 +29,11 @@ func (plsqlConn) MaxStringLength() int64 {
 	return plsqlMaxLen
 }
 
+// PLSQL reports that the statement is PL/SQL, whose BOOLEAN a bool binds as.
+func (plsqlConn) PLSQL() bool {
+	return true
+}
+
 func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 	connection := stmt.connection
 	par.init()
@@ -103,6 +108,15 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 			}
 		}
 	}
+	// an OUT of a time binds as a TIMESTAMP, which holds what a DATE holds
+	// and a fraction. A time with no fraction, as the zero time of an OUT
+	// alone, binds as a DATE otherwise, and the server cut the fraction of
+	// the value that it returned
+	if dp, ok := par.encoder.(*codec.DateParameter); ok && par.Direction != Input && dp.DataType == 0 {
+		dp = dp.Copy().(*codec.DateParameter)
+		dp.DataType = types.TIMESTAMP
+		par.encoder = dp
+	}
 	par.encoder.UpdateParameterInfo(par.ParameterInfo())
 	var conn codec.Conn = connection
 	if stmt.stmtType == PLSQL {
@@ -153,10 +167,13 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 			// cut a RETURNING value of 8 characters to 4
 			size = connection.MaxStringLength() / perChar
 		}
-		if par.MaxCharLen < size {
-			par.MaxCharLen = size
-		}
-		par.MaxLen = par.MaxCharLen * perChar
+		par.MaxLen = max(par.MaxCharLen, size) * perChar
+		// the server takes the size from the bytes alone. A count of
+		// characters, which go-ora sent, held a VARCHAR2 OUT of PL/SQL to
+		// 32,767 bytes divided by the bytes of a character, 8,191 on
+		// AL32UTF8, and a longer value failed with ORA-06502.
+		// python-oracledb sends 0
+		par.MaxCharLen = 0
 	}
 
 	if par.DataType == types.OCIFileLocator {

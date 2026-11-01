@@ -1065,10 +1065,16 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	if err != nil {
 		return err
 	}
+	// a NULL BOOLEAN of PL/SQL before 23ai is a byte of 0 with the length
+	// -1, which python-oracledb reads as NULL. go-ora read it as false
+	if length < 0 && param.DataType == types.BOOLEAN {
+		param.BValue, param.oPrimValue = nil, nil
+		return nil
+	}
 	// only a string or a RAW is cut. After an object, 11g sends the length
 	// of its image there
 	if length > 0 && param.oPrimValue != nil && slices.Contains([]uint16{types.NCHAR, types.CHAR, types.RAW}, param.DataType) {
-		return fmt.Errorf("reading an OUT value: the server cut a value of length %d to the size of the OUT, %d: %w", length, param.MaxCharLen, tns.ErrInvalidValue)
+		return fmt.Errorf("reading an OUT value: the server cut a value of length %d to the %d bytes of the OUT: %w", length, param.MaxLen, tns.ErrInvalidValue)
 	}
 	return nil
 }

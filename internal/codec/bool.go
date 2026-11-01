@@ -22,7 +22,7 @@ func (param *BoolParameter) Init() {
 
 func (param *BoolParameter) Encode(input any, conn Conn) error {
 	param.Init()
-	if conn != nil && conn.ServerRelease() < 23 {
+	if conn != nil && conn.ServerRelease() < 23 && !(inPLSQL(conn) && conn.ServerRelease() >= 12) {
 		return param.encodeNumber(input, conn)
 	}
 	encoder := &types.Bool{}
@@ -34,15 +34,37 @@ func (param *BoolParameter) Encode(input any, conn Conn) error {
 	if dt := encoder.DataType(); dt != 0 {
 		param.DataType = dt
 	}
-	if param.MaxLen < encoder.MaxLen() {
-		param.MaxLen = encoder.MaxLen()
-	}
+	// the size of a BOOLEAN, as python-oracledb binds one. With the size 1
+	// that go-ora sent, 18c never answered a block with a BOOLEAN IN and a
+	// BOOLEAN OUT
+	param.MaxLen = max(param.MaxLen, encoder.MaxLen(), boolSize)
 	param.BValue = encoder.Bytes()
 	return nil
 }
 
-// encodeNumber encodes input as the NUMBER 1 or 0, for a server before 23ai,
-// whose SQL has no BOOLEAN.
+// boolSize is the size of a BOOLEAN bind.
+const boolSize = 4
+
+// Write writes a NULL BOOLEAN as 0xFD 1, as python-oracledb writes it. 18c
+// read the empty value that go-ora wrote as a BOOLEAN that is not NULL.
+func (param *BoolParameter) Write(session tns.SessionWriter) error {
+	if param.DataType == types.BOOLEAN && param.BValue == nil && !param.IsUDTPar && !param.IsArrayPar {
+		session.PutBytes(0xFD, 1)
+		return nil
+	}
+	return param.BasicParameter.Write(session)
+}
+
+// inPLSQL reports whether conn binds for a PL/SQL statement. PL/SQL takes a
+// BOOLEAN bind from 12.1, as python-oracledb sends it, and refused the NUMBER
+// that go-ora sent there with PLS-00382.
+func inPLSQL(conn Conn) bool {
+	p, ok := conn.(interface{ PLSQL() bool })
+	return ok && p.PLSQL()
+}
+
+// encodeNumber encodes input as the NUMBER 1 or 0, for SQL before 23ai,
+// which has no BOOLEAN, and for PL/SQL before 12.1.
 func (param *BoolParameter) encodeNumber(input any, conn Conn) error {
 	var b types.Bool
 	if err := b.SetValue(input); err != nil {

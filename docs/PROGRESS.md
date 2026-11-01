@@ -272,7 +272,7 @@ table with its keys (D33). These faults are fixed:
 - A `[]bool` bound to PL/SQL as a host array, and the server failed with an
   internal error, ORA-00600 on 18c. The driver now refuses it.
 
-The twenty-fourth part of step 9 is done. The cases of
+The twenty-fourth part of step 9 is done (`b1aa9c0`). The cases of
 `cursor/test_1800_other.py` that test this driver are written again, and
 found these faults, which are fixed:
 
@@ -282,3 +282,18 @@ found these faults, which are fixed:
   first as a fetch with no execute, and failed with ORA-01002 once a bind
   changed type.
 - An argument matched a bind name in quotes in any case.
+
+The twenty-fifth part of step 9 is done. The types of
+`cursor/test_2000_var.py` go through a PL/SQL variable of each type, OUT and
+IN OUT, with a NULL of each, and the PL/SQL `BOOLEAN` cases of
+`test_2400_boolean.py`, which round twenty left out, are written. They found
+these faults, which are fixed:
+
+- A `bool` bound as a `NUMBER` in PL/SQL before 23ai, which a `BOOLEAN`
+  refused with PLS-00382. A `BOOLEAN` IN and OUT in one block of 18c never
+  answered, and a NULL `BOOLEAN` read as false or bound as a value.
+- A `time.Time` OUT bound as a `DATE` and lost the fraction of a
+  `TIMESTAMP`.
+- A NULL `RAW`, `LONG RAW` or `BLOB` read as a valid empty `[]byte`.
+- An OUT string of PL/SQL held 8,191 characters on AL32UTF8, where the size
+  was 32,767.
