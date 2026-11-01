@@ -15,6 +15,9 @@ type sqlInfo struct {
 	// names holds the name of each bind, in order, once for each place it
 	// appears. A name without quotes is in upper case.
 	names []string
+	// quoted holds, for each name, whether it was in quotes, which keeps its
+	// case.
+	quoted []bool
 	// returning is a DML statement with RETURNING ... INTO.
 	returning bool
 	// call is a CALL, which is of the kind PLSQL and binds a name at each
@@ -114,6 +117,7 @@ func parseSQL(text string) (sqlInfo, error) {
 			}
 			if end > i {
 				info.names = append(info.names, name)
+				info.quoted = append(info.quoted, r[end] == '"')
 				i = end
 			}
 		case unicode.IsSpace(ch):

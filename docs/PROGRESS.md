@@ -260,7 +260,7 @@ The full suites pass on every release. ORA-00600 [kkxcmp0] came back once,
 in `TestClientCharsetWithStringArray` on 19c, and did not come back in 15
 runs of the test and two runs of the suite.
 
-The twenty-third part of step 9 is done. The cases of
+The twenty-third part of step 9 is done (`d6edb15`). The cases of
 `cursor/test_2700_features_12_1.py` are written again: PL/SQL arrays of
 NUMBER, DATE and VARCHAR2, IN, IN OUT and OUT, implicit results, and records
 and index-by tables of a package. Ken decided that `RegisterType` takes the
@@ -271,3 +271,14 @@ table with its keys (D33). These faults are fixed:
   takes it, and a type of a package failed with ORA-00600 [kocpnsh014].
 - A `[]bool` bound to PL/SQL as a host array, and the server failed with an
   internal error, ORA-00600 on 18c. The driver now refuses it.
+
+The twenty-fourth part of step 9 is done. The cases of
+`cursor/test_1800_other.py` that test this driver are written again, and
+found these faults, which are fixed:
+
+- A prepared statement whose run failed sent its text again with no
+  pointer, and its second run failed with ORA-03120.
+- A prepared query with a LOB of the inline mode ran each time after the
+  first as a fetch with no execute, and failed with ORA-01002 once a bind
+  changed type.
+- An argument matched a bind name in quotes in any case.

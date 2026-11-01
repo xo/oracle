@@ -150,3 +150,19 @@ func TestParseKind(t *testing.T) {
 		}
 	}
 }
+
+// TestParseQuoted checks that parseSQL marks a name in quotes, which keeps
+// its case, as 1836 and 1837 of tests/cursor/test_1800_other.py of
+// python-oracledb need.
+func TestParseQuoted(t *testing.T) {
+	info, err := parseSQL(`select :test, :"test", : "Te St", :1 from dual`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"TEST", "test", "Te St", "1"}; !slices.Equal(info.names, want) {
+		t.Errorf("the names %q, want %q", info.names, want)
+	}
+	if want := []bool{false, true, true, false}; !slices.Equal(info.quoted, want) {
+		t.Errorf("quoted %v, want %v", info.quoted, want)
+	}
+}

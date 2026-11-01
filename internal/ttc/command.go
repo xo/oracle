@@ -101,7 +101,12 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	session.PutTTCFunc(0x3, 0x5E)
 	session.PutUint(exeOp, 4, true, true)
 	session.PutUint(stmt.cursorID, 2, true, true)
-	if stmt.cursorID == 0 {
+	// the pointer of the text, which a parse sends, as python-oracledb
+	// writes it. go-ora wrote it only for a new cursor, so a statement that
+	// parsed again into the cursor of a failed run, which the server gives
+	// with the error, sent its text with no pointer, and the server failed
+	// with ORA-03120
+	if stmt.cursorID == 0 || parse {
 		session.PutBytes(1)
 	} else {
 		session.PutBytes(0)
@@ -1627,6 +1632,16 @@ func (stmt *defaultStmt) ioVectorPlaces(count int) []int {
 	return places
 }
 
+// sameName reports whether the name of an argument is the name of a bind. A
+// name in quotes keeps its case, and any other name matches in any case.
+// go-ora matched a quoted name in any case, so :"test" took the argument TEST.
+func sameName(arg, bind string, quoted bool) bool {
+	if quoted {
+		return arg == bind
+	}
+	return strings.EqualFold(arg, bind)
+}
+
 // useNamedParameters: re-arrange parameters according parameter defined in sql text
 func (stmt *Stmt) useNamedParameters() error {
 	info, err := parseSQL(stmt.text)
@@ -1642,7 +1657,7 @@ func (stmt *Stmt) useNamedParameters() error {
 		for x := range names {
 			found := false
 			for _, par := range stmt.Pars {
-				if strings.ToLower(par.Name) == strings.ToLower(names[x]) {
+				if sameName(par.Name, names[x], info.quoted[x]) {
 					parCollection = append(parCollection, par)
 					found = true
 					break
@@ -1670,7 +1685,7 @@ func (stmt *Stmt) useNamedParameters() error {
 			}
 			found := false
 			for _, par := range stmt.Pars {
-				if strings.ToLower(par.Name) == strings.ToLower(names[x]) {
+				if sameName(par.Name, names[x], info.quoted[x]) {
 					if !repeated {
 						parCollection = append(parCollection, par)
 					}
@@ -1945,6 +1960,10 @@ func (stmt *Stmt) _query() (*DataSet, error) {
 		}
 	}
 	stmt.measureLobs(dataSet.currentResultSet().rows)
+	// the next run executes again. go-ora left execute false after the
+	// define, so each later run sent a fetch with the binds and no execute,
+	// which the server refused with ORA-01002 once a bind changed type
+	stmt.execute = true
 	stmt.parse = false
 	stmt.define = false
 	stmt.reSendParDef = false

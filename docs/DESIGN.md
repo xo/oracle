@@ -683,7 +683,9 @@ parser of python-oracledb does. It finds three things:
 A string, a quoted name or a q-string with no end is an error, which a bind
 by name returns. The server reports it for any other statement.
 
-The driver uses the names only for a bind by name. SQL takes a bind for each
+The driver uses the names only for a bind by name. An argument matches a
+name in quotes in its case, and any other name in any case. go-ora matched a
+name in quotes in any case. SQL takes a bind for each
 place a name appears, and PL/SQL one for each name. `CALL` takes one for
 each place, as SQL does, but the IO vector of its response holds one
 direction for each name. The driver gives the direction to the first place
@@ -702,7 +704,14 @@ server then closed the connection with ORA-03138. `TestParseNames` and
 ## Statements that run again
 
 A prepared statement keeps its cursor on the server, and runs it again with
-no parse. The server keeps the types in which the cursor fetched its
+no parse. A run that fails returns the cursor with the error, and the next
+run parses again into that cursor. A parse sends the text with its pointer,
+as python-oracledb sends it. go-ora sent the pointer only for a new cursor,
+so the second run of a statement that failed got ORA-03120. A query with a
+LOB of the inline mode runs, then defines its columns, and then each later
+run executes again. go-ora left the execute out after the define, so each
+later run was a fetch with the binds, which failed with ORA-01002 once a
+bind changed type. `TestCursorOther` holds the cases of python-oracledb. The server keeps the types in which the cursor fetched its
 columns. When a view or a table under the cursor changes the type of a
 column, the server parses again and sends a new describe with the rows. It
 converts a new type to the old type of the fetch when it can, and the rows

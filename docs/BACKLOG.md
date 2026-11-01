@@ -44,32 +44,30 @@ bounds of NUMBER (`test_1800_number.py`), objects
 (`test_1700_nchar.py`), and VECTOR (`test_2700_vector.py`,
 `test_2900_binary_vector.py` and `test_3000_sparse_vector.py`). The files of
 `data_types` are done, and so are `cursor/test_2400_sql_parser.py`,
-`misc/test_1100_error.py` and `cursor/test_2700_features_12_1.py`. Of the
+`misc/test_1100_error.py`, `cursor/test_2700_features_12_1.py` and
+`cursor/test_1800_other.py`. Of the
 last, the batch errors and the count of each row (2700, 2701, 2717 to 2719,
 2722 to 2724, 2726, 2727, 2730 and 2731) need an API of their own, as
 [`DRIVERS.md`](DRIVERS.md) says, and wait for Ken. A `%ROWTYPE` record (2728
 and 2729) waits for the item below. The metadata of a type (2734) has no API
-here.
+here. Of `cursor/test_1800_other.py`, the last ROWID (1821) and the count of
+the rows of a query (1856) have no API in `database/sql`, and the rest test
+the API of Python.
 
 The files outside `data_types` that test what this driver does, in the order
 to write them:
 
-1. `cursor/test_1800_other.py`: repeated DDL, SQL that is not ASCII, the case
-   of bind names, keywords as bind names, a run after an error, ORA-01007,
-   a column added to a cached query, a table with a LOB built again, mixed
-   NULL binds in PL/SQL, the order of PL/SQL binds, LOBs after an error,
-   domains and annotations, and a killed connection with an open cursor.
-2. `cursor/test_2000_var.py` and `cursor/test_2100_arrayvar.py`: the OUT of
+1. `cursor/test_2000_var.py` and `cursor/test_2100_arrayvar.py`: the OUT of
    each type that the files of `data_types` do not reach, and an array past
    its size.
-3. `connection/test_1000_basic.py`: a bad password, a password with `/` and
+2. `connection/test_1000_basic.py`: a bad password, a password with `/` and
    `@`, a rollback at close, connections from many goroutines, a ping,
    `current_schema`, `DBMS_OUTPUT`, a timeout of a call, a proxy user, the
    names of the client, the session ID, and an error in the middle of a
    response.
-4. `aq/test_1000_dbobject.py`, `aq/test_1200_bulk.py`, `aq/test_1400_raw.py`
+3. `aq/test_1000_dbobject.py`, `aq/test_1200_bulk.py`, `aq/test_1400_raw.py`
    and `aq/test_1600_json.py`, for the `aq` package.
-5. `ext/test_ext_2100_bfile_type.py`, which needs a directory and a file on
+4. `ext/test_ext_2100_bfile_type.py`, which needs a directory and a file on
    the server, and `misc/test_1600_defaults.py`, for `prefetch` and
    `lob_fetch`.
 
