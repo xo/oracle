@@ -93,7 +93,9 @@ jobs:
           go build -o "${{ runner.temp }}/bin/dbrun" ./cmd/dbrun
 
       # Every release that dbmeta names, except 19c, whose image is not
-      # public (D17), the Autonomous Database releases, which dbmeta
+      # public and whose first start on a new machine builds its database for
+      # 14 minutes, so it runs on a machine that keeps one (D17, D29), the
+      # Autonomous Database releases, which dbmeta
       # verifies on a machine and never in CI, and the release that requires
       # native network encryption, which is also for a machine.
       - name: Read the list

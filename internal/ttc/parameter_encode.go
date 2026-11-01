@@ -108,6 +108,12 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 	if stmt.stmtType == PLSQL {
 		conn = plsqlConn{connection}
 	}
+	// an object that is an OUT alone goes as a NULL. go-ora sent the image
+	// of the zero value of its destination, and 11g and 19c refused the
+	// NULL of an XMLType attribute in it with ORA-19008
+	if _, ok := par.encoder.(*ObjectParameter); ok && par.Direction == Output {
+		tempValue = nil
+	}
 	err = par.encoder.Encode(tempValue, conn)
 	if err != nil {
 		return err

@@ -31,12 +31,13 @@ conclusion.
 | [D20](#d20-the-driver-reads-tnsnamesora-with-a-parser-of-its-own) | Decided |
 | [D21](#d21-four-upstream-features-are-taken) | Decided |
 | [D22](#d22-a-lob-is-read-in-pieces-until-its-rows-close) | Decided |
-| [D23](#d23-no-test-runs-on-19c) | Decided. Amends D17 |
+| [D23](#d23-no-test-runs-on-19c) | Decided. Amends D17, amended by D29 |
 | [D24](#d24-a-long-value-binds-as-a-temporary-lob-in-plsql-only) | Decided |
 | [D25](#d25-a-collection-of-a-basic-type-binds-through-a-named-type-or-object) | Decided |
 | [D26](#d26-no-two-phase-commit-and-no-sessionless-transactions) | Decided |
 | [D27](#d27-the-open-upstream-issues-are-finished) | Decided |
 | [D28](#d28-the-tests-of-python-oracledb-are-written-again) | Decided |
+| [D29](#d29-19c-is-tested-again) | Decided. Amends D23 |
 
 ## Purpose
 
@@ -315,7 +316,7 @@ Status: Decided. Amends D17.
 Ken decided on 2026-11-01 that no test runs on 19c, not even a change to the
 protocol. The tests on 18c and 26ai cover what lies between, so 19c repeats
 them. No exchange is recorded on 19c. `oracle-adb-19c` is another image, and
-the tests still run on it.
+the tests still run on it. D29 brings 19c back.
 
 ## D24. A long value binds as a temporary LOB in PL/SQL only
 
@@ -385,6 +386,19 @@ pools, data frames, hooks, SODA, two-phase commit and the API of Python are
 left out. python-oracledb is under the UPL 1.0 and the Apache License 2.0.
 Each test here is written again from the cases, and its comment names the
 file and the number of the test that it follows.
+
+## D29. 19c is tested again
+
+Status: Decided. Amends D23.
+
+Ken decided on 2026-11-01 that 19c is tested again, and its exchanges are
+recorded again, since dbmeta v0.21.0 (its D248) starts `oracle-19c` from a
+kept copy of its database in about 30 seconds, on an image of 2.28 GB. The
+first start on a machine builds that copy, in about 14 minutes. The suites
+run on 19c with the other releases of this machine. CI still leaves 19c out,
+as D17 says, because each run of CI starts on a new machine with no copy, so
+each would wait 14 minutes. Ken can change that, for instance with a nightly
+job that keeps the copy in a cache.
 
 ## Open questions for Ken
 

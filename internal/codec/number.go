@@ -25,6 +25,12 @@ func (param *NumberParameter) Init() {
 func (param *NumberParameter) Encode(input any, _ Conn) error {
 	param.Init()
 	encoder := types.Number{}
+	// a coder of BINARY_FLOAT or BINARY_DOUBLE, as an attribute of an
+	// object has, encodes in that form. go-ora encoded a NUMBER, labeled
+	// it NUMBER, and the server read its bytes as a binary float
+	if param.DataType == types.IBFLOAT || param.DataType == types.IBDOUBLE {
+		encoder.SetDataType(param.DataType)
+	}
 	err := encoder.SetValue(input)
 	if err != nil {
 		return err

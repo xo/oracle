@@ -496,6 +496,23 @@ option `0x80000`, and the server went on past the row, so rows after an
 ORA-00001 were stored and the caller got the error alone. `TestBatches` holds
 the cases of python-oracledb.
 
+An object takes an attribute of every type that `ALL_TYPE_ATTRS` names:
+`CHAR`, `NCHAR`, `INTEGER`, `SMALLINT`, `REAL`, `DOUBLE PRECISION`, `FLOAT`,
+`BINARY_FLOAT`, `BINARY_DOUBLE`, `TIMESTAMP WITH TZ`, `TIMESTAMP WITH LOCAL TZ`,
+the intervals, `BOOLEAN`, the LOBs and `XMLTYPE`. go-ora knew a few of the
+names, and keyed the last one as `TIMESTAMP WITH LOCAL TIME ZONE`, which the
+dictionary never writes. A `BINARY_FLOAT` attribute encodes as a binary float,
+where go-ora sent a NUMBER under its type. A `TIMESTAMP WITH LOCAL TIME ZONE`
+attribute is 11 bytes in the zone of the database, where go-ora wrote the
+13 bytes of a zone. An `XMLType` attribute reads as the bytes of its image.
+An object that is an OUT alone sends a NULL, where go-ora sent the zero value
+of its destination, which 11g and 19c refused for its NULL `XMLType`.
+`RegisterType` of a collection whose element is a registered collection marks
+a copy of that coder as an element, where go-ora marked the registered coder
+itself, so a bind of the inner collection hung. `TestObjectAllTypes`,
+`TestNestedCollections` and `TestObjectXMLType` hold the cases of
+python-oracledb, on 11g, 18c, 19c and 26ai.
+
 A nullable value is `sql.Null[T]`, and the driver defines no nullable type of
 its own. `NullTimeStampTZ` is gone, and `sql.Null[TimestampTZ]` takes its
 place. The driver handles every nullable type through two interfaces, with no
@@ -670,10 +687,10 @@ the root package holds a test for each upstream fault that step 9 fixed,
 named for its fault, and its doc comment names the issue. `integration`, which
 was `TestIssues`, holds the integration tests of `go-ora`.
 
-In step 9 the root package and `integration` passed on 11g, 18c, 21c, 23ai,
-26ai, and the two Autonomous Database releases, `oracle-adb-19c` and
-`oracle-adb-26ai`. 19c is left out (D17, D23), because 18c and 26ai cover
-it. `dbrun dsn` prints the URL of an Autonomous
+In step 9 the root package and `integration` passed on 11g, 18c, 19c, 21c,
+23ai, 26ai, and the two Autonomous Database releases, `oracle-adb-19c` and
+`oracle-adb-26ai`. CI leaves 19c out (D17), because its first start on a new
+machine takes 14 minutes, and runs it on this machine (D29). `dbrun dsn` prints the URL of an Autonomous
 Database with the TLS options of `go-ora`, `ssl=true&ssl+verify=false`, which
 this parser refuses. A test gives it `sslmode=require` in their place.
 `oracle-nne-26ai` is a server that requires native network encryption and

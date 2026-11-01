@@ -40,11 +40,23 @@ func (param *xmlParameter) Init() {
 	param.DataType = types.XMLType
 }
 
-func (param *xmlParameter) Encode(any, codec.Conn) error {
+// Encode encodes a NULL, which an XMLType attribute of an object that is an
+// OUT holds. Any other value is an error.
+func (param *xmlParameter) Encode(input any, _ codec.Conn) error {
+	param.Init()
+	if v, err := types.ValueOf(input); err == nil && (v == nil || v == "") {
+		param.BValue = nil
+		return nil
+	}
 	return fmt.Errorf("binding an XMLType: bind its text, and convert it with XMLTYPE(:1): %w", tns.ErrNotSupported)
 }
 
-func (param *xmlParameter) Write(tns.SessionWriter) error {
+// Write writes the NULL of an attribute, the NULL of an object.
+func (param *xmlParameter) Write(session tns.SessionWriter) error {
+	if param.IsUDTPar && len(param.BValue) == 0 {
+		session.PutBytes(0xFD)
+		return nil
+	}
 	return fmt.Errorf("binding an XMLType: %w", tns.ErrNotSupported)
 }
 
@@ -52,6 +64,14 @@ func (param *xmlParameter) SetLobStreamer(types.LobStreamer) {}
 
 // Read reads the object that holds the image, as ObjectParameter does.
 func (param *xmlParameter) Read(session tns.SessionReader) error {
+	if param.IsUDTPar {
+		// an attribute of an object is its image with the length of the
+		// image of the object, as python-oracledb reads it, where go-ora
+		// read the envelope of a column and lost its place
+		var err error
+		param.BValue, err = param.BasicRead(session)
+		return err
+	}
 	if _, err := session.ReadDLC(); err != nil { // the type ID
 		return err
 	}

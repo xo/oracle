@@ -46,10 +46,17 @@ func (date *Date) encode(input time.Time) (bytes []byte, err error) {
 	case DATE:
 		bytes = make([]byte, MaxLenDate)
 		putDate(bytes, &input)
-	case TIMESTAMP:
+	case TIMESTAMP, TimestampLTZ, TimestampLTZDTY:
+		// a TIMESTAMP WITH LOCAL TIME ZONE holds no zone, and the server
+		// reads its wall clock in the zone of the database, which the
+		// decode reads it in. go-ora wrote the zone, and the server refused
+		// 13 bytes with ORA-00910
+		if date.dataType != TIMESTAMP && date.DBTimeZone != nil {
+			input = input.In(date.DBTimeZone)
+		}
 		bytes = make([]byte, MaxLenTimestamp)
 		putTimestamp(bytes, &input)
-	case TIMESTAMPTZ, TimestampTZDTY, TimestampLTZ, TimestampLTZDTY:
+	case TIMESTAMPTZ, TimestampTZDTY:
 		var val time.Time
 		if date.AsUTC {
 			val = input.UTC()

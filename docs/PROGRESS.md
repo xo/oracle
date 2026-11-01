@@ -167,7 +167,7 @@ go-ora (D27) and starts the tests of python-oracledb (D28):
 - `DRIVERS.md` compares the features of the Oracle drivers, and D26 records
   that two-phase commit and sessionless transactions are not built.
 
-The seventeenth part of step 9 is staged. It writes more of the tests of
+The seventeenth part of step 9 is done (`a59a07c`, pushed). It writes more of the tests of
 python-oracledb (D28), and they found these faults, which are fixed:
 
 - A batch went on past a row that failed, and stored the rows after it,
@@ -181,4 +181,19 @@ python-oracledb (D28), and they found these faults, which are fixed:
   number. A value past the range of NUMBER, an infinity and a NaN bound with
   no error, and 1e-130 read as 0.
 - An NCLOB of stream mode read in pieces skipped half of each piece.
+
+The eighteenth part of step 9 is staged. 19c is tested again, and its
+exchanges are recorded again (D29), since dbmeta starts it in 30 seconds.
+Both suites pass on it. The object tests of python-oracledb found these
+faults, which are fixed:
+
+- An object with an attribute of `CHAR`, `NCHAR`, `INTEGER`, `REAL`,
+  `BINARY_FLOAT`, `TIMESTAMP WITH TZ`, an interval or `BOOLEAN` did not
+  register, and one of `TIMESTAMP WITH LOCAL TZ` neither.
+- A `BINARY_FLOAT` attribute stored another number, and a `TIMESTAMP WITH
+  LOCAL TIME ZONE` attribute failed with ORA-00910.
+- A collection of a registered collection changed the coder of the inner
+  one, so a bind of the inner collection hung.
+- An `XMLType` attribute did not read, and an object that is an OUT sent the
+  zero value of its destination.
 

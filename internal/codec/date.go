@@ -23,6 +23,13 @@ func (param *DateParameter) Encode(input any, conn Conn) error {
 	param.Init()
 	encoder := types.Date{}
 	encoder.AsUTC = conn.SendTimeAsUTC()
+	if param.DataType == types.TimestampLTZ || param.DataType == types.TimestampLTZDTY {
+		zone, err := conn.DBTimeZone()
+		if err != nil {
+			return err
+		}
+		encoder.DBTimeZone = zone
+	}
 	encoder.SetDataType(param.DataType)
 	err := encoder.SetValue(input)
 	if err != nil {

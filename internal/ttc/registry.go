@@ -100,6 +100,22 @@ func (driver *Registry) init() {
 	tempClob.CharsetForm = 2
 	driver.nameTypeCoder["NCLOB"] = tempClob
 	driver.nameTypeCoder["XMLTYPE"] = &xmlParameter{}
+	// the names that ALL_TYPE_ATTRS gives an attribute, which an object of
+	// any of them failed to register with
+	driver.nameTypeCoder["CHAR"] = &codec.StringParameter{}
+	driver.nameTypeCoder["NCHAR"] = &codec.StringParameter{CharsetForm: 2}
+	for _, name := range []string{"INTEGER", "SMALLINT", "REAL", "DOUBLE PRECISION", "FLOAT", "DECIMAL"} {
+		driver.nameTypeCoder[name] = &codec.NumberParameter{DataType: types.NUMBER, MaxLen: types.MaxLenNumber}
+	}
+	driver.nameTypeCoder["BINARY_FLOAT"] = &codec.NumberParameter{DataType: types.IBFLOAT, MaxLen: types.MaxLenBFloat}
+	driver.nameTypeCoder["BINARY_DOUBLE"] = &codec.NumberParameter{DataType: types.IBDOUBLE, MaxLen: types.MaxLenBDouble}
+	for _, name := range []string{"TIMESTAMP WITH TZ", "TIMESTAMP WITH TIME ZONE"} {
+		driver.nameTypeCoder[name] = &codec.DateParameter{DataType: types.TimestampTZDTY, MaxLen: types.MaxLenTimestampTZ}
+	}
+	driver.nameTypeCoder["TIMESTAMP WITH LOCAL TZ"] = &codec.DateParameter{DataType: types.TimestampLTZDTY, MaxLen: types.MaxLenTimestampTZ}
+	driver.nameTypeCoder["INTERVAL YEAR TO MONTH"] = &codec.IntervalParameter{DataType: types.IntervalYMDTY, MaxLen: types.MaxLenIntervalYM}
+	driver.nameTypeCoder["INTERVAL DAY TO SECOND"] = &codec.IntervalParameter{DataType: types.IntervalDSDTY, MaxLen: types.MaxLenIntervalDS}
+	driver.nameTypeCoder["BOOLEAN"] = &codec.BoolParameter{}
 
 	// initialize all
 	for _, coder := range driver.goTypeCoder {
@@ -199,6 +215,12 @@ func (drv *Registry) RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTyp
 		drv.goTypeCoder[typ] = objCoder
 		drv.mu.Unlock()
 		arrayParam = objCoder.Copy()
+	} else {
+		// the element of the collection is a copy, which SetAsArrayPar marks.
+		// go-ora marked the coder of the registered type itself, and a bind
+		// of that type then wrote the form of an element, which the server
+		// refused with ORA-03120 or never answered
+		arrayParam = arrayParam.Copy()
 	}
 
 	if len(arrayTypeName) > 0 {
