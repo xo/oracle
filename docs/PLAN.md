@@ -40,6 +40,7 @@ conclusion.
 | [D29](#d29-19c-is-tested-again) | Decided. Amends D23 |
 | [D30](#d30-the-go-types-of-a-vector) | Decided |
 | [D31](#d31-an-nvarchar-binds-as-nvarchar2) | Decided |
+| [D32](#d32-a-unit-that-does-not-compile-is-an-error) | Decided |
 
 ## Purpose
 
@@ -432,6 +433,24 @@ a NULL one, and an OUT of an `NVarChar` or a `[]NVarChar` reads one.
 python-oracledb does the same: a `str` binds as `DB_TYPE_VARCHAR`, and the
 caller asks for `DB_TYPE_NVARCHAR` on the bind variable. `database/sql` has no
 bind variable to ask on, so the type of the value asks.
+
+## D32. A unit that does not compile is an error
+
+Status: Decided.
+
+Ken decided on 2026-11-01 that a statement that creates a PL/SQL unit, a
+view or a type that does not compile returns an error. The server creates the
+object, marks it invalid, and sets a flag of its summary. python-oracledb
+reads the flag as the warning DPY-7000 of the cursor, and OCI returns
+ORA-24344, "success with compilation error", as godror does. `database/sql`
+has no place for a warning, so the statement returns a `*ServerError` with
+ORA-24344, which the sentinel `ErrCompilation` matches. go-ora read the flag
+and dropped it, so the caller did not know.
+
+A warning that the server sends in a message of its own, as at logon for a
+password that will expire, goes to the `Logger` of the `Config` at the level
+Warn. An error there would refuse the connection. go-ora wrote it to
+`os.Stderr`.
 
 ## Open questions for Ken
 

@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"regexp"
-	"strings"
 	"testing"
 )
 
@@ -164,27 +162,4 @@ func TestSetArray(t *testing.T) {
 		return
 	}
 	fmt.Println(array)
-}
-
-func TestParseSqlText(t *testing.T) {
-	data, err := parseQueryParametersNames(`INSERT INTO TTB_NESTED_UDT(ID, DATA1, SEP1, DATA2, SEP2) 
-VALUES(:ID, :DATA1, :SEP1, :DATA2, :SEP2)`)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Log(data)
-}
-
-func TestCatchReturning(t *testing.T) {
-	temp := refineSqlText(strings.ToUpper(`INSERT INTO "test_user" ("uid","name","account","password","email","phone_number","sex","birthday","user_type","enabled","remark","add_new_column","comment_single_quote") VALUES ('U0','someone','guest','MAkOvrJ8JV','','+8618888888888','1',NULL,1,1,'Ahmad','AddNewColumnValue','CommentSingleQuoteValue') /*--*/RETURNING "id" INTO '{{} 0xc000306398 false}' /*-sql.Out{}-*/`))
-	t.Log(temp)
-	hasReturnClause, err := regexp.MatchString(`(\bRETURNING\b|\bRETURN\b)\s+.*\s+\bINTO\b`, temp)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if !hasReturnClause {
-		t.Error(fmt.Errorf("expected true and got false"))
-	}
 }

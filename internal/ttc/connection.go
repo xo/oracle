@@ -127,6 +127,9 @@ func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
 // Ping test if connection is online
 func (conn *Connection) Ping(ctx context.Context) error {
 	conn.logger.Debug("ping")
+	if !conn.IsValid() {
+		return driver.ErrBadConn
+	}
 	conn.session.ResetBuffer()
 	done := conn.session.StartContext(ctx)
 	defer conn.session.EndContext(done)
@@ -933,7 +936,7 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 }
 
 func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	if conn.State != Opened || !conn.session.Connected {
+	if !conn.IsValid() || !conn.session.Connected {
 		// database/sql discards the connection and opens another. go-ora
 		// opened this one again here, printed the result to standard
 		// output, and returned ErrBadConn all the same
@@ -958,6 +961,11 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		conn.logger.Debug("summary", "code", session.Summary.RetCode, "message", string(session.Summary.ErrorMessage))
 		if conn.session.HasError() {
 			return conn.session.ServerError()
+		}
+		// the server created a unit that it could not compile, and the
+		// caller must know (D32)
+		if conn.session.Summary.CompilationError() {
+			return tns.NewCompilationError()
 		}
 	case 8:
 		size, err := session.ReadInt(2, true, true)
@@ -1037,8 +1045,11 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 		if err != nil {
 			return err
 		}
+		// a warning comes at logon too, as for a password that will expire,
+		// so it goes to the logger and not to the caller. go-ora wrote it to
+		// os.Stderr
 		if warning != nil {
-			_, _ = os.Stderr.WriteString(fmt.Sprintln(warning))
+			conn.logger.Warn("server warning", "code", warning.Code(), "message", warning.Message())
 		}
 	case 23:
 		opCode, err := session.ReadByte()

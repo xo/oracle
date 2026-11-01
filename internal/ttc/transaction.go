@@ -15,7 +15,7 @@ type Transaction struct {
 }
 
 func (tx *Transaction) Commit() error {
-	if tx.conn.State != Opened {
+	if !tx.conn.IsValid() {
 		return driver.ErrBadConn
 	}
 	tx.conn.autoCommit = true
@@ -24,7 +24,7 @@ func (tx *Transaction) Commit() error {
 }
 
 func (tx *Transaction) Rollback() error {
-	if tx.conn.State != Opened {
+	if !tx.conn.IsValid() {
 		return driver.ErrBadConn
 	}
 	tx.conn.autoCommit = true

@@ -29,6 +29,24 @@ const ErrInvalidValue Error = "invalid value"
 // ErrRowsClosed is a read of a LOB of a row after its rows closed (D22).
 const ErrRowsClosed Error = "the rows of the LOB are closed"
 
+// ErrCompilation is a PL/SQL unit, a view or a type that the server created
+// but could not compile (D32).
+const ErrCompilation Error = "created with compilation errors"
+
+// compilationCode is the code of ORA-24344, success with compilation error.
+const compilationCode = 24344
+
+// NewCompilationError returns the error of a unit that the server created
+// but could not compile. The server sends no error for it, only a flag of
+// the summary, and OCI returns ORA-24344 (D32).
+func NewCompilationError() *OracleError {
+	return &OracleError{
+		ErrCode: compilationCode,
+		ErrMsg:  "ORA-24344: success with compilation error",
+		errPos:  -1,
+	}
+}
+
 // authCodes are the codes of the errors that refuse a credential.
 var authCodes = []int{
 	1005,  // null password given
@@ -60,9 +78,15 @@ func (err *OracleError) Error() string {
 }
 
 // Is reports whether target is ErrAuthentication and the server refused the
-// credential.
+// credential, or target is ErrCompilation and the error is ORA-24344.
 func (err *OracleError) Is(target error) bool {
-	return target == ErrAuthentication && slices.Contains(authCodes, err.ErrCode)
+	switch target {
+	case ErrAuthentication:
+		return slices.Contains(authCodes, err.ErrCode)
+	case ErrCompilation:
+		return err.ErrCode == compilationCode
+	}
+	return false
 }
 
 // ErrPos return sql error position。
@@ -113,9 +137,14 @@ func (err *OracleError) translate() {
 	}
 }
 
+// Bad reports whether the error ends the session, so that the connection is
+// of no more use. It holds the codes that python-oracledb reads as a closed
+// connection, and the codes that go-ora held.
 func (err *OracleError) Bad() bool {
 	switch err.ErrCode {
-	case 28, 1001, 1012, 1033, 1034, 1089, 3113, 3114, 3135, 12528, 12537:
+	case 22, 28, 31, 45, 378, 600, 602, 603, 609, 1001, 1012, 1033, 1034, 1041,
+		1043, 1089, 1092, 2396, 3113, 3114, 3122, 3135, 12153, 12528, 12537,
+		12547, 12570, 12583:
 		return true
 	default:
 		return false

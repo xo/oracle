@@ -215,7 +215,7 @@ again, and found three faults, which are fixed:
 - A JSON column past 32 KiB came back cut, with no error, when the LOBs came
   inline.
 
-The twenty-first part of step 9 is done. Ken decided the Go types of a
+The twenty-first part of step 9 is done (`6cbdf35`). Ken decided the Go types of a
 VECTOR (D30), and the driver reads and writes `[]int8`, `[]byte` of `BINARY`
 and `SparseVector`. The tests of VECTOR, JSON and NCHAR of python-oracledb
 are written again, and found these faults, which are fixed:
@@ -234,3 +234,28 @@ are written again, and found these faults, which are fixed:
 
 Ken decided that the type `NVarChar` binds as NVARCHAR2 (D31), and the
 cases that bind PL/SQL arrays of NVARCHAR2 are written with it.
+
+The twenty-second part of step 9 is done. The test files of python-oracledb
+outside `data_types` are sorted in the BACKLOG, and the first of them, the
+names of binds of `cursor/test_2400_sql_parser.py`, is written again. A new
+parser, `parseSQL`, follows that of python-oracledb, and fixed these faults:
+
+- A bind by name failed when the text held a colon in a q-string, the colon
+  of a JSON constant, a quoted name or a name with a letter outside ASCII.
+- A `CALL` with an OUT failed with ORA-03146, and the server then closed the
+  connection.
+- A `CALL` with a name that appears twice failed with ORA-01008, and with an
+  OUT it read the OUT into the wrong bind.
+
+The errors of `misc/test_1100_error.py` are written again too. A killed
+session marked its connection bad, but the driver sent the next statement on
+it all the same, and the server answered ORA-01012. The driver now returns
+`driver.ErrBadConn` for a bad connection, and marks it bad on each code that
+python-oracledb reads as a closed connection. Ken decided that a unit that
+does not compile is an error (D32): the statement returns ORA-24344, which
+`ErrCompilation` matches, where go-ora returned nothing. A warning of the
+server goes to the `Logger`, where go-ora wrote it to `os.Stderr`.
+
+The full suites pass on every release. ORA-00600 [kkxcmp0] came back once,
+in `TestClientCharsetWithStringArray` on 19c, and did not come back in 15
+runs of the test and two runs of the suite.

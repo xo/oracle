@@ -43,8 +43,47 @@ bounds of NUMBER (`test_1800_number.py`), objects
 (`test_3100_json.py` and `test_3200_json_26ai.py`), NCHAR
 (`test_1700_nchar.py`), and VECTOR (`test_2700_vector.py`,
 `test_2900_binary_vector.py` and `test_3000_sparse_vector.py`). The files of
-`data_types` are done. Next: the files outside `data_types` that test what
-this driver does, which are not yet sorted.
+`data_types` are done, and so are `cursor/test_2400_sql_parser.py` and
+`misc/test_1100_error.py`.
+
+The files outside `data_types` that test what this driver does, in the order
+to write them:
+
+1. `cursor/test_2700_features_12_1.py`: PL/SQL arrays of BOOLEAN, DATE,
+   NUMBER and strings, with holes, records and `%ROWTYPE`, and implicit
+   results. Batch errors and the count of each row need an API of their own
+   (see [`DRIVERS.md`](DRIVERS.md)), so their cases wait for Ken.
+2. `cursor/test_1800_other.py`: repeated DDL, SQL that is not ASCII, the case
+   of bind names, keywords as bind names, a run after an error, ORA-01007,
+   a column added to a cached query, a table with a LOB built again, mixed
+   NULL binds in PL/SQL, the order of PL/SQL binds, LOBs after an error,
+   domains and annotations, and a killed connection with an open cursor.
+3. `cursor/test_2000_var.py` and `cursor/test_2100_arrayvar.py`: the OUT of
+   each type that the files of `data_types` do not reach, and an array past
+   its size.
+4. `connection/test_1000_basic.py`: a bad password, a password with `/` and
+   `@`, a rollback at close, connections from many goroutines, a ping,
+   `current_schema`, `DBMS_OUTPUT`, a timeout of a call, a proxy user, the
+   names of the client, the session ID, and an error in the middle of a
+   response.
+5. `aq/test_1000_dbobject.py`, `aq/test_1200_bulk.py`, `aq/test_1400_raw.py`
+   and `aq/test_1600_json.py`, for the `aq` package.
+6. `ext/test_ext_2100_bfile_type.py`, which needs a directory and a file on
+   the server, and `misc/test_1600_defaults.py`, for `prefetch` and
+   `lob_fetch`.
+
+The other files test what this driver does not do, or the API of Python:
+
+- Two-phase commit, sessionless transactions, subscriptions, direct path load
+  and external logon (`connection/`).
+- Scrollable cursors (`cursor/test_1600_scroll.py`), because `database/sql`
+  reads forward only, and statements of OCI (`cursor/test_2600`).
+- Pools (`pool/`, `misc/test_1400_pool_params.py`), because `database/sql`
+  holds the pool.
+- `misc/test_1000_module.py`, `misc/test_1700_unsupported_features_thin.py`,
+  `hooks/`, `dataframe/`, `soda/`, `stc/` and `py314/`.
+- The rest of `ext/`, which needs a set up of its own, such as DRCP, the
+  providers of a cloud and the cache of statements.
 
 ### Return the rows of a RETURNING of more than one row
 

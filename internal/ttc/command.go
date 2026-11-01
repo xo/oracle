@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -330,11 +329,6 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 	return rs.rowsAffected, nil
 }
 
-// sqlQueryReturnStatementRegexp finds RETURNING ... INTO, which go-ora found
-// only with spaces around the list, so RETURNING(id)INTO was a statement with
-// no RETURNING, and the server refused its binds with ORA-03146
-var sqlQueryReturnStatementRegexp = regexp.MustCompile(`(?s)\bRETURN(ING)?\b.*\bINTO\b`)
-
 // NewStmt create new stmt and set its connection properties
 func NewStmt(text string, conn *Connection) *Stmt {
 	stmt := &Stmt{
@@ -353,28 +347,12 @@ func NewStmt(text string, conn *Connection) *Stmt {
 	stmt._hasLONG = false
 	stmt.arrayBindCount = 0
 	stmt.scnForSnapshot = make([]int, 2)
-	// get stmt type
-	uCmdText := strings.ToUpper(refineSqlText(text))
-	if strings.HasPrefix(uCmdText, "(") {
-		uCmdText = uCmdText[1:]
-	}
-	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
-		stmt.stmtType = SELECT
-	} else if strings.HasPrefix(uCmdText, "INSERT") ||
-		strings.HasPrefix(uCmdText, "MERGE") ||
-		strings.HasPrefix(uCmdText, "UPDATE") ||
-		strings.HasPrefix(uCmdText, "DELETE") {
-		stmt.stmtType = DML
-		stmt.bulkExec = true
-	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
-		stmt.stmtType = PLSQL
-	} else {
-		stmt.stmtType = OTHERS
-	}
-
-	if stmt.stmtType == DML {
-		stmt._hasReturnClause = sqlQueryReturnStatementRegexp.MatchString(uCmdText)
-	}
+	// the server reports a string with no closing quote, so the error waits
+	// for a bind by name, which needs the names
+	info, _ := parseSQL(text)
+	stmt.stmtType = info.kind
+	stmt.bulkExec = info.kind == DML
+	stmt._hasReturnClause = info.returning
 	return stmt
 }
 
@@ -910,8 +888,12 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 			if err != nil {
 				return err
 			}
-			for x := 0; x < resultSet.columnCount; x++ {
+			places := stmt.ioVectorPlaces(resultSet.columnCount)
+			for _, x := range places {
 				direction, err := session.ReadByte()
+				if err != nil {
+					return err
+				}
 				switch direction {
 				case 32:
 					stmt.Pars[x].Direction = Input
@@ -921,9 +903,6 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				case 48:
 					stmt.Pars[x].Direction = InOut
 					stmt.containOutputPars = true
-				}
-				if err != nil {
-					return err
 				}
 			}
 		case 16:
@@ -1091,7 +1070,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 
 // Close stmt cursor in the server
 func (stmt *defaultStmt) Close() error {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return driver.ErrBadConn
 	}
@@ -1113,7 +1092,7 @@ func (stmt *defaultStmt) Close() error {
 }
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
@@ -1615,14 +1594,51 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 	return result, nil
 }
 
+// ioVectorPlaces returns the index of the bind of each direction of an IO
+// vector, which holds count directions. It is each bind, in order, but for a
+// CALL in which a name appears more than once. The server takes a bind for
+// each place of the name in a CALL, and sends one direction for each name.
+// 26ai sends the count of the names, and 11g the count of the binds. The
+// direction goes to the first place of the name, and a later place is an
+// IN, which reads no value back. go-ora gave the directions to the binds in
+// order, so it read the OUT of the next name into the second place of the
+// first, and failed on the rest of the response.
+func (stmt *defaultStmt) ioVectorPlaces(count int) []int {
+	places := make([]int, 0, len(stmt.Pars))
+	var info sqlInfo
+	if stmt.stmtType == PLSQL {
+		info, _ = parseSQL(stmt.text)
+	}
+	if info.call && len(info.names) == len(stmt.Pars) {
+		seen := make(map[string]bool, len(info.names))
+		for x, name := range info.names {
+			if seen[name] {
+				stmt.Pars[x].Direction = Input
+				continue
+			}
+			seen[name] = true
+			places = append(places, x)
+		}
+		return places
+	}
+	for x := 0; x < count && x < len(stmt.Pars); x++ {
+		places = append(places, x)
+	}
+	return places
+}
+
 // useNamedParameters: re-arrange parameters according parameter defined in sql text
 func (stmt *Stmt) useNamedParameters() error {
-	names, err := parseQueryParametersNames(stmt.text)
+	info, err := parseSQL(stmt.text)
 	if err != nil {
 		return err
 	}
+	names := info.names
 	parCollection := make([]ParameterInfo, 0, len(names))
-	if stmt.stmtType == SELECT || stmt.stmtType == DML {
+	// SQL and CALL take a bind for each place a name appears, and PL/SQL
+	// one for each name. go-ora bound CALL once for each name, and the
+	// server failed with ORA-01008
+	if info.kind != PLSQL || info.call {
 		for x := range names {
 			found := false
 			for _, par := range stmt.Pars {
@@ -1635,7 +1651,7 @@ func (stmt *Stmt) useNamedParameters() error {
 			if !found {
 				return fmt.Errorf("parameter %s is not defined in parameter list", names[x])
 			}
-			for y := x - 1; y >= 0; y-- {
+			for y := x - 1; y >= 0 && !info.call; y-- {
 				if names[y] == names[x] {
 					parCollection[x].Flag = 0x80
 					break
@@ -1675,7 +1691,7 @@ func (stmt *Stmt) useNamedParameters() error {
 
 // Exec execute stmt (INSERT, UPDATE, DELETE, DML, PLSQL) and return driver.Result object
 func (stmt *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
@@ -1728,7 +1744,7 @@ func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
 }
 
 func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction ParameterDirection) (*ParameterInfo, error) {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
@@ -1783,7 +1799,7 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 //
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
@@ -1868,7 +1884,7 @@ func (stmt *Stmt) execError(ctx context.Context, err error) error {
 }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValue) (driver.Rows, error) {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}
@@ -2057,7 +2073,7 @@ func loadLobs(v any) error {
 //
 // args is an array of values that corresponding to parameters in sql
 func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	if stmt.connection.State != Opened {
+	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
 	}

@@ -124,7 +124,7 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 }
 
 func (cursor *RefCursor) Query() (*DataSet, error) {
-	if cursor.connection.State != Opened {
+	if !cursor.connection.IsValid() {
 		cursor.connection.setBad()
 		return nil, driver.ErrBadConn
 	}

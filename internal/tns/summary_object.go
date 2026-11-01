@@ -264,6 +264,14 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 	return result, nil
 }
 
+// CompilationError reports whether the server created a unit that it could
+// not compile, which python-oracledb reads from the same flag.
+func (summary *SummaryObject) CompilationError() bool {
+	return summary.warningFlag&0x20 != 0
+}
+
+// WarningObject is a warning of the server, such as a password that will
+// expire, which comes at logon.
 type WarningObject struct {
 	retCode      int
 	flag         int
@@ -295,4 +303,14 @@ func NewWarningObject(session *Session) (*WarningObject, error) {
 		result.errorMessage = string(msg)
 	}
 	return result, nil
+}
+
+// Code returns the ORA code of the warning.
+func (warning *WarningObject) Code() int {
+	return warning.retCode
+}
+
+// Message returns the message of the warning.
+func (warning *WarningObject) Message() string {
+	return warning.errorMessage
 }

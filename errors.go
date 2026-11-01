@@ -27,6 +27,11 @@ const (
 	// ErrAuthentication is a server that refused the credential. A
 	// *ServerError with ORA-01017 matches it.
 	ErrAuthentication = tns.ErrAuthentication
+	// ErrCompilation is a PL/SQL unit, a view or a type that the server
+	// created but could not compile. The statement returns a *ServerError
+	// with ORA-24344, which matches it, and USER_ERRORS holds the errors of
+	// the compilation (D32).
+	ErrCompilation = tns.ErrCompilation
 )
 
 // ServerError is an error that the server returned, with its ORA code in

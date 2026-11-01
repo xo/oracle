@@ -14,7 +14,6 @@ import (
 	"io"
 	"net"
 	"reflect"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -23,82 +22,6 @@ import (
 
 	"github.com/xo/oracle/internal/tns"
 )
-
-var ()
-
-func refineSqlText(text string) string {
-	index := 0
-	length := len(text)
-	inSingleQuote := false
-	inDoubleQuote := false
-	skip := false
-	lineComment := false
-	textBuffer := make([]byte, 0, len(text))
-	for ; index < length; index++ {
-		ch := text[index]
-		switch ch {
-		case '\\':
-			// bypass next character
-			continue
-		case '/':
-			if !inDoubleQuote && !inSingleQuote {
-				if index+1 < length && text[index+1] == '*' {
-					index += 1
-					skip = true
-				}
-			}
-		case '*':
-			if !inDoubleQuote && !inSingleQuote {
-				if index+1 < length && text[index+1] == '/' {
-					index += 1
-					skip = false
-				}
-			}
-		case '\'':
-			if !skip && !lineComment && !inDoubleQuote {
-				inSingleQuote = !inSingleQuote
-			}
-		case '"':
-			if !skip && !lineComment && !inSingleQuote {
-				inDoubleQuote = !inDoubleQuote
-			}
-		case '-':
-			if !skip {
-				if index+1 < length && text[index+1] == '-' {
-					index += 1
-					lineComment = true
-				}
-			}
-		case '\n':
-			if lineComment {
-				lineComment = false
-			} else {
-				textBuffer = append(textBuffer, ch) // oheurtel : keep the line feed character
-			}
-		default:
-			if skip || lineComment || inSingleQuote || inDoubleQuote {
-				continue
-			}
-			textBuffer = append(textBuffer, text[index])
-		}
-	}
-	return strings.TrimSpace(string(textBuffer))
-}
-
-var parameterNameRegexp = regexp.MustCompile(`:(\w+)`)
-
-func parseQueryParametersNames(text string) (names []string, err error) {
-	refinedSql := refineSqlText(text)
-
-	names = make([]string, 0, 10)
-	matches := parameterNameRegexp.FindAllStringSubmatch(refinedSql, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			names = append(names, match[1])
-		}
-	}
-	return names, nil
-}
 
 func generateTokenHeader(host, service string, port int) string {
 	ret := fmt.Sprintf("date:%s\n(request-target):%s\nhost:%s:%d", time.Now().UTC().Format(time.RFC1123), service, host, port)

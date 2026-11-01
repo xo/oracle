@@ -558,16 +558,28 @@ JSON and OSON (the binary JSON of Oracle) are read and written with
 
 A sentinel error is a constant of the type `Error`, as in dbimp D6:
 `ErrNotSupported`, `ErrScheme`, `ErrUnknownKey`, `ErrRepeatedKey`,
-`ErrInvalidValue`, `ErrConnectorClosed` and `ErrAuthentication`.
+`ErrInvalidValue`, `ErrConnectorClosed`, `ErrAuthentication` and
+`ErrCompilation`.
 
 An error from the server is a `*ServerError`, with the `ORA-` code, the message
 and the position in the statement. Its `Is` method makes ORA-01017 and
-ORA-28000 match `ErrAuthentication`, as dbimp D197 asks. A message is lower
+ORA-28000 match `ErrAuthentication`, as dbimp D197 asks, and ORA-24344 match
+`ErrCompilation`. A statement that creates a unit that does not compile
+returns ORA-24344, and a warning of the server goes to the `Logger` (D32). A message is lower
 case, starts with a gerund and names what failed, such as
 `reading the accept packet: %w`.
 
 `driver.ErrBadConn` is returned only when the statement did not reach the
 server, so that `database/sql` runs it again only when that is safe.
+
+An error that ends the session marks the connection bad: ORA-00028 of a
+killed session, ORA-01012, ORA-03113 and the other codes that python-oracledb
+reads as a closed connection. The statement returns the error of the server.
+`database/sql` then drops the connection from the pool, and a statement, a
+ping or a transaction on a `sql.Conn` that holds it returns
+`driver.ErrBadConn`. go-ora marked the connection bad and sent the next
+statement on it all the same, which the server answered with ORA-01012.
+`TestKilledSession` holds it.
 
 ## Logging
 
@@ -628,6 +640,41 @@ The code uses these, where each fits:
 
 The `go fix` of Go 1.27 does most of the mechanical part. The rest is review.
 
+## The text of a statement
+
+`parseSQL` in `internal/ttc` reads the text of a statement once, as the
+parser of python-oracledb does. It finds three things:
+
+- The kind of the statement, from its first word. `DECLARE` and `BEGIN` are
+  PL/SQL, `SELECT` and `WITH` a query, `INSERT`, `UPDATE`, `DELETE` and
+  `MERGE` DML. `CALL` is PL/SQL too, as python-oracledb reads it.
+- Whether DML has `RETURNING` or `RETURN`, then `INTO`.
+- The names of the binds. A bind is a colon outside a comment, a string, a
+  q-string or a quoted name, then a name. Spaces can come before the name. A
+  name in quotes keeps its case and holds any character, and any other name
+  is in upper case. A colon after a string is a part of a JSON constant, as
+  in `json_object('k':v)`, and is not a bind. DDL has no binds, so the `:new`
+  and `:old` of a trigger are not binds.
+
+A string, a quoted name or a q-string with no end is an error, which a bind
+by name returns. The server reports it for any other statement.
+
+The driver uses the names only for a bind by name. SQL takes a bind for each
+place a name appears, and PL/SQL one for each name. `CALL` takes one for
+each place, as SQL does, but the IO vector of its response holds one
+direction for each name. The driver gives the direction to the first place
+of the name. 26ai counts the names in the IO vector and 11g counts the
+binds, so the driver does not use the count.
+
+go-ora removed the comments and the strings and took each colon and word
+that was left. It took the words of a q-string and the colon of a JSON
+constant, and it took no quoted name and no name with a letter outside
+ASCII. A bind by name of such a statement failed. It read `CALL` as neither
+SQL nor PL/SQL, so a `CALL` with an OUT failed with ORA-03146, and the
+server then closed the connection with ORA-03138. `TestParseNames` and
+`TestParseKind` hold the cases of python-oracledb, and `TestBindNames` and
+`TestCallBindNames` in `integration` run them on the server.
+
 ## Statements that run again
 
 A prepared statement keeps its cursor on the server, and runs it again with
@@ -648,8 +695,8 @@ python-oracledb.
 The driver sends the binds of a statement again when one grows or changes
 type. For DML RETURNING it sends the option of PL/SQL binds every time, as
 python-oracledb does, where go-ora left it out then, and the server refused
-the execute with ORA-03146 (sijms/go-ora#697). `RETURNING` is found with word
-boundaries, so `RETURNING(id)INTO` is DML RETURNING too. The server cuts a
+the execute with ORA-03146 (sijms/go-ora#697). `RETURNING` is a word outside
+strings and comments, so `RETURNING(id)INTO` is DML RETURNING too. The server cuts a
 value of RETURNING to the size of its OUT, and sends the length that it had,
 and the driver returns an error for it, where go-ora returned the cut value.
 An `UPDATE` of no row gives each OUT of RETURNING a NULL. `TestRebind` and
