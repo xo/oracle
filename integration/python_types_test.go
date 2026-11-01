@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -273,5 +276,185 @@ func TestNegativeIntervals(t *testing.T) {
 	var got oracle.IntervalYM
 	if err := db.QueryRow("SELECT :1 FROM dual", in).Scan(&got); err != nil || got != in {
 		t.Errorf("%v: got %v, %v", in, got, err)
+	}
+}
+
+// TestDateBounds reads and binds dates at the ends of the range of DATE and
+// TIMESTAMP, a year before 0, and TIMESTAMP WITH TIME ZONE values in
+// regions, with nanoseconds. It holds the case 1118 of
+// tests/data_types/test_1100_date.py of python-oracledb, which expects an
+// error where Python holds no year before 1, and the cases of
+// test_2100_timestamp.py and test_2300_timestamp_tz.py, written again here.
+func TestDateBounds(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var d time.Time
+	if err := db.QueryRow("SELECT TO_DATE('-4712-01-01', 'SYYYY-MM-DD') FROM dual").Scan(&d); err != nil || d.Year() != -4712 || d.Month() != 1 || d.Day() != 1 {
+		t.Errorf("year -4712: got %v, %v", d, err)
+	}
+	for _, in := range []time.Time{
+		time.Date(-4712, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
+		time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC),
+		time.Date(1, 1, 1, 0, 0, 0, 1, time.UTC),
+	} {
+		var out time.Time
+		if err := db.QueryRow("SELECT CAST(:1 AS TIMESTAMP(9)) FROM dual", in).Scan(&out); err != nil || !out.Equal(in) {
+			t.Errorf("%v: got %v, %v", in, out, err)
+		}
+	}
+	for _, zone := range []string{"Europe/Prague", "America/New_York", "Asia/Kolkata"} {
+		loc, err := time.LoadLocation(zone)
+		if err != nil {
+			t.Skip(err)
+		}
+		for _, in := range []time.Time{
+			time.Date(2022, 1, 7, 18, 30, 10, 250000000, loc),
+			time.Date(2022, 7, 7, 18, 30, 10, 123456789, loc),
+		} {
+			var out time.Time
+			if err := db.QueryRow("SELECT CAST(:1 AS TIMESTAMP(9) WITH TIME ZONE) FROM dual", oracle.TimestampTZ(in)).Scan(&out); err != nil || !out.Equal(in) {
+				t.Errorf("%v: got %v, %v", in, out, err)
+			}
+		}
+	}
+}
+
+// TestBooleanColumn binds and reads the BOOLEAN of 23ai: true, false and
+// NULL, into a column, out of PL/SQL, and through RETURNING. It holds the
+// cases 2409 to 2415 of tests/data_types/test_2400_boolean.py of
+// python-oracledb, written again here.
+func TestBooleanColumn(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	requireRelease(t, db, 23)
+	db.Exec("DROP TABLE go_bools PURGE")
+	if err := execCmd(db, "CREATE TABLE go_bools (id NUMBER, b BOOLEAN)"); err != nil {
+		t.Fatal(err)
+	}
+	defer execCmd(db, "DROP TABLE go_bools PURGE")
+	for i, in := range []sql.Null[bool]{{V: true, Valid: true}, {V: false, Valid: true}, {}} {
+		var ret sql.Null[bool]
+		_, err := db.Exec("INSERT INTO go_bools VALUES (:1, :2) RETURNING b INTO :3", i, in, oracle.Out{Dest: &ret})
+		if err != nil || ret != in {
+			t.Errorf("%v: returned %v, %v", in, ret, err)
+		}
+		var out sql.Null[bool]
+		if err := db.QueryRow("SELECT b FROM go_bools WHERE id = :1", i).Scan(&out); err != nil || out != in {
+			t.Errorf("%v: read %v, %v", in, out, err)
+		}
+		var plsql sql.Null[bool]
+		if _, err := db.Exec("BEGIN :1 := :2; END;", oracle.Out{Dest: &plsql}, in); err != nil || plsql != in {
+			t.Errorf("%v: out of PL/SQL %v, %v", in, plsql, err)
+		}
+	}
+}
+
+// TestJSONFieldNames reads JSON that the server encoded and that the driver
+// encoded, with field names longer than 255 bytes, which OSON writes in
+// another form, from a table and from a table with compressed JSON, whose
+// OSON has relative offsets. It holds the cases of
+// tests/data_types/test_3200_json_26ai.py of python-oracledb, written again
+// here.
+func TestJSONFieldNames(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	requireRelease(t, db, 23)
+	drop := func() { execCmd(db, "DROP TABLE go_json_names PURGE", "DROP TABLE go_json_compressed PURGE") }
+	drop()
+	// a JSON column needs a tablespace of automatic segment space
+	// management, which SYSTEM, the one of system on 26ai Free, is not
+	space := ""
+	if err := execCmd(db, "CREATE TABLE go_json_names (id NUMBER, j JSON)"); err != nil {
+		space = " TABLESPACE USERS"
+		if err := execCmd(db, "CREATE TABLE go_json_names (id NUMBER, j JSON)"+space); err != nil {
+			t.Fatal(err)
+		}
+	}
+	compressed := execCmd(db, "CREATE TABLE go_json_compressed (id NUMBER, j JSON) JSON (j) STORE AS (COMPRESS HIGH)"+space) == nil
+	defer drop()
+	many := func(long, short bool) map[string]any {
+		m := map[string]any{}
+		for i := range 26 {
+			for j := range 26 {
+				name := string(rune('A'+i)) + string(rune('A'+j))
+				if short {
+					m[name] = 6.75
+				}
+				if long {
+					m[name+strings.Repeat("X", 254)] = 12.25
+				}
+			}
+		}
+		return m
+	}
+	oneLong := many(false, true)
+	oneLong[strings.Repeat("B", 256)] = 6704.0
+	values := map[string]any{
+		"3200 one long name":           map[string]any{strings.Repeat("A", 256): 6700.0},
+		"3201 a short and a long":      map[string]any{"short_name": "Short name", strings.Repeat("A", 256): 6701.0},
+		"3202 many long names":         many(true, false),
+		"3203 many long and short":     many(true, true),
+		"3204 one long and many short": oneLong,
+		"3210 lists":                   map[string]any{strings.Repeat("C", 256): 6710.0, "num_list": []any{1.5, 2.25, 3.75, 5.5}, "str_list": []any{"string 1", "string 2"}},
+	}
+	var shared, distinct []any
+	for i := range 15 {
+		shared = append(shared, map[string]any{"a": 6711.0, "b": "String Value"})
+		distinct = append(distinct, map[string]any{"a": float64(6711 + i), "b": fmt.Sprint("String Value ", i)})
+	}
+	values["3211 shared fields and values"] = shared
+	values["3212 shared fields"] = distinct
+	for name, value := range values {
+		text, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tables := []string{"go_json_names"}
+		if compressed {
+			tables = append(tables, "go_json_compressed")
+		}
+		for _, table := range tables {
+			db.Exec("DELETE FROM " + table)
+			// encoded by the server, from text. Text past 32,767 bytes binds
+			// as a LONG in SQL, which JSON() takes as a CLOB only (D24)
+			clob, err := oracle.CreateClob(context.Background(), db, string(text), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec("INSERT INTO "+table+" VALUES (1, JSON(:1))", clob); err != nil {
+				t.Fatalf("%s, %s: %v", name, table, err)
+			}
+			// encoded by the driver
+			doc, err := oracle.NewJSON(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec("INSERT INTO "+table+" VALUES (2, :1)", doc); err != nil {
+				t.Fatalf("%s, %s, bound: %v", name, table, err)
+			}
+			for id := 1; id <= 2; id++ {
+				var got any
+				if err := db.QueryRow("SELECT j FROM "+table+" WHERE id = :1", id).Scan(&got); err != nil {
+					t.Fatalf("%s, %s, %d: %v", name, table, id, err)
+				}
+				var back any
+				if err := json.Unmarshal([]byte(fmt.Sprint(got)), &back); err != nil {
+					t.Fatalf("%s, %s, %d: %v", name, table, id, err)
+				}
+				if !reflect.DeepEqual(back, value) {
+					t.Errorf("%s, %s, %d: the documents differ", name, table, id)
+				}
+			}
+		}
 	}
 }

@@ -539,6 +539,9 @@ Three nullable types are the exception, because `sql.Null[T].Value` converts a
 A NULL binds with the type of its value, which an OUT argument needs, for
 `sql.NullX` and for `sql.Null[T]` of the common types. A NULL of any other
 type binds as a NULL `VARCHAR2`.
+A NULL `sql.Null[bool]` or `sql.NullBool` binds as a NULL
+`BOOLEAN`, which a PL/SQL `BOOLEAN` takes. `database/sql` made a NULL of no
+type of it, which PL/SQL refused with ORA-06550.
 
 JSON and OSON (the binary JSON of Oracle) are read and written with
 `encoding/json/v2` and `encoding/json/jsontext`.
@@ -859,6 +862,21 @@ NUMBER and dates, so `codec` and `ttc` make the conversions. A later step can mo
 NUMBER and dates below both. Binding JSON never worked in `go-ora`: it sent a
 NULL, because the coder was set after the value. `TestJSON` binds and reads it
 on 21c and 26ai.
+
+OSON holds a name of up to 255 bytes in version 1 and of up to 65535 bytes in
+version 3, which puts the long names in a segment of their own. The codec
+reads both, and writes version 3 when a name is longer than 255 bytes. A name
+hashes with the 32 bits of FNV-1a over its UTF-8, and the names sort by the
+low byte of the hash, then the length, then the bytes, as the server sorts
+them. go-ora read version 3 as corrupt, hashed with a sum of its own, and cut
+a long name to its low byte of length. The flags that size the header follow
+the count of names and the size of each segment, so a document of more than
+255 names or 64 KiB of names reads back. A JSON column asks for 32 MiB with
+its locator and a `VECTOR` column for 1 MiB, the largest of each, as
+python-oracledb asks. go-ora asked for 32 KiB, and the server cut a longer
+document with no error when the LOBs came inline. `TestJSONFieldNames` holds
+the cases of python-oracledb, and `TestNames` in `internal/codec/oson` the
+sizes of the header.
 
 ## The order of the work
 

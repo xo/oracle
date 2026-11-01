@@ -278,7 +278,19 @@ func (stmt *defaultStmt) writeDefine() error {
 				}
 			} else {
 				col.ContFlag |= 0x2000000
-				col.MaxCharLen = 0x8000
+				// the length that the server sends with the locator. A
+				// JSON and a VECTOR come whole within it, up to their
+				// largest, as python-oracledb asks: 32 MiB of OSON and
+				// 1 MiB of VECTOR. go-ora asked for 32 KiB, and a JSON
+				// past it came back cut, with no error
+				switch {
+				case col.IsJSON || col.DataType == types.JSONType:
+					col.MaxCharLen = 32 << 20
+				case col.DataType == types.VECTOR:
+					col.MaxCharLen = 1 << 20
+				default:
+					col.MaxCharLen = 0x8000
+				}
 			}
 		} else {
 			col.ContFlag = 0

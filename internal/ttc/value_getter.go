@@ -1,6 +1,7 @@
 package ttc
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -230,6 +231,11 @@ func basicValue(v any) (any, error) {
 func ownValue(v any) bool {
 	switch v.(type) {
 	case types.TimestampTZ, *types.TimestampTZ:
+		return true
+	case sql.Null[bool], sql.NullBool:
+		// a NULL bool binds as a NULL BOOLEAN, which PL/SQL assigns to a
+		// BOOLEAN. database/sql made a NULL of no type of it, which PL/SQL
+		// refused with ORA-06550
 		return true
 	case *apd.Decimal, apd.Decimal:
 		// a decimal binds as a NUMBER. As the text that database/sql made

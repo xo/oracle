@@ -21,151 +21,141 @@ type header struct {
 	objectHeaders        []objectHeader
 }
 
-func (h *header) write(buffer *bytes.Buffer) error {
-	var err error
-	_, err = buffer.Write([]byte{0xff, 0x4a, 0x5a, 0x1})
-	if err != nil {
-		return err
-	}
-	keyLen := len(h.keys)
-	if keyLen > 0xFFFF {
-		h.flags |= 8
-	} else if keyLen > 0xFF {
-		h.flags |= 0x400
-	}
-	if h.keyDataLen > 0xFFFF {
-		h.flags |= 0x800
-	}
-	if h.nodeDataLen > 0xFFFF {
-		h.flags |= 0x1000
-	}
-	err = binary.Write(buffer, binary.BigEndian, h.flags)
-	if err != nil {
-		return err
-	}
-	err = h.writeKeyCount(buffer)
-	if h.flags&0x800 != 0 {
-		err = binary.Write(buffer, binary.BigEndian, uint32(h.keyDataLen))
-	} else {
-		err = binary.Write(buffer, binary.BigEndian, uint16(h.keyDataLen))
-	}
-	if err != nil {
-		return err
-	}
-	if h.flags&0x1000 != 0 {
-		err = binary.Write(buffer, binary.BigEndian, uint32(h.nodeDataLen))
-	} else {
-		err = binary.Write(buffer, binary.BigEndian, uint16(h.nodeDataLen))
-	}
-	if err != nil {
-		return err
-	}
-	err = binary.Write(buffer, binary.BigEndian, h.tinyNodeCount)
-	if err != nil {
-		return err
-	}
-	// write key length
-	// write keys
-	return nil
-}
+// read reads the header of an OSON image and its field names, and leaves
+// buffer at the tree of nodes. It follows the decoder of python-oracledb. A
+// version 3 image holds field names longer than 255 bytes in a second
+// segment, after the short ones. go-ora took the version byte for part of
+// the magic, so each version 3 image was corrupted, and it read a count of
+// 2 bytes where there are 4, an offset of 2 bytes where there can be 4, and
+// put the long names in place of the short ones.
 func (h *header) read(buffer *bytes.Reader) error {
-	var num uint32
-	err := binary.Read(buffer, binary.BigEndian, &num)
-	if err != nil {
+	var magic [3]byte
+	if _, err := io.ReadFull(buffer, magic[:]); err != nil {
 		return err
 	}
-	if num != 4283062785 {
+	if magic != [3]byte{0xff, 0x4a, 0x5a} {
 		return errors.New("corrupted json data")
 	}
-	h.version = int(num & 0xFF)
-	if h.version < 1 || h.version > 4 {
+	version, err := buffer.ReadByte()
+	if err != nil {
+		return err
+	}
+	h.version = int(version)
+	if h.version != 1 && h.version != 3 {
 		return fmt.Errorf("unsupported json version %d", h.version)
 	}
-	err = binary.Read(buffer, binary.BigEndian, &h.flags)
+	if err := binary.Read(buffer, binary.BigEndian, &h.flags); err != nil {
+		return err
+	}
+	readUint := func(wide bool) (int, error) {
+		if wide {
+			var v uint32
+			err := binary.Read(buffer, binary.BigEndian, &v)
+			return int(v), err
+		}
+		var v uint16
+		err := binary.Read(buffer, binary.BigEndian, &v)
+		return int(v), err
+	}
+	if h.flags&0x10 != 0 {
+		// a scalar, whose header is the size of its tree
+		if _, err := readUint(h.flags&0x1000 != 0); err != nil {
+			return err
+		}
+		h.nodeOffset, err = buffer.Seek(0, io.SeekCurrent)
+		return err
+	}
+	shortCount, err := h.readKeyCount(buffer)
 	if err != nil {
 		return err
 	}
-	if h.flags&2 == 0 || h.flags&4 == 0 {
-		return errors.New("corrupted json data")
-	}
-	keyCount, err := h.readKeyCount(buffer)
-	if err != nil {
+	shortWide := h.flags&0x800 != 0
+	if h.keyDataLen, err = readUint(shortWide); err != nil {
 		return err
 	}
-	if h.flags&0x800 != 0 {
-		var temp uint32
-		err = binary.Read(buffer, binary.BigEndian, &temp)
-		if err != nil {
-			return err
-		}
-		h.keyDataLen = int(temp)
-	} else {
-		var temp uint16
-		err = binary.Read(buffer, binary.BigEndian, &temp)
-		if err != nil {
-			return err
-		}
-		h.keyDataLen = int(temp)
-	}
-	// if version == 3
-	// read 2 bytes flags2 ==> read 4 bytes keysCount2 ==> read 4 bytes key data2
+	var longCount, longSegSize int
+	longWide := true
 	if h.version == 3 {
-		err = binary.Read(buffer, binary.BigEndian, &h.flags2)
-		if err != nil {
+		if err := binary.Read(buffer, binary.BigEndian, &h.flags2); err != nil {
 			return err
 		}
-		var temp uint16
-		err = binary.Read(buffer, binary.BigEndian, &temp)
-		if err != nil {
+		longWide = h.flags2&0x100 == 0
+		if longCount, err = readUint(true); err != nil {
 			return err
 		}
-		keyCount = int(temp)
-		var temp2 uint32
-		err = binary.Read(buffer, binary.BigEndian, &temp2)
-		if err != nil {
+		if longSegSize, err = readUint(true); err != nil {
 			return err
 		}
-		h.keyDataLen = int(temp2)
 	}
-	if h.flags&0x1000 != 0 {
-		var temp uint32
-		err = binary.Read(buffer, binary.BigEndian, &temp)
-		if err != nil {
-			return err
-		}
-		h.nodeDataLen = int(temp)
-	} else {
-		var temp uint16
-		err = binary.Read(buffer, binary.BigEndian, &temp)
-		if err != nil {
-			return err
-		}
-		h.nodeDataLen = int(temp)
-	}
-	err = binary.Read(buffer, binary.BigEndian, &h.tinyNodeCount)
-	if err != nil {
+	if h.nodeDataLen, err = readUint(h.flags&0x1000 != 0); err != nil {
 		return err
 	}
-	err = h.readKeys(buffer, keyCount)
-	if err != nil {
+	if err := binary.Read(buffer, binary.BigEndian, &h.tinyNodeCount); err != nil {
 		return err
 	}
-	// at the end of reading key the cursor is on the start of the key buffer
-	// so seek from current amount equal to key data length
-	h.nodeOffset, err = buffer.Seek(int64(h.keyDataLen), io.SeekCurrent)
-	return err
-}
-func (h *header) writeKeyCount(buffer *bytes.Buffer) error {
-	var err error
-	if h.flags&0x8 != 0 {
-		err = binary.Write(buffer, binary.BigEndian, uint32(len(h.keys)))
-	} else if h.flags&0x400 != 0 {
-		err = binary.Write(buffer, binary.BigEndian, uint16(len(h.keys)))
-	} else {
-		err = buffer.WriteByte(uint8(len(h.keys)))
+	h.keys = nil
+	if err := h.readKeys(buffer, shortCount, 1, shortWide, h.keyDataLen, 1); err != nil {
+		return err
 	}
+	if err := h.readKeys(buffer, longCount, 2, longWide, longSegSize, 2); err != nil {
+		return err
+	}
+	h.nodeOffset, err = buffer.Seek(0, io.SeekCurrent)
 	return err
 }
+
+// readKeys reads count field names: an array of hashes of hashSize bytes,
+// an array of offsets of 2 bytes, or 4 when wide, and a segment of segSize
+// bytes, which holds each name after its length of lenSize bytes. It leaves
+// buffer after the segment.
+func (h *header) readKeys(buffer *bytes.Reader, count, hashSize int, wide bool, segSize, lenSize int) error {
+	if count == 0 {
+		return nil
+	}
+	hashes := make([]byte, count*hashSize)
+	if _, err := io.ReadFull(buffer, hashes); err != nil {
+		return err
+	}
+	offsets := make([]int, count)
+	for i := range offsets {
+		var err error
+		if wide {
+			var v uint32
+			err = binary.Read(buffer, binary.BigEndian, &v)
+			offsets[i] = int(v)
+		} else {
+			var v uint16
+			err = binary.Read(buffer, binary.BigEndian, &v)
+			offsets[i] = int(v)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	seg := make([]byte, segSize)
+	if _, err := io.ReadFull(buffer, seg); err != nil {
+		return err
+	}
+	for i, off := range offsets {
+		if off+lenSize > len(seg) {
+			return errors.New("corrupted json data")
+		}
+		n := int(seg[off])
+		if lenSize == 2 {
+			n = int(binary.BigEndian.Uint16(seg[off:]))
+		}
+		if off+lenSize+n > len(seg) {
+			return errors.New("corrupted json data")
+		}
+		k := key{name: string(seg[off+lenSize : off+lenSize+n]), offset: off, size: n}
+		if hashSize == 1 {
+			k.hash = hashes[i]
+		}
+		h.keys = append(h.keys, k)
+	}
+	return nil
+}
+
 func (h *header) readKeyCount(buffer *bytes.Reader) (int, error) {
 	if h.flags&0x8 != 0 {
 		var keyCount uint32
@@ -179,48 +169,6 @@ func (h *header) readKeyCount(buffer *bytes.Reader) (int, error) {
 	}
 	keyCount, err := buffer.ReadByte()
 	return int(keyCount), err
-}
-func (h *header) readKeys(buffer *bytes.Reader, keysCount int) error {
-	var err error
-	var index int
-	h.keys = make(keyCollection, keysCount)
-	for index = 0; index < keysCount; index++ {
-		h.keys[index].hash, err = buffer.ReadByte()
-		if err != nil {
-			return err
-		}
-	}
-	var offset uint16
-	for index = 0; index < keysCount; index++ {
-		err = binary.Read(buffer, binary.BigEndian, &offset)
-		h.keys[index].offset = int(offset)
-	}
-	var baseOffset int64
-	baseOffset, err = buffer.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
-	var stringLen uint8
-	for index = range keysCount {
-		// seek to the start of the key
-		_, err = buffer.Seek(baseOffset+int64(h.keys[index].offset), io.SeekStart)
-		if err != nil {
-			return err
-		}
-		stringLen, err = buffer.ReadByte()
-		if err != nil {
-			return err
-		}
-		nameBytes := make([]byte, stringLen)
-		_, err = buffer.Read(nameBytes)
-		if err != nil {
-			return err
-		}
-		h.keys[index].name = string(nameBytes)
-	}
-	// seek to the base offset
-	_, err = buffer.Seek(baseOffset, io.SeekStart)
-	return err
 }
 func (h *header) isRelativeOffsetUsed() bool {
 	return h.flags&1 != 0

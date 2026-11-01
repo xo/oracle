@@ -80,19 +80,42 @@ op = 62 and length = 11
 
 //var jsonDecoder map[int]FieldDecoder
 
+// Encode returns the OSON image of mainObj, a map or a slice, as
+// python-oracledb encodes one. Names of up to 255 bytes go in the segment of
+// short names and longer ones in the segment of long names, in version 3,
+// each sorted, and the field IDs count the short names first. The flags are
+// set before the tree is encoded, since an object writes its field IDs in the
+// width that they give. go-ora set them after, wrote long names with a
+// length of one byte, and left the names in the order of a map.
 func Encode(mainObj any) ([]byte, error) {
-	header := &header{
-		flags: 0x2106,
-		keys:  keyCollection{},
-	}
-	var err error
+	header := &header{flags: 0x2106, keys: keyCollection{}}
 	header.keys.extractKeys(mainObj)
-	keyBuffer, err := header.keys.encode()
-	if err != nil {
-		return nil, err
+	var short, long keyCollection
+	for _, k := range header.keys {
+		if k.size > 0xFFFF {
+			return nil, fmt.Errorf("encoding JSON: the field name of %d bytes is longer than 65,535", k.size)
+		}
+		if k.size > 0xFF {
+			long = append(long, k)
+		} else {
+			short = append(short, k)
+		}
 	}
-	header.keyDataLen = len(keyBuffer)
+	short.Sort()
+	long.Sort()
+	shortSeg, longSeg := short.encode(1), long.encode(2)
+	header.keys = append(append(keyCollection{}, short...), long...)
+	switch n := len(header.keys); {
+	case n > 0xFFFF:
+		header.flags |= 0x8
+	case n > 0xFF:
+		header.flags |= 0x400
+	}
+	if len(shortSeg) > 0xFFFF {
+		header.flags |= 0x800
+	}
 	var objectData []byte
+	var err error
 	switch mainObj := mainObj.(type) {
 	case map[string]any:
 		obj, err := newObjectField(mainObj, header)
@@ -100,47 +123,72 @@ func Encode(mainObj any) ([]byte, error) {
 			return nil, err
 		}
 		objectData, err = obj.Encode()
+		if err != nil {
+			return nil, err
+		}
 	case []any:
 		obj, err := newArrayField(mainObj, header)
 		if err != nil {
 			return nil, err
 		}
 		objectData, err = obj.Encode()
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("cannot set value of %T into JSON", mainObj)
 	}
-	if err != nil {
-		return nil, err
+	if len(objectData) > 0xFFFF {
+		header.flags |= 0x1000
 	}
-	header.nodeDataLen = len(objectData)
-
-	buffer := bytes.NewBuffer(nil)
-	err = header.write(buffer)
-	if err != nil {
-		return nil, err
-	}
-	for _, key := range header.keys {
-		err = buffer.WriteByte(key.hash)
-		if err != nil {
-			return nil, err
+	put := func(b []byte, v int, wide bool) []byte {
+		if wide {
+			return binary.BigEndian.AppendUint32(b, uint32(v))
 		}
+		return binary.BigEndian.AppendUint16(b, uint16(v))
 	}
-	for _, key := range header.keys {
-		if header.flags&0x800 != 0 {
-			err = binary.Write(buffer, binary.BigEndian, uint32(key.offset))
-		} else {
-			err = binary.Write(buffer, binary.BigEndian, uint16(key.offset))
+	version := byte(1)
+	if len(long) > 0 {
+		version = 3
+	}
+	out := []byte{0xff, 0x4a, 0x5a, version}
+	out = binary.BigEndian.AppendUint16(out, header.flags)
+	switch {
+	case header.flags&0x8 != 0:
+		out = binary.BigEndian.AppendUint32(out, uint32(len(short)))
+	case header.flags&0x400 != 0:
+		out = binary.BigEndian.AppendUint16(out, uint16(len(short)))
+	default:
+		out = append(out, uint8(len(short)))
+	}
+	out = put(out, len(shortSeg), header.flags&0x800 != 0)
+	longWide := len(longSeg) > 0xFFFF
+	if len(long) > 0 {
+		var flags2 uint16
+		if !longWide {
+			flags2 = 0x100
 		}
-		if err != nil {
-			return nil, err
-		}
+		out = binary.BigEndian.AppendUint16(out, flags2)
+		out = binary.BigEndian.AppendUint32(out, uint32(len(long)))
+		out = binary.BigEndian.AppendUint32(out, uint32(len(longSeg)))
 	}
-	_, err = buffer.Write(keyBuffer)
-	if err != nil {
-		return nil, err
+	out = put(out, len(objectData), header.flags&0x1000 != 0)
+	out = binary.BigEndian.AppendUint16(out, 0) // the tiny nodes
+	for _, k := range short {
+		out = append(out, k.hash)
 	}
-	_, err = buffer.Write(objectData)
-	return buffer.Bytes(), err
+	for _, k := range short {
+		out = put(out, k.offset, header.flags&0x800 != 0)
+	}
+	out = append(out, shortSeg...)
+	for _, k := range long {
+		out = binary.BigEndian.AppendUint16(out, uint16(k.hash32))
+	}
+	for _, k := range long {
+		out = put(out, k.offset, longWide)
+	}
+	out = append(out, longSeg...)
+	return append(out, objectData...), err
 }
 
 func isObject(opCode uint8) bool {

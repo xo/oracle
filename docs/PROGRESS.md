@@ -197,11 +197,20 @@ faults, which are fixed:
 - An `XMLType` attribute did not read, and an object that is an OUT sent the
   zero value of its destination.
 
-The nineteenth part of step 9 is staged. The ORA-00600 [kkxcmp0] of a
-package did not come back in 60 runs on 18c and 19c, and each test now
+The nineteenth part of step 9 is done (`efc65fa`). The ORA-00600 [kkxcmp0]
+of a package did not come back in 60 runs on 18c and 19c, and each test now
 compiles a package of its own name, where two pairs of tests replaced one
 package. The tests of LONG, ROWID, procedures, NCLOB with RETURNING and
 negative intervals of python-oracledb are written again, and found that a
 logical UROWID read as text that the server refused, and a NULL ROWID read as
 a ROWID of zeros. Both are fixed.
 
+The twentieth part of step 9 is done. The tests of the bounds of dates,
+BOOLEAN columns and the field names of JSON of python-oracledb are written
+again, and found three faults, which are fixed:
+
+- A NULL bool bound with no type, which PL/SQL refused with ORA-06550.
+- OSON of version 3, which holds a name past 255 bytes, read as corrupt, and
+  the driver hashed, sorted and cut the names of what it wrote.
+- A JSON column past 32 KiB came back cut, with no error, when the LOBs came
+  inline.

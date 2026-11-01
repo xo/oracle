@@ -1,69 +1,60 @@
 package oson
 
 import (
-	"bytes"
+	"encoding/binary"
 	"sort"
-	"strconv"
 )
 
 type key struct {
 	name   string
 	size   int
 	hash   uint8
+	hash32 uint32
 	offset int
 }
 
 type keyCollection []key
 
+// NewKey returns the key of name, with the hash that OSON and the server
+// use: FNV-1a of 32 bits over the UTF-8 of the name. go-ora hashed the
+// decimal code point of a character above U+07FF, so the server found no such
+// key in a document that the driver encoded.
 func NewKey(name string) *key {
-	ret := new(key)
-	ret.name = name
-	input := []rune(name)
-	var num uint64 = 0xFFFFFFFF811C9DC5
-	ret.size = len(input)
-	for i := 0; i < len(input); i++ {
-		c := input[i]
-		var temp []byte
-		if c <= 0x7ff {
-			temp = []byte(string(c))
-			for j := 0; j < len(temp); j++ {
-				num = (num ^ uint64(temp[j])) * uint64(0x1000193)
-			}
+	var h uint32 = 0x811C9DC5
+	for _, b := range []byte(name) {
+		h = (h ^ uint32(b)) * 16777619
+	}
+	return &key{name: name, size: len(name), hash: uint8(h), hash32: h}
+}
+
+// encode returns the segment of the names of the keys, each after its
+// length of lenSize bytes, and sets the offset of each key in it.
+func (collection keyCollection) encode(lenSize int) []byte {
+	var seg []byte
+	for x, k := range collection {
+		collection[x].offset = len(seg)
+		if lenSize == 2 {
+			seg = binary.BigEndian.AppendUint16(seg, uint16(len(k.name)))
 		} else {
-			temp = []byte(strconv.Itoa(int(c)))
-			for x := 0; x < len(temp); x++ {
-				num = (num ^ uint64(temp[x])) * uint64(0x1000193)
-			}
-			if len(temp) == 2 {
-				i++
-			}
+			seg = append(seg, uint8(len(k.name)))
 		}
-		ret.size = ret.size + len(temp) - 1
+		seg = append(seg, k.name...)
 	}
-	ret.hash = uint8(num)
-	return ret
+	return seg
 }
 
-func (collection *keyCollection) encode() ([]byte, error) {
-	keyBuffer := bytes.NewBuffer(nil)
-	var err error
-	for x, key := range *collection {
-		(*collection)[x].offset = keyBuffer.Len()
-		err = keyBuffer.WriteByte(uint8(len(key.name)))
-		if err != nil {
-			return nil, err
-		}
-		_, err = keyBuffer.Write([]byte(key.name))
-		if err != nil {
-			return nil, err
-		}
-	}
-	return keyBuffer.Bytes(), nil
-}
-
+// Sort sorts the keys as OSON wants them: by the low byte of the hash, then
+// by length, then by bytes, as python-oracledb sorts them.
 func (collection *keyCollection) Sort() {
 	sort.Slice(*collection, func(i, j int) bool {
-		return (*collection)[i].hash < (*collection)[j].hash // Sort by hash ascending
+		a, b := (*collection)[i], (*collection)[j]
+		if a.hash != b.hash {
+			return a.hash < b.hash
+		}
+		if a.size != b.size {
+			return a.size < b.size
+		}
+		return a.name < b.name
 	})
 }
 
