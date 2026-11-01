@@ -2,12 +2,14 @@ package ttc
 
 import (
 	"bytes"
+	"cmp"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/xo/oracle/internal/codec"
@@ -17,9 +19,12 @@ import (
 
 type ObjectParameter struct {
 	codec.BasicParameter
-	fields       []string
-	attribs      map[string]codec.OracleParameterCoder
-	isArray      bool
+	fields  []string
+	attribs map[string]codec.OracleParameterCoder
+	isArray bool
+	// indexed is a collection that is a PL/SQL index-by table, whose image
+	// holds the key of each element
+	indexed      bool
 	activeFields map[string]int
 	typ          reflect.Type
 }
@@ -36,6 +41,16 @@ func (param *ObjectParameter) loadActiveFields() {
 	}
 }
 
+// plsqlAttribCoders are the coders of the attributes of a record of a package
+// whose types SQL has not, or writes in another form. ALL_PLSQL_TYPE_ATTRS
+// names a BOOLEAN BOOLEAN from 23ai, and PL/SQL BOOLEAN before it.
+var plsqlAttribCoders = map[string]codec.OracleParameterCoder{
+	"BOOLEAN":               &codec.BinaryIntegerParameter{Boolean: true},
+	"PL/SQL BOOLEAN":        &codec.BinaryIntegerParameter{Boolean: true},
+	"PL/SQL PLS INTEGER":    &codec.BinaryIntegerParameter{},
+	"PL/SQL BINARY INTEGER": &codec.BinaryIntegerParameter{},
+}
+
 func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, drv *Registry, owner, name string) (err error) {
 	if param.typ == nil {
 		err = errors.New("type object cannot be nil")
@@ -50,12 +65,22 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, drv *Registry, owne
 	if err != nil {
 		return
 	}
-	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, LENGTH, ATTR_NO 
-					FROM ALL_TYPE_ATTRS 
+	sqlText := `SELECT ATTR_NAME, ATTR_TYPE_NAME, NULL, LENGTH, ATTR_NO
+					FROM ALL_TYPE_ATTRS
 					WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2
 					ORDER BY ATTR_NO`
+	args := []any{strings.ToUpper(owner), strings.ToUpper(name)}
+	pkg, typ, inPackage := packageType(name)
+	if inPackage {
+		// a record of a package
+		sqlText = `SELECT attr_name, attr_type_name, attr_type_package, length, attr_no
+			FROM all_plsql_type_attrs
+			WHERE owner = :1 AND package_name = :2 AND type_name = :3
+			ORDER BY attr_no`
+		args = []any{strings.ToUpper(owner), pkg, typ}
+	}
 	var rows *sql.Rows
-	rows, err = db.Query(sqlText, strings.ToUpper(owner), strings.ToUpper(name))
+	rows, err = db.Query(sqlText, args...)
 	if err != nil {
 		return
 	}
@@ -66,16 +91,26 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, drv *Registry, owne
 		attName     sql.NullString
 		attOrder    int64
 		attTypeName sql.NullString
+		attPackage  sql.NullString
 		length      sql.NullInt64
 	)
 	param.attribs = make(map[string]codec.OracleParameterCoder)
 	for rows.Next() {
-		err = rows.Scan(&attName, &attTypeName, &length, &attOrder)
+		err = rows.Scan(&attName, &attTypeName, &attPackage, &length, &attOrder)
 		if err != nil {
 			return
 		}
 		param.fields = append(param.fields, attName.String)
-		par, ok := drv.nameTypeCoder[strings.ToUpper(attTypeName.String)]
+		attType := strings.ToUpper(attTypeName.String)
+		if attPackage.Valid {
+			// a record or a collection of a package, which RegisterType
+			// registered as PKG.TYPE
+			attType = strings.ToUpper(attPackage.String) + "." + attType
+		}
+		par, ok := plsqlAttribCoders[attType]
+		if !ok || !inPackage {
+			par, ok = drv.nameTypeCoder[attType]
+		}
 		if ok {
 			param.attribs[strings.ToUpper(attName.String)] = par.Copy()
 			param.attribs[strings.ToUpper(attName.String)].SetAsUDTPar()
@@ -100,9 +135,9 @@ func (param *ObjectParameter) Copy() codec.OracleParameterCoder {
 func (param *ObjectParameter) Init() {
 	param.SetDefault()
 	param.DataType = types.XMLType
-	if !param.isArray {
-		param.Version = 1
-	}
+	// the version of the type, which DBMS_PICKLER.GET_TYPE_SHAPE gives as 1,
+	// and python-oracledb sends for an object and a collection
+	param.Version = 1
 }
 
 func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
@@ -110,8 +145,8 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	session := tns.NewMemorySession(nil, nil, conn.Session().Properties())
 	inputType := getType(input)
 	rValue := reflect.ValueOf(input)
-	// a nil slice is a NULL collection, and not an empty one
-	if input == nil || (rValue.Kind() == reflect.Slice && rValue.IsNil()) {
+	// a nil slice or map is a NULL collection, and not an empty one
+	if input == nil || ((rValue.Kind() == reflect.Slice || rValue.Kind() == reflect.Map) && rValue.IsNil()) {
 		param.BValue = nil
 		return
 	}
@@ -120,14 +155,41 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 		coder.Init()
 		param.UpdateParameterInfo(coder.ParameterInfo())
 		size := rValue.Len()
+		// a map is an index-by table, whose keys go in order
+		var keys []reflect.Value
+		if rValue.Kind() == reflect.Map {
+			if !param.indexed {
+				return fmt.Errorf("binding a map as the collection %s, which is not an index-by table: %w", param.TypeName, tns.ErrInvalidValue)
+			}
+			keys = rValue.MapKeys()
+			slices.SortFunc(keys, func(a, b reflect.Value) int {
+				return cmp.Compare(a.Int(), b.Int())
+			})
+		}
 		// the prefix segment, of length 1, the flags of the collection, and
-		// its count, as the server writes a collection
-		session.PutBytes(1, 1, 0)
+		// its count, as the server writes a collection. An index-by table
+		// has the flag 0x10, and the key of each element before it. The
+		// keys of a slice are from 1, as PL/SQL reads a host array (D33)
+		flags := uint8(0)
+		if param.indexed {
+			flags = collectionHasIndexes
+		}
+		session.PutBytes(1, 1, flags)
 		putImageLength(session, size)
 		for i := range size {
+			elem := reflect.Value{}
+			key := int64(i + 1)
+			if keys != nil {
+				key, elem = keys[i].Int(), rValue.MapIndex(keys[i])
+			} else {
+				elem = rValue.Index(i)
+			}
+			if param.indexed {
+				session.PutUint(uint32(int32(key)), 4, true, false)
+			}
 			var item driver.Value
-			if rValue.Index(i).CanInterface() {
-				item, err = getValue(rValue.Index(i).Interface())
+			if elem.CanInterface() {
+				item, err = getValue(elem.Interface())
 				if err != nil {
 					return err
 				}
@@ -186,6 +248,10 @@ func (param *ObjectParameter) Encode(input any, conn codec.Conn) (err error) {
 	param.BValue = session.WriteBuffer()
 	return
 }
+
+// collectionHasIndexes is the flag of the image of a collection that holds
+// the key of each element, a PL/SQL index-by table.
+const collectionHasIndexes = 0x10
 
 // maxShortImageLength is the longest length that the image of an object
 // writes in one byte. A longer one is 0xFE and four bytes, big endian.
@@ -316,12 +382,16 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 	}
 	switch objectType {
 	case 0x88:
-		_ /*attribsLen*/, err := param.PSession.ReadInt(2, true, true)
+		// the prefix segment
+		_, err := param.PSession.ReadInt(2, true, true)
 		if err != nil {
 			return nil, err
 		}
-
-		itemsLen, err := param.PSession.ReadInt(2, false, true)
+		flags, err := param.PSession.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		itemsLen, err := param.PSession.ReadInt(1, false, true)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +402,19 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 			}
 		}
 		items := make([]any, itemsLen)
+		// an index-by table holds the key of each element, in order
+		var keys []int32
+		if flags&collectionHasIndexes != 0 {
+			keys = make([]int32, itemsLen)
+		}
 		for i := 0; i < itemsLen; i++ {
+			if keys != nil {
+				key, err := param.PSession.ReadInt(4, false, true)
+				if err != nil {
+					return nil, err
+				}
+				keys[i] = int32(uint32(key))
+			}
 			decoder := param.attribs[""].Copy()
 			decoder.UpdateParameterInfo(param.ParameterInfo())
 			decoder.SetLobStreamer(conn.NewLobStreamer())
@@ -344,6 +426,9 @@ func (param *ObjectParameter) Decode(conn codec.Conn) (any, error) {
 			if err != nil {
 				return nil, err
 			}
+		}
+		if keys != nil {
+			return &indexedItems{keys: keys, items: items}, nil
 		}
 		return items, nil
 	case 0x85:
@@ -474,6 +559,19 @@ func resolveObjects(v any, load bool) (any, error) {
 				return nil, err
 			}
 		}
+	case *indexedItems:
+		if _, err := resolveObjects(v.items, load); err != nil {
+			return nil, err
+		}
 	}
 	return v, nil
+}
+
+// indexedItems is a PL/SQL index-by table that the server sent: its elements
+// and the key of each, in order. It fills a map[int32]T with its keys, and a
+// slice with its elements alone, so that the holes between the keys close up
+// (D33).
+type indexedItems struct {
+	keys  []int32
+	items []any
 }

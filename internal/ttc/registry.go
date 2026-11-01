@@ -239,11 +239,25 @@ func (drv *Registry) RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTyp
 		if err != nil {
 			return err
 		}
+		if pkg, typ, ok := packageType(arrayTypeName); ok {
+			var kind string
+			err = db.QueryRow(`SELECT coll_type FROM all_plsql_coll_types
+				WHERE owner = :1 AND package_name = :2 AND type_name = :3`,
+				strings.ToUpper(owner), pkg, typ).Scan(&kind)
+			if err != nil {
+				return fmt.Errorf("reading the kind of the collection %s: %w", arrayTypeName, err)
+			}
+			arrayCoder.indexed = kind == "PL/SQL INDEX TABLE"
+		}
 		drv.mu.Lock()
 		drv.nameTypeCoder[strings.ToUpper(arrayTypeName)] = arrayCoder
-		// map type to coder
+		// map type to coder. An index-by table binds from a map of its
+		// keys too (D33)
 		if typeObj != nil {
 			drv.goTypeCoder[arrayCoder.typ] = arrayCoder
+			if arrayCoder.indexed {
+				drv.goTypeCoder[reflect.MapOf(reflect.TypeFor[int32](), typ)] = arrayCoder
+			}
 		}
 		drv.mu.Unlock()
 	}

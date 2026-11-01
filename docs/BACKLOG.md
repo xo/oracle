@@ -43,32 +43,33 @@ bounds of NUMBER (`test_1800_number.py`), objects
 (`test_3100_json.py` and `test_3200_json_26ai.py`), NCHAR
 (`test_1700_nchar.py`), and VECTOR (`test_2700_vector.py`,
 `test_2900_binary_vector.py` and `test_3000_sparse_vector.py`). The files of
-`data_types` are done, and so are `cursor/test_2400_sql_parser.py` and
-`misc/test_1100_error.py`.
+`data_types` are done, and so are `cursor/test_2400_sql_parser.py`,
+`misc/test_1100_error.py` and `cursor/test_2700_features_12_1.py`. Of the
+last, the batch errors and the count of each row (2700, 2701, 2717 to 2719,
+2722 to 2724, 2726, 2727, 2730 and 2731) need an API of their own, as
+[`DRIVERS.md`](DRIVERS.md) says, and wait for Ken. A `%ROWTYPE` record (2728
+and 2729) waits for the item below. The metadata of a type (2734) has no API
+here.
 
 The files outside `data_types` that test what this driver does, in the order
 to write them:
 
-1. `cursor/test_2700_features_12_1.py`: PL/SQL arrays of BOOLEAN, DATE,
-   NUMBER and strings, with holes, records and `%ROWTYPE`, and implicit
-   results. Batch errors and the count of each row need an API of their own
-   (see [`DRIVERS.md`](DRIVERS.md)), so their cases wait for Ken.
-2. `cursor/test_1800_other.py`: repeated DDL, SQL that is not ASCII, the case
+1. `cursor/test_1800_other.py`: repeated DDL, SQL that is not ASCII, the case
    of bind names, keywords as bind names, a run after an error, ORA-01007,
    a column added to a cached query, a table with a LOB built again, mixed
    NULL binds in PL/SQL, the order of PL/SQL binds, LOBs after an error,
    domains and annotations, and a killed connection with an open cursor.
-3. `cursor/test_2000_var.py` and `cursor/test_2100_arrayvar.py`: the OUT of
+2. `cursor/test_2000_var.py` and `cursor/test_2100_arrayvar.py`: the OUT of
    each type that the files of `data_types` do not reach, and an array past
    its size.
-4. `connection/test_1000_basic.py`: a bad password, a password with `/` and
+3. `connection/test_1000_basic.py`: a bad password, a password with `/` and
    `@`, a rollback at close, connections from many goroutines, a ping,
    `current_schema`, `DBMS_OUTPUT`, a timeout of a call, a proxy user, the
    names of the client, the session ID, and an error in the middle of a
    response.
-5. `aq/test_1000_dbobject.py`, `aq/test_1200_bulk.py`, `aq/test_1400_raw.py`
+4. `aq/test_1000_dbobject.py`, `aq/test_1200_bulk.py`, `aq/test_1400_raw.py`
    and `aq/test_1600_json.py`, for the `aq` package.
-6. `ext/test_ext_2100_bfile_type.py`, which needs a directory and a file on
+5. `ext/test_ext_2100_bfile_type.py`, which needs a directory and a file on
    the server, and `misc/test_1600_defaults.py`, for `prefetch` and
    `lob_fetch`.
 
@@ -84,6 +85,14 @@ The other files test what this driver does not do, or the API of Python:
   `hooks/`, `dataframe/`, `soda/`, `stc/` and `py314/`.
 - The rest of `ext/`, which needs a set up of its own, such as DRCP, the
   providers of a cloud and the cache of statements.
+
+### Register a record of %ROWTYPE
+
+`RegisterType` takes a type of SQL and a type of a package (D33). A record
+of `TABLE%ROWTYPE`, alone or as the element of a collection of a package, is
+in neither view. python-oracledb reads its type OID from
+`DBMS_PICKLER.GET_TYPE_SHAPE` and its attributes from `ALL_TAB_COLS`, and the
+driver can do the same.
 
 ### Return the rows of a RETURNING of more than one row
 

@@ -41,6 +41,7 @@ conclusion.
 | [D30](#d30-the-go-types-of-a-vector) | Decided |
 | [D31](#d31-an-nvarchar-binds-as-nvarchar2) | Decided |
 | [D32](#d32-a-unit-that-does-not-compile-is-an-error) | Decided |
+| [D33](#d33-registertype-takes-the-types-of-a-package) | Decided |
 
 ## Purpose
 
@@ -451,6 +452,32 @@ A warning that the server sends in a message of its own, as at logon for a
 password that will expire, goes to the `Logger` of the `Config` at the level
 Warn. An error there would refuse the connection. go-ora wrote it to
 `os.Stderr`.
+
+## D33. RegisterType takes the types of a package
+
+Status: Decided.
+
+Ken decided on 2026-11-01 that `RegisterType` registers a record and a
+collection that a PL/SQL package declares, by the name `PKG.TYPE`, and that a
+`map[int32]T` binds and reads an index-by table with its keys. The public API
+does not change.
+
+- `RegisterType(db, "PKG.REC", "PKG.RECS", rec{})` registers a record and an
+  index-by table of it. `RegisterType(db, "VARCHAR2", "PKG.STRINGS",
+  name(""))` registers an index-by table of a basic type, as D25 does for a
+  collection of SQL.
+- The driver reads a type of a package from `ALL_PLSQL_TYPES`,
+  `ALL_PLSQL_TYPE_ATTRS` and `ALL_PLSQL_COLL_TYPES`, which 12.1 added. A
+  `BOOLEAN`, a `PLS_INTEGER` and a `BINARY_INTEGER` attribute are four bytes
+  in the image, as python-oracledb writes them.
+- The image of an index-by table holds the key of each element. A slice
+  binds with the keys from 1, as PL/SQL reads a host array. A map binds with
+  its own keys. On a read, a map keeps the keys, and a slice takes the
+  elements in the order of their keys, so the holes between them close up.
+
+python-oracledb binds these types as a `DbObject` of the type that
+`Connection.gettype` returns. go-ora looked a type up in `ALL_TYPES` alone,
+which holds no type of a package.
 
 ## Open questions for Ken
 

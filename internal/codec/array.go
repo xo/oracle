@@ -60,6 +60,12 @@ func (param *ArrayParameter) Encode(input any, conn Conn) (err error) {
 		coder = param.attrib.Copy()
 		coder.Init()
 		param.UpdateParameterInfo(coder.ParameterInfo())
+		// the server fails with an internal error on an array of BOOLEAN,
+		// ORA-06544 on 26ai and ORA-00600 on 18c, where go-ora sent it.
+		// python-oracledb binds a collection type of the package instead
+		if param.DataType == types.BOOLEAN {
+			return fmt.Errorf("binding a PL/SQL array of BOOLEAN, which the server takes only as a collection type: %w", tns.ErrNotSupported)
+		}
 		rValue := reflect.ValueOf(input)
 		length := rValue.Len()
 		if length > param.ArraySize {

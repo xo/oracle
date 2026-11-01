@@ -437,6 +437,30 @@ through a named Go element type, such as `type Name string`, or through
 `[]byte`, inside an object or a collection binds as that kind, where
 `database/sql` converts one only at the top of a statement.
 
+`RegisterType` takes a record and a collection of a PL/SQL package as
+`PKG.TYPE`, from `ALL_PLSQL_TYPES` and its attributes from
+`ALL_PLSQL_TYPE_ATTRS` (D33). A `BOOLEAN`, a `PLS_INTEGER` and a
+`BINARY_INTEGER` attribute are a length of 4 and four bytes, big endian, in
+the image. An index-by table has the flag 0x10 in its image, and the key of
+each element before it. A slice binds with the keys from 1, and a
+`map[int32]T` with its own keys. On a read, a map keeps the keys, and a slice
+takes the elements in their order. The bind of every object sends the version
+of its type, 1, as python-oracledb sends it. go-ora sent 0, which a SQL type
+takes and a type of a package fails with ORA-00600 [kocpnsh014].
+`TestPLSQLRecords` holds the cases of python-oracledb.
+
+A slice binds to PL/SQL as a host array, as an index-by table that PL/SQL
+reads with the keys from 1. A `[]bool` is refused with `ErrNotSupported`,
+because the server fails on a host array of `BOOLEAN` with an internal error,
+ORA-06544 on 26ai and ORA-00600 on 18c. A collection of a package binds one
+(D33). A host array with holes fails with ORA-06513, and a collection of the
+package reads one. `TestPLSQLArrays` and `TestPLSQLBooleanArrays` hold the
+cases of python-oracledb.
+
+The cursors that a PL/SQL block returns with `DBMS_SQL.RETURN_RESULT` read as
+the result sets of its rows, through `Rows.NextResultSet`.
+`TestImplicitResults` holds the cases of python-oracledb.
+
 The values of a call are decoded while its reply is read, when no LOB can
 load. After the call, the driver loads each CLOB and BLOB of an OUT value
 and of the elements of a collection. An object with a LOB attribute is

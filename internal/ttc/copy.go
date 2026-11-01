@@ -15,8 +15,9 @@ import (
 //
 // A value type of the driver, such as a LOB, goes as its plain value, unless
 // dest is a value type of the driver too, which takes it through Scan. A
-// collection, a []any, fills a slice one element at a time. Every other pair
-// goes to sql.ConvertAssign, through assign.
+// collection, a []any, fills a slice one element at a time, and an index-by
+// table fills a map by its keys or a slice. Every other pair goes to
+// sql.ConvertAssign, through assign.
 //
 // A NULL in a destination that cannot hold one is its zero value, as it was
 // in go-ora, because a field of a user defined type is often a plain string.
@@ -42,8 +43,11 @@ func copyValue(dest, src any) error {
 		v.Elem().SetZero()
 		return nil
 	}
-	if items, ok := src.([]any); ok {
+	switch items := src.(type) {
+	case []any:
 		return copySlice(dest, items)
+	case *indexedItems:
+		return copyIndexed(dest, items)
 	}
 	return assign(driver.ScanContext{}, dest, src)
 }
@@ -76,5 +80,30 @@ func copySlice(dest any, items []any) error {
 		}
 	}
 	v.Set(s)
+	return nil
+}
+
+// copyIndexed stores an index-by table in dest: in a map, by its keys, and
+// in anything else as copySlice stores its elements.
+func copyIndexed(dest any, src *indexedItems) error {
+	v := reflect.ValueOf(dest)
+	if v.Kind() != reflect.Pointer || v.IsNil() || v.Elem().Kind() != reflect.Map {
+		return copySlice(dest, src.items)
+	}
+	v = v.Elem()
+	m := reflect.MakeMapWithSize(v.Type(), len(src.keys))
+	for i, item := range src.items {
+		key := reflect.New(v.Type().Key()).Elem()
+		if !key.CanInt() {
+			return fmt.Errorf("copying an index-by table into %s, whose key is not an integer", v.Type())
+		}
+		key.SetInt(int64(src.keys[i]))
+		elem := reflect.New(v.Type().Elem())
+		if err := copyValue(elem.Interface(), item); err != nil {
+			return fmt.Errorf("copying the element of key %d of an index-by table: %w", src.keys[i], err)
+		}
+		m.SetMapIndex(key, elem.Elem())
+	}
+	v.Set(m)
 	return nil
 }

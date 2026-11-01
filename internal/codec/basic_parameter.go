@@ -107,6 +107,9 @@ func (basic *BasicParameter) UpdateParameterInfo(data BasicParameter) {
 	if len(basic.ToID) == 0 {
 		basic.ToID = data.ToID
 	}
+	if basic.Version == 0 {
+		basic.Version = data.Version
+	}
 	if basic.ArraySize < data.ArraySize {
 		basic.ArraySize = data.ArraySize
 	}

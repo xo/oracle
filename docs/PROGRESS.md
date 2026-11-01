@@ -235,7 +235,7 @@ are written again, and found these faults, which are fixed:
 Ken decided that the type `NVarChar` binds as NVARCHAR2 (D31), and the
 cases that bind PL/SQL arrays of NVARCHAR2 are written with it.
 
-The twenty-second part of step 9 is done. The test files of python-oracledb
+The twenty-second part of step 9 is done (`2ab0f95`). The test files of python-oracledb
 outside `data_types` are sorted in the BACKLOG, and the first of them, the
 names of binds of `cursor/test_2400_sql_parser.py`, is written again. A new
 parser, `parseSQL`, follows that of python-oracledb, and fixed these faults:
@@ -259,3 +259,15 @@ server goes to the `Logger`, where go-ora wrote it to `os.Stderr`.
 The full suites pass on every release. ORA-00600 [kkxcmp0] came back once,
 in `TestClientCharsetWithStringArray` on 19c, and did not come back in 15
 runs of the test and two runs of the suite.
+
+The twenty-third part of step 9 is done. The cases of
+`cursor/test_2700_features_12_1.py` are written again: PL/SQL arrays of
+NUMBER, DATE and VARCHAR2, IN, IN OUT and OUT, implicit results, and records
+and index-by tables of a package. Ken decided that `RegisterType` takes the
+types of a package as `PKG.TYPE`, and that a map binds and reads an index-by
+table with its keys (D33). These faults are fixed:
+
+- The bind of an object sent the version of its type as 0. A type of SQL
+  takes it, and a type of a package failed with ORA-00600 [kocpnsh014].
+- A `[]bool` bound to PL/SQL as a host array, and the server failed with an
+  internal error, ORA-00600 on 18c. The driver now refuses it.

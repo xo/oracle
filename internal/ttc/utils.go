@@ -115,10 +115,25 @@ func isBadConn(err error) bool {
 	return false
 }
 
+// packageType splits name into a package and a type, in upper case, when it
+// names a type of a package, as PKG.TYPE.
+func packageType(name string) (pkg, typ string, ok bool) {
+	pkg, typ, ok = strings.Cut(name, ".")
+	return strings.ToUpper(pkg), strings.ToUpper(typ), ok
+}
+
+// getTOID2 returns the type OID of a type, from ALL_TYPES, or of a type of a
+// package, from ALL_PLSQL_TYPES (12.1).
 func getTOID2(conn *sql.DB, owner, typeName string) ([]byte, error) {
 	var toid []byte
-	err := conn.QueryRow(`SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`,
-		strings.ToUpper(owner), strings.ToUpper(typeName)).Scan(&toid)
+	var err error
+	if pkg, typ, ok := packageType(typeName); ok {
+		err = conn.QueryRow(`SELECT type_oid FROM ALL_PLSQL_TYPES WHERE owner = :1 AND package_name = :2 AND type_name = :3`,
+			strings.ToUpper(owner), pkg, typ).Scan(&toid)
+	} else {
+		err = conn.QueryRow(`SELECT type_oid FROM ALL_TYPES WHERE UPPER(OWNER)=:1 AND UPPER(TYPE_NAME)=:2`,
+			strings.ToUpper(owner), strings.ToUpper(typeName)).Scan(&toid)
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		err = fmt.Errorf("type: %s is not present or wrong type name", typeName)
 	}

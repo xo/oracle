@@ -1964,7 +1964,7 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 			break
 		}
 		switch val := row[colIndex].(type) {
-		case *pendingObject, []any:
+		case *pendingObject, []any, *indexedItems:
 			// an object with a LOB attribute, alone or in a collection
 			auto := stmt.connection.connOption.LobReadMode == config.LobReadModeAuto
 			row[colIndex], err = resolveObjects(val, auto)
@@ -2065,6 +2065,8 @@ func loadLobs(v any) error {
 				return err
 			}
 		}
+	case *indexedItems:
+		return loadLobs(v.items)
 	}
 	return nil
 }
