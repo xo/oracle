@@ -38,6 +38,8 @@ conclusion.
 | [D27](#d27-the-open-upstream-issues-are-finished) | Decided |
 | [D28](#d28-the-tests-of-python-oracledb-are-written-again) | Decided |
 | [D29](#d29-19c-is-tested-again) | Decided. Amends D23 |
+| [D30](#d30-the-go-types-of-a-vector) | Decided |
+| [D31](#d31-an-nvarchar-binds-as-nvarchar2) | Decided |
 
 ## Purpose
 
@@ -399,6 +401,37 @@ run on 19c with the other releases of this machine. CI still leaves 19c out,
 as D17 says, because each run of CI starts on a new machine with no copy, so
 each would wait 14 minutes. Ken can change that, for instance with a nightly
 job that keeps the copy in a cache.
+
+## D30. The Go types of a VECTOR
+
+Status: Decided.
+
+Ken decided on 2026-11-01 that a VECTOR maps to the Go types of
+python-oracledb:
+
+- `INT8` is `[]int8`, `FLOAT32` is `[]float32` and `FLOAT64` is `[]float64`.
+- `BINARY` is `[]byte`, with 8 dimensions in each byte. go-ora read `INT8` as
+  `[]uint8`, so a negative element read wrong, and a `[]uint8` binds as
+  `BINARY` now.
+- A sparse vector is `oracle.SparseVector`, which holds the number of
+  dimensions, the indices of the elements that are not zero, and their
+  values. It binds as it is.
+- A VECTOR column scans into a `*Vector`, a `*SparseVector`, or a pointer to
+  the slice of its elements. A dense vector binds through `CreateVector`,
+  because a slice binds as an array.
+
+## D31. An NVarChar binds as NVARCHAR2
+
+Status: Decided.
+
+Ken decided on 2026-11-01 that the exported type `NVarChar`, a named
+`string`, binds as `NVARCHAR2`, in the national character set of the
+database, as go-ora v2 had it. A `string` still binds as `VARCHAR2`. A
+`[]NVarChar` binds as a PL/SQL array of `NVARCHAR2`, `sql.Null[NVarChar]` as
+a NULL one, and an OUT of an `NVarChar` or a `[]NVarChar` reads one.
+python-oracledb does the same: a `str` binds as `DB_TYPE_VARCHAR`, and the
+caller asks for `DB_TYPE_NVARCHAR` on the bind variable. `database/sql` has no
+bind variable to ask on, so the type of the value asks.
 
 ## Open questions for Ken
 

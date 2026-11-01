@@ -16,6 +16,13 @@ func TestTextRoundTrip(t *testing.T) {
 		{`[1,"two",true,false,null,{"k":[1.5,-2]}]`, `[1,"two",true,false,null,{"k":[1.5,-2]}]`},
 		{`{"nested":{"deep":{"deeper":[{"x":0.001}]}}}`, `{"nested":{"deep":{"deeper":[{"x":0.001}]}}}`},
 		{`{"unicode":"日本語 ✓","escape":"a\"b\\c"}`, `{"escape":"a\"b\\c","unicode":"日本語 ✓"}`},
+		// a document that is a scalar
+		{`true`, `true`},
+		{`false`, `false`},
+		{`null`, `null`},
+		{`"String"`, `"String"`},
+		{`-9999999999999999999`, `-9999999999999999999`},
+		{`319438950232418390.273596`, `319438950232418390.273596`},
 	}
 	for _, test := range tests {
 		data, err := EncodeText([]byte(test.in))
@@ -89,5 +96,29 @@ func TestNames(t *testing.T) {
 	}
 	if _, err := Encode(map[string]any{strings.Repeat("e", 65536): "v"}); err == nil {
 		t.Error("a name of 65536 bytes: no error")
+	}
+}
+
+// TestDecodeRefusesBadOSON reads OSON with a byte changed, as the case 3116
+// of tests/data_types/test_3100_json.py of python-oracledb does, and every
+// part of a document cut short. Each read must fail and not panic.
+func TestDecodeRefusesBadOSON(t *testing.T) {
+	bad, err := EncodeText([]byte(`{"key_1":"test_3116a","key_2":"test_3116b"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the offset of the first name, past the end of the names
+	bad[15] = 0xFF
+	if got, err := DecodeText(bad); err == nil {
+		t.Errorf("a byte changed: got %s, no error", got)
+	}
+	data, err := EncodeText([]byte(`{"key_1":"test_3116a","key_2":"test_3116b","list":[1,{"a":true}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := range len(data) {
+		if got, err := DecodeText(data[:n]); err == nil {
+			t.Errorf("%d bytes of %d: got %s, no error", n, len(data), got)
+		}
 	}
 }

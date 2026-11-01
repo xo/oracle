@@ -205,7 +205,7 @@ negative intervals of python-oracledb are written again, and found that a
 logical UROWID read as text that the server refused, and a NULL ROWID read as
 a ROWID of zeros. Both are fixed.
 
-The twentieth part of step 9 is done. The tests of the bounds of dates,
+The twentieth part of step 9 is done (`f773a10`). The tests of the bounds of dates,
 BOOLEAN columns and the field names of JSON of python-oracledb are written
 again, and found three faults, which are fixed:
 
@@ -214,3 +214,23 @@ again, and found three faults, which are fixed:
   the driver hashed, sorted and cut the names of what it wrote.
 - A JSON column past 32 KiB came back cut, with no error, when the LOBs came
   inline.
+
+The twenty-first part of step 9 is done. Ken decided the Go types of a
+VECTOR (D30), and the driver reads and writes `[]int8`, `[]byte` of `BINARY`
+and `SparseVector`. The tests of VECTOR, JSON and NCHAR of python-oracledb
+are written again, and found these faults, which are fixed:
+
+- `INT8` read as unsigned, and a `BINARY` vector read wrong.
+- A zero `BINARY_FLOAT` or `BINARY_DOUBLE` encoded as NaN, and a second read
+  of one was wrong.
+- A batch of JSON or VECTOR wrote every row with the locator of the last, so
+  a longer row failed with ORA-51803, and a NULL last row hung the connection.
+- A NULL VECTOR or JSON of stream mode did not scan.
+- OSON read no date, timestamp, interval, RAW or VECTOR, read an interval as
+  a NUMBER, and refused a document that is a scalar.
+- Two objects with the same names in an array of OSON made the server fail
+  with ORA-40596.
+- An OUT JSON read as empty.
+
+Ken decided that the type `NVarChar` binds as NVARCHAR2 (D31), and the
+cases that bind PL/SQL arrays of NVARCHAR2 are written with it.

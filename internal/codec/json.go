@@ -59,16 +59,17 @@ func (param *JSONParameter) Decode(_ Conn) (any, error) {
 }
 
 func (param *JSONParameter) Write(session tns.SessionWriter) error {
-	if param.locator != nil {
-		session.PutUint(len(param.locator), 4, true, true)
+	locator := types.RowLocator(param.locator, param.BValue)
+	if locator != nil {
+		session.PutUint(len(locator), 4, true, true)
 		if param.isQueueMessage {
-			session.PutBytes(param.locator...)
+			session.PutBytes(locator...)
 		} else {
-			session.PutClr(param.locator)
+			session.PutClr(locator)
 		}
 		session.PutClr(param.BValue)
 	} else {
-		session.PutClr(param.locator)
+		session.PutClr(locator)
 	}
 	return nil
 }

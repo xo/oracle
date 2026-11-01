@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -454,6 +455,198 @@ func TestJSONFieldNames(t *testing.T) {
 				if !reflect.DeepEqual(back, value) {
 					t.Errorf("%s, %s, %d: the documents differ", name, table, id)
 				}
+			}
+		}
+	}
+}
+
+// TestNChar binds and reads NVARCHAR2 and NCHAR values with characters
+// outside ASCII: in a query, in and out of PL/SQL, and in PL/SQL arrays of
+// NVARCHAR2, which take an NVarChar and refuse a string. It holds the cases
+// of tests/data_types/test_1700_nchar.py of python-oracledb, written again
+// here.
+func TestNChar(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	drop := func() { execCmd(db, "DROP TABLE go_unicodes PURGE", "DROP PACKAGE go_unicode_arrays") }
+	drop()
+	defer drop()
+	if err := execCmd(db, `CREATE TABLE go_unicodes (id NUMBER(9), u NVARCHAR2(20), f NCHAR(40), n NVARCHAR2(50))`,
+		`BEGIN
+			FOR i IN 1..10 LOOP
+				INSERT INTO go_unicodes VALUES (i, 'Unicode ' || UNISTR('\3042') || ' ' || TO_CHAR(i),
+					'Fixed Unicode ' || TO_CHAR(i), DECODE(MOD(i, 2), 0, NULL, UNISTR('Nullable ') || TO_CHAR(i)));
+			END LOOP;
+		END;`,
+		`CREATE PACKAGE go_unicode_arrays AS
+			TYPE list IS TABLE OF NVARCHAR2(100) INDEX BY BINARY_INTEGER;
+			FUNCTION total(start_len NUMBER, a list) RETURN NUMBER;
+			PROCEDURE convert(n NUMBER, a IN OUT list);
+			PROCEDURE fill(n NUMBER, a OUT list);
+		END;`,
+		`CREATE PACKAGE BODY go_unicode_arrays AS
+			FUNCTION total(start_len NUMBER, a list) RETURN NUMBER IS
+				t NUMBER := start_len;
+			BEGIN
+				FOR i IN 1..a.COUNT LOOP
+					t := t + LENGTH(a(i));
+				END LOOP;
+				RETURN t;
+			END;
+			PROCEDURE convert(n NUMBER, a IN OUT list) IS
+			BEGIN
+				FOR i IN 1..n LOOP
+					a(i) := UNISTR('Converted element \3042 # ') || TO_CHAR(i) || ' originally had length ' || TO_CHAR(LENGTH(a(i)));
+				END LOOP;
+			END;
+			PROCEDURE fill(n NUMBER, a OUT list) IS
+			BEGIN
+				FOR i IN 1..n LOOP
+					a(i) := UNISTR('Test out element \3042 # ') || TO_CHAR(i);
+				END LOOP;
+			END;
+		END;`); err != nil {
+		t.Fatal(err)
+	}
+	type row struct {
+		id   int
+		u, f string
+		n    sql.Null[string]
+	}
+	want := func(i int) row {
+		r := row{id: i, u: fmt.Sprintf("Unicode あ %d", i), f: fmt.Sprintf("%-40s", fmt.Sprintf("Fixed Unicode %d", i))}
+		if i%2 == 1 {
+			r.n = sql.Null[string]{V: fmt.Sprintf("Nullable %d", i), Valid: true}
+		}
+		return r
+	}
+	query := func(name, q string, args ...any) []row {
+		t.Helper()
+		rows, err := db.Query(q, args...)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			return nil
+		}
+		defer rows.Close()
+		var out []row
+		for rows.Next() {
+			var r row
+			if err := rows.Scan(&r.id, &r.u, &r.f, &r.n); err != nil {
+				t.Errorf("%s: %v", name, err)
+				return nil
+			}
+			out = append(out, r)
+		}
+		return out
+	}
+
+	// 1715 every row, and 1701 and 1709 a bind in a query
+	all := query("1715", "SELECT * FROM go_unicodes ORDER BY id")
+	for i, r := range all {
+		if r != want(i+1) {
+			t.Errorf("1715 row %d: got %+v, want %+v", i+1, r, want(i+1))
+		}
+	}
+	if len(all) != 10 {
+		t.Errorf("1715: got %d rows", len(all))
+	}
+	if got := query("1701", "SELECT * FROM go_unicodes WHERE u = :1", "Unicode あ 5"); len(got) != 1 || got[0] != want(5) {
+		t.Errorf("1701: got %+v", got)
+	}
+	if got := query("1701 an NVarChar", "SELECT * FROM go_unicodes WHERE u = :1", oracle.NVarChar("Unicode あ 5")); len(got) != 1 || got[0] != want(5) {
+		t.Errorf("1701 an NVarChar: got %+v", got)
+	}
+	if got := query("1709", "SELECT * FROM go_unicodes WHERE u = :1", nil); len(got) != 0 {
+		t.Errorf("1709: got %+v", got)
+	}
+
+	// 1700 the length in characters
+	var n int
+	if _, err := db.Exec("BEGIN :1 := LENGTH(:2); END;", oracle.Out{Dest: &n}, "InVal あ"); err != nil || n != 7 {
+		t.Errorf("1700: got %d, %v", n, err)
+	}
+
+	// 1702 and 1710 to 1713 out and in out of PL/SQL
+	for _, test := range []struct {
+		name, block, in, want string
+	}{
+		{"1702", `BEGIN :1 := UNISTR('Called \3042'); END;`, "", "Called あ"},
+		{"1702 again", `BEGIN :1 := 'Called'; END;`, "", "Called"},
+		{"1710", `BEGIN :1 := UNISTR('TSI \3042'); END;`, "", "TSI あ"},
+		{"1711", `BEGIN :1 := :1 || UNISTR(' TSI \3042'); END;`, "InVal ぁ", "InVal ぁ TSI あ"},
+	} {
+		s := test.in
+		if _, err := db.Exec(test.block, oracle.Out{Dest: &s, Size: 100, In: test.in != ""}); err != nil || s != test.want {
+			t.Errorf("%s: got %q, %v", test.name, s, err)
+		}
+	}
+	for _, test := range []struct {
+		name, block string
+		in, want    oracle.NVarChar
+	}{
+		{"1710 an NVarChar", `BEGIN :1 := UNISTR('TSI \3042'); END;`, "", "TSI あ"},
+		{"1711 an NVarChar", `BEGIN :1 := :1 || UNISTR(' TSI \3042'); END;`, "InVal ぁ", "InVal ぁ TSI あ"},
+	} {
+		s := test.in
+		if _, err := db.Exec(test.block, oracle.Out{Dest: &s, Size: 100, In: test.in != ""}); err != nil || s != test.want {
+			t.Errorf("%s: got %q, %v", test.name, s, err)
+		}
+	}
+	var nullNV sql.Null[oracle.NVarChar]
+	if _, err := db.Exec(`BEGIN :1 := NULL; END;`, oracle.Out{Dest: &nullNV, Size: 100}); err != nil || nullNV.Valid {
+		t.Errorf("a NULL NVarChar: got %+v, %v", nullNV, err)
+	}
+	if got := query("a NULL NVarChar", "SELECT * FROM go_unicodes WHERE u = :1", sql.Null[oracle.NVarChar]{}); len(got) != 0 {
+		t.Errorf("a NULL NVarChar: got %+v", got)
+	}
+	var nv sql.Null[string]
+	if _, err := db.Exec(`DECLARE v NVARCHAR2(30); BEGIN v := UNISTR('TSI (VAR) \3042'); :1 := v; END;`, oracle.Out{Dest: &nv, Size: 100}); err != nil || nv.V != "TSI (VAR) あ" {
+		t.Errorf("1712: got %q, %v", nv.V, err)
+	}
+	// 1704 to 1708 PL/SQL arrays of NVARCHAR2
+	values := make([]oracle.NVarChar, 10)
+	for i := range values {
+		values[i] = oracle.NVarChar(want(i + 1).u)
+	}
+	var total int
+	if _, err := db.Exec("BEGIN :1 := go_unicode_arrays.total(:2, :3); END;", oracle.Out{Dest: &total}, 5, values); err != nil || total != 116 {
+		t.Errorf("1704: got %d, %v", total, err)
+	}
+	long := make([]oracle.NVarChar, 15)
+	for i := range long {
+		long[i] = oracle.NVarChar(fmt.Sprintf("Unicode - あ %d", i))
+	}
+	if _, err := db.Exec("BEGIN :1 := go_unicode_arrays.total(:2, :3); END;", oracle.Out{Dest: &total}, 8, long); err != nil || total != 208 {
+		t.Errorf("1704 again: got %d, %v", total, err)
+	}
+	if _, err := db.Exec("BEGIN :1 := go_unicode_arrays.total(:2, :3); END;", oracle.Out{Dest: &total}, 5, []string{"a"}); err == nil {
+		t.Error("1704 of strings: no error, and PL/SQL refuses an array of VARCHAR2 for one of NVARCHAR2")
+	}
+	inOut := slices.Clone(values)
+	if _, err := db.Exec("BEGIN go_unicode_arrays.convert(:1, :2); END;", 5, oracle.Out{Dest: &inOut, Size: 10, In: true}); err != nil {
+		t.Errorf("1707: %v", err)
+	} else {
+		for i, got := range inOut {
+			w := values[i]
+			if i < 5 {
+				w = oracle.NVarChar(fmt.Sprintf("Converted element あ # %d originally had length %d", i+1, len([]rune(values[i]))))
+			}
+			if got != w {
+				t.Errorf("1707 element %d: got %q, want %q", i, got, w)
+			}
+		}
+	}
+	var out []oracle.NVarChar
+	if _, err := db.Exec("BEGIN go_unicode_arrays.fill(:1, :2); END;", 6, oracle.Out{Dest: &out, Size: 6}); err != nil {
+		t.Errorf("1708: %v", err)
+	} else {
+		for i := range 6 {
+			if w := oracle.NVarChar(fmt.Sprintf("Test out element あ # %d", i+1)); i >= len(out) || out[i] != w {
+				t.Errorf("1708: got %q", out)
+				break
 			}
 		}
 	}

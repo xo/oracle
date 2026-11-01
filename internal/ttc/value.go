@@ -114,6 +114,10 @@ func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
 		lob = v
 	case *types.Blob:
 		lob = v
+	case *types.Vector:
+		// a VECTOR of stream mode stays a locator until here, a NULL one
+		// too, which no slice took
+		lob = v
 	case *types.BFile:
 		dataSet.own(v.Streamer())
 		return v, nil
@@ -122,7 +126,7 @@ func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
 	}
 	dataSet.own(lob.Streamer())
 	switch dest.(type) {
-	case *types.Clob, *types.Blob:
+	case *types.Clob, *types.Blob, *types.Vector:
 		return lob, nil
 	}
 	switch {
@@ -168,6 +172,23 @@ func assign(scanCtx driver.ScanContext, dest, src any) error {
 	case *apd.Decimal:
 		if s, ok := src.(*apd.Decimal); ok {
 			d.Set(s)
+			return nil
+		}
+	// a NULL VECTOR is a nil slice, as a NULL RAW is a nil []byte, which
+	// database/sql refused for the other element types
+	case *[]float32:
+		if src == nil {
+			*d = nil
+			return nil
+		}
+	case *[]float64:
+		if src == nil {
+			*d = nil
+			return nil
+		}
+	case *[]int8:
+		if src == nil {
+			*d = nil
 			return nil
 		}
 	}

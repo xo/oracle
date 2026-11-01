@@ -232,6 +232,10 @@ func ownValue(v any) bool {
 	switch v.(type) {
 	case types.TimestampTZ, *types.TimestampTZ:
 		return true
+	case sql.Null[types.NVarChar]:
+		// database/sql made a string of the value, which binds as a
+		// VARCHAR2
+		return true
 	case sql.Null[bool], sql.NullBool:
 		// a NULL bool binds as a NULL BOOLEAN, which PL/SQL assigns to a
 		// BOOLEAN. database/sql made a NULL of no type of it, which PL/SQL

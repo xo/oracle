@@ -239,24 +239,14 @@ func (number *Number) decodeDouble() (float64, error) {
 	if len(number.bValue) < int(MaxLenBDouble) {
 		return 0, fmt.Errorf("error decoding binary double, supplied buffer length: %d and required length: %d", len(number.bValue), 8)
 	}
-	if number.bValue[0]&128 != 0 {
-		number.bValue[0] = number.bValue[0] & 127
-	} else {
-		xorBuffer(number.bValue, int(MaxLenBDouble))
-	}
-	return math.Float64frombits(binary.BigEndian.Uint64(number.bValue)), nil
+	return getBinaryDouble(number.bValue), nil
 }
 
 func (number *Number) decodeFloat() (float32, error) {
 	if len(number.bValue) < int(MaxLenBFloat) {
 		return 0, fmt.Errorf("error decoding binary float, supplied buffer length: %d and required length: %d", len(number.bValue), 4)
 	}
-	if number.bValue[0]&128 != 0 {
-		number.bValue[0] = number.bValue[0] & 127
-	} else {
-		xorBuffer(number.bValue, int(MaxLenBFloat))
-	}
-	return math.Float32frombits(binary.BigEndian.Uint32(number.bValue)), nil
+	return getBinaryFloat(number.bValue), nil
 }
 
 func (number *Number) Value() (any, error) {
@@ -287,28 +277,66 @@ func (number *Number) encodeUint(input uint64) error {
 
 func (number *Number) encodeFloat64(input float64) error {
 	number.bValue = make([]byte, MaxLenBDouble)
-	temp := math.Float64bits(input)
-	binary.BigEndian.PutUint64(number.bValue, temp)
-	if input > 0 {
-		number.bValue[0] = number.bValue[0] | 128
-	} else {
-		xorBuffer(number.bValue, 8)
-	}
+	putBinaryDouble(number.bValue, input)
 	number.dataType = IBDOUBLE
 	return nil
 }
 func (number *Number) encodeFloat32(input float32) error {
 	number.bValue = make([]byte, MaxLenBFloat)
-	temp := math.Float32bits(input)
-	binary.BigEndian.PutUint32(number.bValue, temp)
-	if input > 0 {
-		number.bValue[0] = number.bValue[0] | 128
-	} else {
-		xorBuffer(number.bValue, 4)
-	}
+	putBinaryFloat(number.bValue, input)
 	number.dataType = IBFLOAT
 	return nil
 }
+
+// putBinaryFloat writes the image of the BINARY_FLOAT f to b: its bits, big
+// endian, with the sign bit set when it is clear and every bit flipped when it
+// is set, so that the images sort as the values do. go-ora flipped the bits of
+// a zero, which read back as NaN.
+func putBinaryFloat(b []byte, f float32) {
+	u := math.Float32bits(f)
+	if u&(1<<31) == 0 {
+		u |= 1 << 31
+	} else {
+		u = ^u
+	}
+	binary.BigEndian.PutUint32(b, u)
+}
+
+// getBinaryFloat returns the BINARY_FLOAT of the image b. go-ora decoded in
+// place, so a second read of the value was wrong.
+func getBinaryFloat(b []byte) float32 {
+	u := binary.BigEndian.Uint32(b)
+	if u&(1<<31) != 0 {
+		u &^= 1 << 31
+	} else {
+		u = ^u
+	}
+	return math.Float32frombits(u)
+}
+
+// putBinaryDouble writes the image of the BINARY_DOUBLE f to b, as
+// putBinaryFloat does.
+func putBinaryDouble(b []byte, f float64) {
+	u := math.Float64bits(f)
+	if u&(1<<63) == 0 {
+		u |= 1 << 63
+	} else {
+		u = ^u
+	}
+	binary.BigEndian.PutUint64(b, u)
+}
+
+// getBinaryDouble returns the BINARY_DOUBLE of the image b.
+func getBinaryDouble(b []byte) float64 {
+	u := binary.BigEndian.Uint64(b)
+	if u&(1<<63) != 0 {
+		u &^= 1 << 63
+	} else {
+		u = ^u
+	}
+	return math.Float64frombits(u)
+}
+
 func (number *Number) encodeFloat(input float64) error {
 	if math.IsNaN(input) || math.IsInf(input, 0) {
 		return fmt.Errorf("binding %v: a NUMBER holds no infinity and no NaN", input)

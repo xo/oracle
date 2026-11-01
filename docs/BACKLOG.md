@@ -39,19 +39,12 @@ bounds of NUMBER (`test_1800_number.py`), objects
 (`test_1900_dbobject.py`), LONG (`test_1600_longs.py`), ROWID
 (`test_3400_rowid.py`), and cases of `test_1400_callproc.py`,
 `test_2000_char.py` and the intervals, the bounds of dates
-(`test_1100_date.py`), BOOLEAN (`test_2400_boolean.py`), and the field names
-of JSON (`test_3200_json_26ai.py`). Left, in the order of their value: the
-other cases of JSON (`test_3100_json.py`), NCHAR (`test_1700_nchar.py`), and
-VECTOR, which waits on the item below.
-
-### Decide the Go types of VECTOR
-
-A `VECTOR` of `INT8` reads as `[]uint8`, so a negative element comes back
-wrong. The `BINARY` format and sparse vectors have no Go type, although the
-comment of `CreateVector` says that it takes a sparse one. python-oracledb
-reads `INT8` as signed, `BINARY` as unsigned bytes, and has `SparseVector`.
-Ken chooses the Go types, and then the tests of `test_2700_vector.py` and
-`test_6000_vector.py` are written again.
+(`test_1100_date.py`), BOOLEAN (`test_2400_boolean.py`), JSON
+(`test_3100_json.py` and `test_3200_json_26ai.py`), NCHAR
+(`test_1700_nchar.py`), and VECTOR (`test_2700_vector.py`,
+`test_2900_binary_vector.py` and `test_3000_sparse_vector.py`). The files of
+`data_types` are done. Next: the files outside `data_types` that test what
+this driver does, which are not yet sorted.
 
 ### Return the rows of a RETURNING of more than one row
 

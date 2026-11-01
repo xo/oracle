@@ -49,12 +49,13 @@ func (param *VectorParameter) Decode(_ Conn) (any, error) {
 }
 
 func (param *VectorParameter) Write(session tns.SessionWriter) error {
-	if param.locator != nil {
-		session.PutUint(len(param.locator), 4, true, true)
-		session.PutClr(param.locator)
+	locator := types.RowLocator(param.locator, param.BValue)
+	if locator != nil {
+		session.PutUint(len(locator), 4, true, true)
+		session.PutClr(locator)
 		session.PutClr(param.BValue)
 	} else {
-		session.PutClr(param.locator)
+		session.PutClr(locator)
 	}
 	return nil
 }

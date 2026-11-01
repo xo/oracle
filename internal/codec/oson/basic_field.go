@@ -1,5 +1,12 @@
 package oson
 
+import (
+	"errors"
+	"fmt"
+
+	"github.com/xo/oracle/internal/types"
+)
+
 type (
 	FieldEncoder interface {
 		Encode() ([]byte, error)
@@ -41,6 +48,36 @@ func (field *basicField) Offset() int {
 }
 func (field *basicField) SetOffset(offset int) {
 	field.offset = offset
+}
+
+// valueField is a scalar of OSON that has no field of its own, such as a
+// date. Its value is the text that JSON_SERIALIZE writes for it.
+type valueField struct {
+	value string
+	basicField
+}
+
+func (field *valueField) Value() (any, error) {
+	return field.value, nil
+}
+
+func (field *valueField) Encode() ([]byte, error) {
+	return nil, errors.New("writing a JSON value of the node type " + fmt.Sprintf("%#x", field.opCode) + ": not supported")
+}
+
+// vectorField is a VECTOR in a JSON value. Its value is the elements of the
+// vector.
+type vectorField struct {
+	value types.Vector
+	basicField
+}
+
+func (field *vectorField) Value() (any, error) {
+	return field.value.Value()
+}
+
+func (field *vectorField) Encode() ([]byte, error) {
+	return nil, errors.New("writing a VECTOR in a JSON value: not supported")
 }
 
 type nullField struct {

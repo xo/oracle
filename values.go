@@ -70,6 +70,10 @@ const DefaultPieceSize = types.DefaultPieceSize
 // Vector is a VECTOR of Oracle 23ai and later.
 type Vector = types.Vector
 
+// SparseVector is a sparse VECTOR: the number of its dimensions, and the
+// indices and values of the elements that are not zero.
+type SparseVector = types.SparseVector
+
 // JSON is a JSON value of Oracle 21c and later. A JSON column scans as a
 // jsontext.Value, and into any destination that encoding/json/v2 decodes
 // into. NewJSON makes one to bind.
@@ -81,6 +85,11 @@ type JSON = types.JSON
 func NewJSON(v any) (*JSON, error) {
 	return types.NewJSON(v)
 }
+
+// NVarChar is a string that binds as NVARCHAR2, in the national character set
+// of the database. A string binds as VARCHAR2. A []NVarChar binds as a PL/SQL
+// array of NVARCHAR2, and sql.Null[NVarChar] as a NULL one.
+type NVarChar = types.NVarChar
 
 // Bool is a BOOLEAN of Oracle 23ai and later, or of PL/SQL.
 type Bool = types.Bool
@@ -109,8 +118,10 @@ func CreateBFile(ctx context.Context, db *sql.DB, dir, name string) (*BFile, err
 	return types.CreateBFile(ctx, db, dir, name)
 }
 
-// CreateVector returns a VECTOR that holds array: a []uint8, a []float32 or
-// a []float64, dense or sparse.
+// CreateVector returns a VECTOR that holds array: a []float32, a []float64,
+// a []int8, a []byte of the BINARY format, which holds 8 dimensions in each
+// byte, or a SparseVector. A VECTOR column scans into a *Vector, or into a
+// pointer to the type of its elements.
 func CreateVector(array any) (*Vector, error) {
 	return types.CreateVector(array)
 }

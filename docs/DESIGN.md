@@ -372,7 +372,7 @@ its type for an object. `go-ora` gave none. `TestColumnType` holds it.
 | `RAW`, `LONG RAW`, `BLOB` | `[]byte` | `Blob` |
 | `BOOLEAN` | `bool` | `sql.Null[bool]` |
 | `JSON` | `JSON`, which holds the document | `string`, any type that `encoding/json/v2` decodes |
-| `VECTOR` | `Vector` | the slices of each element type |
+| `VECTOR` | the elements: `[]float32`, `[]float64`, `[]int8`, `[]byte` of `BINARY`, or `SparseVector` | `Vector` |
 | `ROWID`, `UROWID` | `string` | `RowID` |
 | `REF CURSOR` | `*sql.Rows` through `driver.Rows` | |
 | An object or a collection | the type that `RegisterType` registered | |
@@ -539,6 +539,14 @@ Three nullable types are the exception, because `sql.Null[T].Value` converts a
 A NULL binds with the type of its value, which an OUT argument needs, for
 `sql.NullX` and for `sql.Null[T]` of the common types. A NULL of any other
 type binds as a NULL `VARCHAR2`.
+
+A `string` binds as `VARCHAR2`, and an `NVarChar` as `NVARCHAR2`, in the
+national character set (D31). The string coder of an `NVarChar` sends the
+form of that character set, for each element of a `[]NVarChar` too, which a
+PL/SQL array of `NVARCHAR2` needs and which an array of `VARCHAR2` fails with
+PLS-00418. `sql.Null[NVarChar]` is a value that the driver binds itself, so
+that `database/sql` does not make a `string` of it. `TestNChar` holds the
+cases of python-oracledb.
 A NULL `sql.Null[bool]` or `sql.NullBool` binds as a NULL
 `BOOLEAN`, which a PL/SQL `BOOLEAN` takes. `database/sql` made a NULL of no
 type of it, which PL/SQL refused with ORA-06550.
@@ -846,7 +854,11 @@ and nothing else:
 - `oson.EncodeText` reads JSON text with a `jsontext.Decoder` into a tree of
   maps, slices, strings, numbers as text, booleans and nil, and writes OSON.
 - `oson.DecodeText` writes the OSON as JSON text with a `jsontext.Encoder`,
-  with a number as its exact digits and a date as RFC 3339.
+  with a number as its exact digits. A date, a timestamp, an interval, a RAW,
+  an infinity and a NaN are strings, in the form that `JSON_SERIALIZE`
+  writes, such as `2022-12-05T15:06:05`, `P1DT2H3M4.500000S` and `0102AB`.
+  A `VECTOR` is an array of its numbers, and a sparse one the array of its
+  dimensions, its indices and its values, as Oracle writes it.
 - `types.JSON` holds the JSON text. `NewJSON` and `SetValue` take JSON text,
   or any Go value through `json.Marshal`. `codec.JSONParameter` turns the text
   into OSON to bind it, and `ttc` turns the OSON of a row into text, after a
@@ -877,6 +889,42 @@ python-oracledb asks. go-ora asked for 32 KiB, and the server cut a longer
 document with no error when the LOBs came inline. `TestJSONFieldNames` holds
 the cases of python-oracledb, and `TestNames` in `internal/codec/oson` the
 sizes of the header.
+
+The codec reads each node type of OSON as python-oracledb reads it. go-ora
+read no date, timestamp, interval, RAW, ID or `VECTOR`, read an interval as a
+`NUMBER`, and read no integer that holds its length in its node type, so a
+document of any of them failed or read wrong. A document that is a scalar,
+such as `true` or `"text"`, has a header of its own, which the codec now
+writes. go-ora refused it. Each object writes its own field IDs, as
+python-oracledb does. go-ora pointed an object at the field IDs of an earlier
+object with the same names, and the server failed with ORA-40596 on a path
+into an array of such objects. An OUT JSON reads as its text, which go-ora
+left empty, and a NULL JSON of stream mode reads as NULL. `TestJSONValues`
+and `TestJSONTypes` hold the cases of python-oracledb, and each scalar type
+reads as the text that the server writes for it.
+
+A batch writes every row with one coder, that of its last value that is not
+NULL, and a JSON or a `VECTOR` writes the locator of its own row, which holds
+its length. go-ora wrote every row with the coder and the locator of the last
+row, so the server refused a row longer than the last with ORA-51803, and a
+NULL last row went as a `VARCHAR2` and hung the connection. `TestJSONBatch`
+and the batch of `TestVectorColumns` hold the cases.
+
+### VECTOR
+
+D30 sets the Go types of a `VECTOR`: `[]float32`, `[]float64`, `[]int8`,
+`[]byte` for `BINARY`, which holds 8 dimensions in each byte, and
+`SparseVector`. `internal/types/vector.go` reads and writes the image of
+python-oracledb: a magic byte, a version, flags, the format, the number of
+dimensions, 8 bytes for the norm, and for a sparse vector the number of its
+elements and their indices before them. go-ora read the number of dimensions
+in a width that it took from the flags, so a `BINARY` vector read wrong, and
+read `INT8` as unsigned. A NULL `VECTOR` scans into a slice as nil, in both
+LOB modes. `BINARY_FLOAT` and `BINARY_DOUBLE` encode by their sign bit, where
+go-ora flipped the bits of a zero, which read back as NaN, and decoded in
+place, so a second read was wrong. `TestVectorColumns`, `TestVectorPLSQL`,
+`TestBinaryVector` and `TestSparseVector` hold the cases of python-oracledb,
+and the server converts between the formats.
 
 ## The order of the work
 

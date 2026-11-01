@@ -1465,6 +1465,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				dataType := uint16(0)
 				seen := map[uint16]bool{}
 				nullType := uint16(0)
+				var encoder codec.OracleParameterEncoder
 				arrayValues := make([][]byte, stmt.arrayBindCount)
 				for y := 0; y < stmt.arrayBindCount; y++ {
 					par.Value = tempVal.Index(y).Interface()
@@ -1492,6 +1493,14 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 					}
 					dataType = par.DataType
 					seen[dataType] = true
+					encoder = par.encoder
+				}
+				// every row is written with one coder, which must be that of
+				// a value. go-ora kept the coder of the last row, and when
+				// it was NULL, a VECTOR or a JSON went as a NULL VARCHAR2,
+				// and the server waited for the rest of it
+				if encoder != nil {
+					par.encoder = encoder
 				}
 				// a batch binds one type for each argument
 				switch {
@@ -1576,7 +1585,13 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 						return nil, err
 					}
 				}
-
+				// an OUT JSON holds OSON, and the caller reads its text,
+				// which go-ora left empty
+				if js, ok := par.oPrimValue.(*types.JSON); ok {
+					if err := codec.DecodeOSON(js); err != nil {
+						return nil, err
+					}
+				}
 			}
 			err = copyValue(par.Value, par.oPrimValue)
 			if err != nil {
@@ -1964,6 +1979,12 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 			// a JSON row is its JSON text. Inline, the row holds the OSON,
 			// and streamed, it holds a locator that a load reads
 			if stmt.connection.connOption.Lob != config.INLINE {
+				if val.IsNil() {
+					// a NULL has no locator, and stayed a JSON, which no
+					// destination of text took
+					row[colIndex] = nil
+					continue
+				}
 				if val.ReadMode() != config.LobReadModeAuto {
 					continue
 				}

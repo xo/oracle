@@ -6,6 +6,11 @@ import (
 	"github.com/xo/oracle/internal/charset"
 )
 
+// NVarChar is a string that binds as NVARCHAR2, in the national character set
+// of the database. A string binds as VARCHAR2, as python-oracledb binds a str
+// unless the caller asks for DB_TYPE_NVARCHAR (D31).
+type NVarChar string
+
 type String struct {
 	Basic
 	Conv        *charset.Converter
@@ -61,6 +66,10 @@ func (str *String) SetValue(input any) error {
 		str.bValue = str.Conv.Encode(data)
 	case *string:
 		str.bValue = str.Conv.Encode(*data)
+	case NVarChar:
+		str.bValue = str.Conv.Encode(string(data))
+	case *NVarChar:
+		str.bValue = str.Conv.Encode(string(*data))
 	default:
 		return fmt.Errorf("cannot set value of type %T into string", input)
 	}

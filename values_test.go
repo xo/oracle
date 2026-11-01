@@ -431,7 +431,7 @@ func TestVector(t *testing.T) {
 	}
 	ctx := t.Context()
 	createTable(t, db, "xo_oracle_vector", "id NUMBER, f32 VECTOR(3, FLOAT32), f64 VECTOR(3, FLOAT64), i8 VECTOR(3, INT8)")
-	f32, f64, i8 := []float32{1.5, -2.25, 3}, []float64{1.5, -2.25, 3}, []uint8{1, 2, 3}
+	f32, f64, i8 := []float32{1.5, -2.25, 3}, []float64{1.5, -2.25, 3}, []int8{1, -2, 3}
 	args := []any{}
 	for _, v := range []any{f32, f64, i8} {
 		vec, err := oracle.CreateVector(v)

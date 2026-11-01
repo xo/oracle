@@ -18,6 +18,8 @@ func builtinCoder(v any) codec.OracleParameterCoder {
 	switch v.(type) {
 	case string, types.String, sql.NullString, sql.Null[string]:
 		return &codec.StringParameter{}
+	case types.NVarChar, sql.Null[types.NVarChar]:
+		return &codec.StringParameter{National: true}
 	case []byte, types.Raw:
 		return &codec.RawParameter{}
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64,
@@ -38,7 +40,9 @@ func builtinCoder(v any) codec.OracleParameterCoder {
 		return &codec.IntervalParameter{BasicParameter: codec.BasicParameter{DataType: types.IntervalYMDTY, MaxLen: types.MaxLenIntervalYM}}
 	case types.Interval:
 		return &codec.IntervalParameter{}
-	case types.Vector:
+	case types.Vector, types.SparseVector:
+		// a slice of numbers binds as an array, so a dense vector binds
+		// through CreateVector
 		return &codec.VectorParameter{}
 	case types.JSON:
 		return &codec.JSONParameter{}

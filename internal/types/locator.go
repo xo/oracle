@@ -22,6 +22,21 @@ func NewInlineLocator(dataLen uint64) Locator {
 	return ret
 }
 
+// RowLocator returns the locator to send with the value b of one row: loc,
+// or an inline locator of the length of b when loc is inline or nil. A batch
+// writes every row with the coder of its last row, and go-ora sent the
+// locator of that row, which holds its length, so the server refused a longer
+// row with ORA-51803 and read every row as NULL when the last was NULL.
+func RowLocator(loc Locator, b []byte) Locator {
+	switch {
+	case loc != nil && !loc.IsInline():
+		return loc
+	case len(b) == 0:
+		return nil
+	}
+	return NewInlineLocator(uint64(len(b)))
+}
+
 // IsInline reports whether loc is a locator of NewInlineLocator.
 func (loc Locator) IsInline() bool {
 	return len(loc) > 3 && loc[3] == 4

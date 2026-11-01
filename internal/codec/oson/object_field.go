@@ -76,8 +76,7 @@ func (obj *objectField) Encode() ([]byte, error) {
 	}
 	// create object header
 	objHeader := newObjectHeader(flag, keys, offset)
-	var selectedHeader *objectHeader
-	offset, selectedHeader, err = objHeader.write(buffer, obj.header)
+	offset, err = objHeader.write(buffer, obj.header)
 	if childLen == 0 {
 		return buffer.Bytes(), nil
 	}
@@ -87,47 +86,21 @@ func (obj *objectField) Encode() ([]byte, error) {
 	} else {
 		offset += childLen * 2
 	}
-	if selectedHeader != nil {
-		for _, index := range selectedHeader.keysIndex {
-			for i, child := range obj.children {
-				if index == child.KeyIndex() {
-					// calculate offset
-					obj.children[i].SetOffset(offset + childBuffer.Len())
-					child.SetOffset(offset + childBuffer.Len())
-					if flag&0x20 > 0 {
-						err = binary.Write(buffer, binary.BigEndian, uint32(offset+childBuffer.Len()))
-					} else {
-						err = binary.Write(buffer, binary.BigEndian, uint16(offset+childBuffer.Len()))
-					}
-					data, err := child.Encode()
-					if err != nil {
-						return nil, err
-					}
-					_, err = childBuffer.Write(data)
-					if err != nil {
-						return nil, err
-					}
-					break
-				}
-			}
+	for i, child := range obj.children {
+		// calculate offset
+		obj.children[i].SetOffset(offset + childBuffer.Len())
+		if flag&0x20 > 0 {
+			err = binary.Write(buffer, binary.BigEndian, uint32(offset+childBuffer.Len()))
+		} else {
+			err = binary.Write(buffer, binary.BigEndian, uint16(offset+childBuffer.Len()))
 		}
-	} else {
-		for i, child := range obj.children {
-			// calculate offset
-			obj.children[i].SetOffset(offset + childBuffer.Len())
-			if flag&0x20 > 0 {
-				err = binary.Write(buffer, binary.BigEndian, uint32(offset+childBuffer.Len()))
-			} else {
-				err = binary.Write(buffer, binary.BigEndian, uint16(offset+childBuffer.Len()))
-			}
-			data, err := child.Encode()
-			if err != nil {
-				return nil, err
-			}
-			_, err = childBuffer.Write(data)
-			if err != nil {
-				return nil, err
-			}
+		data, err := child.Encode()
+		if err != nil {
+			return nil, err
+		}
+		_, err = childBuffer.Write(data)
+		if err != nil {
+			return nil, err
 		}
 	}
 

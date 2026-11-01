@@ -18,7 +18,6 @@ type header struct {
 	tinyNodeCount        uint16
 	nodeOffset           int64
 	currentObjBaseOffset []int64
-	objectHeaders        []objectHeader
 }
 
 // read reads the header of an OSON image and its field names, and leaves

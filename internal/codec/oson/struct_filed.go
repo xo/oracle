@@ -8,7 +8,6 @@ type structField struct {
 }
 
 func (field *structField) getTotalLength() (int, error) {
-	objHeaders := field.header.objectHeaders
 	childBuffer := bytes.NewBuffer(nil)
 	for _, child := range field.children {
 		data, err := child.Encode()
@@ -20,7 +19,6 @@ func (field *structField) getTotalLength() (int, error) {
 			return 0, err
 		}
 	}
-	field.header.objectHeaders = objHeaders
 	return childBuffer.Len(), nil
 }
 

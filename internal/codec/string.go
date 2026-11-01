@@ -7,6 +7,9 @@ import (
 
 type StringParameter struct {
 	BasicParameter
+	// National makes the string an NVARCHAR2, in the national character
+	// set, for an NVarChar and for each element of a slice of them
+	National bool
 	// clob binds the string when it goes as a temporary CLOB
 	clob *ClobParameter
 }
@@ -25,6 +28,9 @@ func (param *StringParameter) Init() {
 	param.ContFlag = 0x10
 	if param.CharsetForm == 0 {
 		param.CharsetForm = 1
+	}
+	if param.National {
+		param.CharsetForm = 2
 	}
 }
 

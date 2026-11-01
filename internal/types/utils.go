@@ -17,15 +17,6 @@ const (
 	MaxLenBFile       int64 = 4000
 )
 
-func xorBuffer(buffer []byte, length int) {
-	if len(buffer) < length {
-		length = len(buffer)
-	}
-	for i := 0; i < length; i++ {
-		buffer[i] = ^buffer[i]
-	}
-}
-
 func putDate(buffer []byte, ti *time.Time) {
 	buffer[0] = uint8(ti.Year()/100 + 100)
 	buffer[1] = uint8(ti.Year()%100 + 100)
