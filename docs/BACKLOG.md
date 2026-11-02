@@ -18,12 +18,6 @@ package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
 type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
 list of authentication services or out of band breaks, which `go-ora` read. Add each when a caller needs it.
 
-### Return the rows of a RETURNING of more than one row
-
-A RETURNING that touches more than one row fails with an error, because an
-OUT takes one value. python-oracledb returns an array for each OUT. Find a
-form for `database/sql`, such as an OUT of a slice, and ask Ken.
-
 ### Tell dburl and usql when the first tag exists
 
 usql moved to this module on 2026-11-02, at a pseudo-version, and keeps one

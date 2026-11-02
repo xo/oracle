@@ -818,8 +818,9 @@ strings and comments, so `RETURNING(id)INTO` is DML RETURNING too. The server cu
 value of RETURNING to the size of its OUT, and sends the length that it had,
 and the driver returns an error for it, where go-ora returned the cut value.
 An `UPDATE` of no row gives each OUT of RETURNING a NULL. `TestRebind` and
-`TestReturning` hold it. A RETURNING of more than one row is an error, as the
-driver returns no array.
+`TestReturning` hold it. A RETURNING of more than one row fills an OUT of a
+slice, one element for each row, and fails for an OUT of one value (D35).
+`TestReturningRows` holds it.
 
 ## Testing
 

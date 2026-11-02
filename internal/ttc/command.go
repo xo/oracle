@@ -759,8 +759,20 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 						if err != nil {
 							return err
 						}
+						// an OUT of a slice takes a value for each row (D35)
+						if stmt.Pars[x].returnRows {
+							values := make([]any, 0, num)
+							for range num {
+								if err = stmt.calculateParameterValue(&stmt.Pars[x]); err != nil {
+									return err
+								}
+								values = append(values, stmt.Pars[x].oPrimValue)
+							}
+							stmt.Pars[x].oPrimValue = values
+							continue
+						}
 						if num > 1 {
-							return errors.New("more than one row affected with return clause")
+							return errors.New("a RETURNING of more than one row needs an OUT of a slice (D35)")
 						}
 						if num == 0 {
 							// no row, so the value is NULL. go-ora cleared the
@@ -1802,11 +1814,38 @@ func (stmt *Stmt) NewParam(name string, val driver.Value, size int, direction Pa
 		Direction: direction,
 		Value:     val,
 	}
+	// an OUT of a slice of a DML RETURNING binds as its element, and takes
+	// one for each row that the statement changes (D35)
+	elem, rows := stmt.returningRows(val, direction)
+	if rows {
+		param.Value, param.returnRows = elem, true
+	}
 	err := param.encodeValue(int64(size), stmt)
 	if err != nil {
 		return nil, err
 	}
+	if rows {
+		param.Value = val
+	}
 	return param, err
+}
+
+// returningRows returns the zero value of the element of val, and true, when
+// val is an OUT of a DML RETURNING that is a pointer to a slice: not a
+// []byte, which is one RAW, and not a collection that RegisterType
+// registered, which is one value.
+func (stmt *Stmt) returningRows(val driver.Value, direction ParameterDirection) (any, bool) {
+	if direction != Output || stmt.stmtType != DML || !stmt._hasReturnClause {
+		return nil, false
+	}
+	t := reflect.TypeOf(val)
+	if t == nil || t.Kind() != reflect.Pointer || t.Elem().Kind() != reflect.Slice || t.Elem().Elem().Kind() == reflect.Uint8 {
+		return nil, false
+	}
+	if _, err := stmt.connection.ParameterCoder(t.Elem()); err == nil {
+		return nil, false
+	}
+	return reflect.New(t.Elem().Elem()).Elem().Interface(), true
 }
 
 func (stmt *Stmt) setParam(pos int, par ParameterInfo) {

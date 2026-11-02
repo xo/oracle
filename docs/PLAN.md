@@ -43,6 +43,7 @@ conclusion.
 | [D32](#d32-a-unit-that-does-not-compile-is-an-error) | Decided |
 | [D33](#d33-registertype-takes-the-types-of-a-package) | Decided |
 | [D34](#d34-batch-errors-and-the-count-of-each-row-are-options) | Decided |
+| [D35](#d35-a-returning-of-rows-fills-an-out-of-a-slice) | Decided |
 
 ## Purpose
 
@@ -500,6 +501,19 @@ statement, as python-oracledb asks through `batcherrors` and
   `ErrNotSupported`.
 - Either option on a statement that is not DML fails with `ErrNotSupported`,
   as python-oracledb refuses them for PL/SQL.
+
+## D35. A RETURNING of rows fills an OUT of a slice
+
+Status: Decided.
+
+Ken decided on 2026-11-02 that a DML RETURNING that changes more than one
+row returns its values into an OUT of a slice, one element for each row, as
+python-oracledb returns a list for each OUT. `sql.Out{Dest: &ids}` with ids
+a `[]int64` binds as an OUT of an `int64`, and takes the value of each row.
+A RETURNING of no row gives an empty slice. A `[]byte` stays one `RAW`, and
+a slice of a type that `RegisterType` registered stays one collection. An
+OUT of one value still fails when more than one row returns, with an error
+that names the slice.
 
 ## Open questions for Ken
 

@@ -143,3 +143,63 @@ func TestReturning(t *testing.T) {
 		}
 	})
 }
+
+// TestReturningRows reads a RETURNING of more than one row into OUTs of
+// slices, one element for each row (D35). python-oracledb returns a list for
+// each OUT. A RETURNING of more than one row into an OUT of one value fails,
+// and a RETURNING of no row gives empty slices.
+func TestReturningRows(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := t.Context()
+	db.Exec("DROP TABLE go_ret_rows PURGE")
+	if err := execCmd(db, "CREATE TABLE go_ret_rows (id NUMBER(9), name VARCHAR2(30), d DATE)"); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DROP TABLE go_ret_rows PURGE")
+	date := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	if _, err := db.ExecContext(ctx, "INSERT INTO go_ret_rows VALUES (:1, :2, :3)",
+		[]int{1, 2, 3, 4}, []string{"one", "two", "", "four"}, []time.Time{date, date, date, date}); err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	var names []sql.Null[string]
+	var dates []time.Time
+	if _, err := db.ExecContext(ctx, "UPDATE go_ret_rows SET d = d + id WHERE id < 4 RETURNING id, name, d INTO :1, :2, :3",
+		sql.Out{Dest: &ids}, oracle.Out{Dest: &names, Size: 30}, sql.Out{Dest: &dates}); err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 3 || len(names) != 3 || len(dates) != 3 {
+		t.Fatalf("got %v, %v and %v", ids, names, dates)
+	}
+	for i, id := range ids {
+		want := map[int64]string{1: "one", 2: "two", 3: ""}[id]
+		if names[i].V != want || names[i].Valid != (want != "") || !dates[i].Equal(date.AddDate(0, 0, int(id))) {
+			t.Errorf("row %d: got %d, %+v and %v", i, id, names[i], dates[i])
+		}
+	}
+	// no row
+	ids = []int64{9}
+	if _, err := db.ExecContext(ctx, "DELETE FROM go_ret_rows WHERE id > 100 RETURNING id INTO :1", sql.Out{Dest: &ids}); err != nil || len(ids) != 0 {
+		t.Errorf("no row: got %v, %v", ids, err)
+	}
+	// a DELETE of every row
+	if _, err := db.ExecContext(ctx, "DELETE FROM go_ret_rows RETURNING id INTO :1", sql.Out{Dest: &ids}); err != nil || len(ids) != 4 {
+		t.Errorf("a DELETE: got %v, %v", ids, err)
+	}
+	// an OUT of one value and more than one row
+	if _, err := db.ExecContext(ctx, "INSERT INTO go_ret_rows VALUES (:1, :2, :3)", []int{1, 2}, []string{"a", "b"}, []time.Time{date, date}); err != nil {
+		t.Fatal(err)
+	}
+	var one int64
+	if _, err := db.ExecContext(ctx, "UPDATE go_ret_rows SET name = 'x' RETURNING id INTO :1", sql.Out{Dest: &one}); err == nil {
+		t.Error("an OUT of one value: no error")
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, "SELECT 1 FROM dual").Scan(&n); err != nil {
+		t.Errorf("after: %v", err)
+	}
+}

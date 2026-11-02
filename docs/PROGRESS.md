@@ -347,3 +347,4 @@ tag v0.1.0 at the start.
    of each row of a batch of DML (D34). A batch that fails is a break, and
    its reply after the reset is now read as a statement, which keeps the
    counts.
+5. A RETURNING of more than one row fills an OUT of a slice (D35).

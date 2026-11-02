@@ -28,6 +28,9 @@ type Out struct {
 }
 
 type ParameterInfo struct {
+	// returnRows is an OUT of a slice of a DML RETURNING, which takes one
+	// element for each row (D35)
+	returnRows   bool
 	Name         string
 	SchemaName   string
 	DomainSchema string
