@@ -9,7 +9,9 @@ export ORACLE_DSN=$(cd ../dbmeta/test && go run ./cmd/dbrun dsn --json oracle-26
 go test -count=1 ./integration
 ```
 
-Many files are named for the upstream issue of `sijms/go-ora` that they hold.
+Each file holds the tests of one area. A test of an upstream fault names the
+issue in its doc comment, as `sijms/go-ora#205`. The `python_` files hold the
+tests of python-oracledb, written again here (D28).
 
 For an Autonomous Database release, such as `oracle-adb-26ai`, replace the
 query of the URL that `dbrun` prints, which names the TLS options of

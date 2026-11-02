@@ -7,7 +7,7 @@ driver will offer. A feature comes in only through a decision in `PLAN.md`.
 
 The columns are:
 
-- **xo**: this driver, at the commit that added this file.
+- **xo**: this driver, from its code, updated on 2026-11-02.
 - **Py-T** and **Py-K**: python-oracledb, thin and thick, v26.1.0.
 - **Nd-T** and **Nd-K**: node-oracledb, thin and thick, v26.0.0.
 - **JDBC**: the Oracle JDBC thin driver of 23ai and 26ai.
@@ -96,12 +96,12 @@ later. This driver and go-ora connect to 11g as well.
 | Implicit results | partial (`NextResultSet`) | yes | yes | yes | yes | yes | ? | yes | yes | partial |
 | REF CURSOR | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | Array DML | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
-| Batch errors | no | yes | yes | yes | yes | partial | ? | yes | yes | no |
-| Row count of each row | no | yes | yes | yes | yes | yes | partial | no | yes | no |
+| Batch errors | yes (D34) | yes | yes | yes | yes | partial | ? | yes | yes | no |
+| Row count of each row | yes (D34) | yes | yes | yes | yes | yes | partial | no | yes | no |
 | DML RETURNING | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | PL/SQL associative arrays | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 | PL/SQL BOOLEAN | yes | yes | yes | yes | yes | yes | yes | yes | yes | partial |
-| PL/SQL records | ? | yes | yes | yes | yes | yes (k) | ? | yes | yes | ? |
+| PL/SQL records | yes (D33) | yes | yes | yes | yes | yes (k) | ? | yes | yes | ? |
 | Close piggybacked on the next call | no | yes | yes | yes | yes | yes (k) | ? | yes | yes | no |
 | Network compression | no | no | yes (client) | ? | yes (client) | yes (k) | ? | yes (client) | yes (client) | no |
 
@@ -171,13 +171,12 @@ transactions, since no caller needs them and neither fits `database/sql`.
    RADIUS, Application Continuity and FAN in protocol code with no Oracle
    Client. So each of these can be built over TNS and TTC here too.
 2. The thin drivers of Oracle have these, and this driver lacks them:
-   statement caching, DRCP, batch errors and the count of each row,
-   pipelining, direct path load, keepalive, the tracing attributes, and Entra
-   ID tokens.
+   statement caching, DRCP, pipelining, direct path load, keepalive, the
+   tracing attributes, and Entra ID tokens.
 3. The features that a `database/sql` driver can add with no new API are
    statement caching, keepalive, the tracing attributes as connector options,
-   and `RETRY_COUNT` with `RETRY_DELAY`. Batch errors, the count of each row
-   and pipelining need an API of their own.
+   and `RETRY_COUNT` with `RETRY_DELAY`. Pipelining needs an API of its own.
+   Batch errors and the count of each row took the options of D34.
 
 ## Not checked
 

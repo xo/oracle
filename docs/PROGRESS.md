@@ -41,17 +41,16 @@ its column type, the intervals decode right, and `DataSet` implements
 Ken asked on 2026-10-31 to use `sql.Null[T]` and drop the driver's own nullable
 types. That is done and staged. `NullTimeStampTZ` is gone, `TimeStampTZ` binds
 as `TIMESTAMP WITH TIME ZONE` for the first time, and the per-type cases of the
-`sql.NullX` types are gone. On the way, an OUT string of size 10 could not
+`sql.NullX` types are gone. On the way, an OUT string of size 10 did not
 hold 'abc', which also made the logon NLS query fail on 11g. That is fixed,
-which was sijms/go-ora#703. The tests pass on 11g and 26ai, and `TestIssues`
-on 26ai gives the same 42 passes and 3 failures.
+which was sijms/go-ora#703. The tests pass on 11g and 26ai, and `TestIssues`,
+now `integration`, on 26ai gives the same 42 passes and 3 failures.
 
 The `sql.Null` work is done (`ff69666`). The cleanup of step 11 is done in
 `d993e1c` and `2ca0f62`, and its last part is staged: no method starts with
 `Get`, and each interface that stays has more than one implementation or
-breaks an import cycle. `DESIGN.md`, under Where the cleanup stands, lists
-what is left. The tests pass, and `integration` on 26ai gives the same 42
-passes and 3 failures.
+breaks an import cycle. The tests pass, and `integration` on 26ai gives the
+same 42 passes and 3 failures.
 
 Step 11 is done (`ba43353`), and step 7, JSON on `encoding/json/v2`, is done
 (`83f010d`).
@@ -66,7 +65,8 @@ Step 8 is done (`073dd07`).
 Step 9 is in progress. Its first part is done (`bf54b03`). It fixes
 sijms/go-ora#776, #703 for NCHAR, #699 for every basic kind and #762, finds
 that #671 does not break the connection here, and `upstream_test.go` holds
-each against a live server. `TestIssue543` makes its own index.
+each against a live server. `TestIssue543`, now `TestLongIndexExpression`,
+makes its own index.
 
 The second part of step 9 is done (`399f398`). It fixes #698, a batch that
 failed and hung on 11g, #695, #624 and #692, whose cookies are now per
@@ -79,9 +79,9 @@ The fourth part of step 9 is done (`9d4ea66`). `ColumnTypeDatabaseTypeName`
 gives the names of the data dictionary, a `time.Time` with a fraction of a
 second binds as a `TIMESTAMP`, and `Config.NTS` replaces `SetNTSAuth`.
 
-The fifth part of step 9 is done (`91a5448`, pushed). It reads XMLType,
-which fixes #771, binds long text safely on 11g, and records D8 to D21. CI found the same
-fault of long text on 18c, and the sixth part covers every release before
+The fifth part of step 9 is done (`91a5448`, pushed). It reads XMLType, which
+fixes #771, binds long text safely on 11g, and records D8 to D21. CI found the
+same fault of long text on 18c, and the sixth part covers every release before
 19c.
 
 The sixth part of step 9 is done (`a06284d`, pushed). It replaces a missing
@@ -102,34 +102,34 @@ The tenth part of step 9 is done (`284844c`, pushed). A fetch of rows with
 LOB values holds the values of about 4 MiB (#664), and AES takes a zero IV
 on a server before 12c (#729).
 
-The eleventh part of step 9 is done (`63282cc`, pushed). `Clob`, `Blob` and `BFile` have
-`NewReader(ctx)`, which reads a LOB in pieces of 1 MiB (#681 and #559, D22).
-`ScanColumn` gives the locator to an `oracle.Clob` or an `oracle.Blob`, and
-loads the value for any other destination. A read after the rows close
-fails with `ErrRowsClosed`. With this, D21 is done.
+The eleventh part of step 9 is done (`63282cc`, pushed). `Clob`, `Blob` and
+`BFile` have `NewReader(ctx)`, which reads a LOB in pieces of 1 MiB (#681 and
+#559, D22). `ScanColumn` gives the locator to an `oracle.Clob` or an
+`oracle.Blob`, and loads the value for any other destination. A read after the
+rows close fails with `ErrRowsClosed`. With this, D21 is done.
 
-The twelfth part of step 9 is done (`dfba5e0`, pushed). A refused logon on 23ai and later gives
-ORA-01017, where the driver read the reply to the protocol negotiation twice
-and gave "message code error". `Query` of a statement that is not a query
-gives no rows, where `Next` failed with ORA-01002. A `DATE` is in UTC (#672),
-and the zone of the database reads right when it is a region (#655). The logon
-runs no query, so `skip_nls` is gone (#611), and the exchanges of 11g, 18c,
-21c, 23ai and 26ai are recorded again. Ken decided that no test runs on 19c
-(D23), so its exchanges are deleted. #683 is not a fault: a lower case user name logs
-on quoted.
+The twelfth part of step 9 is done (`dfba5e0`, pushed). A refused logon on
+23ai and later gives ORA-01017, where the driver read the reply to the
+protocol negotiation twice and gave "message code error". `Query` of a
+statement that is not a query gives no rows, where `Next` failed with
+ORA-01002. A `DATE` is in UTC (#672), and the zone of the database reads right
+when it is a region (#655). The logon runs no query, so `skip_nls` is gone
+(#611), and the exchanges of 11g, 18c, 21c, 23ai and 26ai are recorded again.
+Ken decided that no test runs on 19c (D23), so its exchanges are deleted. #683
+is not a fault: a lower case user name logs on quoted.
 
-The thirteenth part of step 9 is done (`c037ddd`, pushed). In a PL/SQL block a string or a
-`[]byte` binds as a `VARCHAR2` or a `RAW` up to 32,767 bytes on every release,
-and as a temporary LOB past that (D24), where the driver bound a `LONG` over
-4,000 bytes on 11g and 32,767 on the rest, and PL/SQL refused it with
-ORA-01483. `UPSTREAM.md` records #635, #688, #680 and #697, which did not
+The thirteenth part of step 9 is done (`c037ddd`, pushed). In a PL/SQL block a
+string or a `[]byte` binds as a `VARCHAR2` or a `RAW` up to 32,767 bytes on
+every release, and as a temporary LOB past that (D24), where the driver bound
+a `LONG` over 4,000 bytes on 11g and 32,767 on the rest, and PL/SQL refused it
+with ORA-01483. `UPSTREAM.md` records #635, #688, #680 and #697, which did not
 reproduce.
 
-The fourteenth part of step 9 is done (`2db0d89`, pushed). The integration tests that step 1
-deleted are written again on the new API, in `collections_test.go`,
-`lobs_test.go`, `objects_test.go` and `named_types_test.go`. `gorm_test.go`
-and `issue_363_test.go` test `gorm` and `xorm`, and do not come back. The
-tests found five faults, which are fixed:
+The fourteenth part of step 9 is done (`2db0d89`, pushed). The integration
+tests that step 1 deleted are written again on the new API, in
+`collections_test.go`, `lobs_test.go`, `objects_test.go` and
+`named_types_test.go`. `gorm_test.go` and `issue_363_test.go` test `gorm` and
+`xorm`, and do not come back. The tests found five faults, which are fixed:
 
 - An object with a CLOB or a BLOB attribute panicked on a read.
 - An OUT collection of CLOBs or BLOBs gave the locators of its elements.
@@ -142,14 +142,14 @@ tests found five faults, which are fixed:
 
 `Object` names a type at a bind (D25).
 
-The fifteenth part of step 9 is done (`922cd35`, pushed). A CLOB or a BLOB attribute of an
-object reads into a `string` or a `[]byte` field, in an OUT value, a
-collection, a row and an object inside another, and an object with one binds,
-where the server refused it with ORA-03101. A nil `*oracle.Clob` or
+The fifteenth part of step 9 is done (`922cd35`, pushed). A CLOB or a BLOB
+attribute of an object reads into a `string` or a `[]byte` field, in an OUT
+value, a collection, a row and an object inside another, and an object with
+one binds, where the server refused it with ORA-03101. A nil `*oracle.Clob` or
 `*oracle.Blob` binds as NULL, where it panicked.
 
-The sixteenth part of step 9 is done (`922cd35`, pushed). It finishes the open issues of
-go-ora (D27) and starts the tests of python-oracledb (D28):
+The sixteenth part of step 9 is done (`922cd35`, pushed). It finishes the open
+issues of go-ora (D27) and starts the tests of python-oracledb (D28):
 
 - A prepared query whose column changed type under it failed in 14 of 18
   cases. It reads the type that the cursor fetched, and parses again on
@@ -167,8 +167,9 @@ go-ora (D27) and starts the tests of python-oracledb (D28):
 - `DRIVERS.md` compares the features of the Oracle drivers, and D26 records
   that two-phase commit and sessionless transactions are not built.
 
-The seventeenth part of step 9 is done (`a59a07c`, pushed). It writes more of the tests of
-python-oracledb (D28), and they found these faults, which are fixed:
+The seventeenth part of step 9 is done (`a59a07c`, pushed). It writes more of
+the tests of python-oracledb (D28), and they found these faults, which are
+fixed:
 
 - A batch went on past a row that failed, and stored the rows after it,
   because the driver asked for the errors of a batch.
@@ -182,10 +183,10 @@ python-oracledb (D28), and they found these faults, which are fixed:
   no error, and 1e-130 read as 0.
 - An NCLOB of stream mode read in pieces skipped half of each piece.
 
-The eighteenth part of step 9 is done (`efa15cf`, pushed). 19c is tested again, and its
-exchanges are recorded again (D29), since dbmeta starts it in 30 seconds.
-Both suites pass on it. The object tests of python-oracledb found these
-faults, which are fixed:
+The eighteenth part of step 9 is done (`efa15cf`, pushed). 19c is tested
+again, and its exchanges are recorded again (D29), since dbmeta starts it in
+30 seconds. Both suites pass on it. The object tests of python-oracledb found
+these faults, which are fixed:
 
 - An object with an attribute of `CHAR`, `NCHAR`, `INTEGER`, `REAL`,
   `BINARY_FLOAT`, `TIMESTAMP WITH TZ`, an interval or `BOOLEAN` did not
@@ -205,9 +206,9 @@ negative intervals of python-oracledb are written again, and found that a
 logical UROWID read as text that the server refused, and a NULL ROWID read as
 a ROWID of zeros. Both are fixed.
 
-The twentieth part of step 9 is done (`f773a10`). The tests of the bounds of dates,
-BOOLEAN columns and the field names of JSON of python-oracledb are written
-again, and found three faults, which are fixed:
+The twentieth part of step 9 is done (`f773a10`). The tests of the bounds of
+dates, BOOLEAN columns and the field names of JSON of python-oracledb are
+written again, and found three faults, which are fixed:
 
 - A NULL bool bound with no type, which PL/SQL refused with ORA-06550.
 - OSON of version 3, which holds a name past 255 bytes, read as corrupt, and
@@ -215,10 +216,10 @@ again, and found three faults, which are fixed:
 - A JSON column past 32 KiB came back cut, with no error, when the LOBs came
   inline.
 
-The twenty-first part of step 9 is done (`6cbdf35`). Ken decided the Go types of a
-VECTOR (D30), and the driver reads and writes `[]int8`, `[]byte` of `BINARY`
-and `SparseVector`. The tests of VECTOR, JSON and NCHAR of python-oracledb
-are written again, and found these faults, which are fixed:
+The twenty-first part of step 9 is done (`6cbdf35`). Ken decided the Go types
+of a VECTOR (D30), and the driver reads and writes `[]int8`, `[]byte` of
+`BINARY` and `SparseVector`. The tests of VECTOR, JSON and NCHAR of
+python-oracledb are written again, and found these faults, which are fixed:
 
 - `INT8` read as unsigned, and a `BINARY` vector read wrong.
 - A zero `BINARY_FLOAT` or `BINARY_DOUBLE` encoded as NaN, and a second read
@@ -235,10 +236,11 @@ are written again, and found these faults, which are fixed:
 Ken decided that the type `NVarChar` binds as NVARCHAR2 (D31), and the
 cases that bind PL/SQL arrays of NVARCHAR2 are written with it.
 
-The twenty-second part of step 9 is done (`2ab0f95`). The test files of python-oracledb
-outside `data_types` are sorted in the BACKLOG, and the first of them, the
-names of binds of `cursor/test_2400_sql_parser.py`, is written again. A new
-parser, `parseSQL`, follows that of python-oracledb, and fixed these faults:
+The twenty-second part of step 9 is done (`2ab0f95`). The test files of
+python-oracledb outside `data_types` are sorted in the BACKLOG, and the first
+of them, the names of binds of `cursor/test_2400_sql_parser.py`, is written
+again. A new parser, `parseSQL`, follows that of python-oracledb, and fixed
+these faults:
 
 - A bind by name failed when the text held a colon in a q-string, the colon
   of a JSON constant, a quoted name or a name with a letter outside ASCII.
@@ -298,15 +300,15 @@ these faults, which are fixed:
 - An OUT string of PL/SQL held 8,191 characters on AL32UTF8, where the size
   was 32,767.
 
-The twenty-sixth part of step 9 is done (`441787d`), and it finishes the tests of
-python-oracledb (D28). Ken asked for the rest in one part. The cases of
-`connection/test_1000_basic.py`, `aq/`, `ext/test_ext_2100_bfile_type.py`
-and `misc/test_1600_defaults.py` that test this driver are written, and the
-other files test the API of Python or what this driver does not do. They
-found these faults, which are fixed:
+The twenty-sixth part of step 9 is done (`441787d`), and it finishes the tests
+of python-oracledb (D28). Ken asked for the rest in one part. The cases of
+`connection/test_1000_basic.py`, `aq/`, `ext/test_ext_2100_bfile_type.py` and
+`misc/test_1600_defaults.py` that test this driver are written, and the other
+files test the API of Python or what this driver does not do. They found these
+faults, which are fixed:
 
 - A connection that closed with a transaction open committed it.
-- `aq` had no test. A `*sql.Conn` could not make a queue. A dequeue of an
+- `aq` had no test. A `*sql.Conn` did not make a queue. A dequeue of an
   empty queue returned ORA-25228, and of an array broke the connection. A
   buffered message never dequeued, and an array returned empty messages and
   gave every message the ID of one.
@@ -314,7 +316,7 @@ found these faults, which are fixed:
   open, and `CreateBFile` wrote its names in AL16UTF16.
 
 The batch errors and the count of each row of `test_2700_features_12_1.py`
-wait for Ken, in the BACKLOG.
+waited for Ken, and item 4 below built them.
 
 Ken asked, from the usql session, for the method `AuthenticationRefused()
 bool` of usql W66. A `*ServerError` and an `Error` have it, true for
@@ -362,3 +364,16 @@ The triage was read again on 2026-11-02. sijms/go-ora#781 did not
 reproduce, sijms/go-ora#779 and #780 are not needed, and the last fault of
 sijms/go-ora#778 is fixed: a failed commit or rollback makes the connection
 bad.
+
+Step 9 is done, and D27 records the end of the upstream issues. The fixes
+that have no test are in `BACKLOG.md`.
+
+Ken asked on 2026-11-02 for a sweep of the documents and of what the rewrite
+left behind. The documents now agree with the code and with each other. The
+24 files of go-ora that were named for an upstream issue are in files by
+area, and each test names its issue in its doc comment. `module_test`, a
+second module that nothing ran, failed on the mapping of a `NUMBER` that
+go-ora had. Its tests check the new mapping now, in
+`integration/number_test.go`, and the module is gone. The code that was
+commented out, most of it copied from decompiled C#, is gone, and so is
+`integration/clob.json`, which no test read.

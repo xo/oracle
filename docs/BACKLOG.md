@@ -34,7 +34,15 @@ dburl maps no `tls` key to `sslmode` for any scheme, and will not. The parser
 of D11 landed in step 4. When the first tag exists, tell the dburl session,
 which then rechecks its tests and documents.
 
-### Fix the upstream issues
+### Test the upstream fixes that have no test
 
-[`UPSTREAM.md`](UPSTREAM.md) holds the triage of every open issue and pull
-request of `sijms/go-ora`, and the work that follows from it.
+D27 finished the open issues of `sijms/go-ora`, and
+[`UPSTREAM.md`](UPSTREAM.md) holds the triage of each. These fixes have no
+test:
+
+- sijms/go-ora#774: a logon with a password longer than 30 characters.
+- sijms/go-ora#757: a dial leaves the `*tls.Config` of the caller as it was.
+- sijms/go-ora#765: after a listener redirect, TLS checks the certificate
+  against the host of the DSN. No release of `dbrun` redirects.
+- sijms/go-ora#692: two databases with different charsets in one process.
+  Every release of `dbrun` is AL32UTF8.

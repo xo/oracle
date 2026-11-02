@@ -21,7 +21,7 @@ conclusion.
 | [D10](#d10-a-context-ends-a-round-trip-through-deadlines-and-contextafterfunc) | Decided |
 | [D11](#d11-the-dsn-is-an-oracle-url-with-lower-case-keys) | Decided |
 | [D12](#d12-the-protocol-code-moves-to-internal) | Decided |
-| [D13](#d13-the-module-requires-go-1271) | Decided |
+| [D13](#d13-the-module-requires-go-1271) | Decided. Amends the `go 1.24` line of `go.mod` |
 | [D14](#d14-the-driver-logs-only-to-a-logger-that-the-caller-passes) | Decided |
 | [D15](#d15-unit-tests-play-back-recorded-tns-exchanges) | Decided |
 | [D16](#d16-a-decimal-is-an-apddecimal) | Decided. Amends hard rule 2 of AGENTS.md |
@@ -112,7 +112,7 @@ list of its own. When `dbrun` has no release that a fix needs, such as 11g or
 
 ## D7. CI tests three operating systems and every Oracle release dbmeta knows
 
-Status: Decided.
+Status: Decided. Amended by D17.
 
 Ken decided on 2026-10-31 to discard the upstream workflow and write a new one.
 The unit job runs on `ubuntu-latest`, `macos-latest` and `windows-latest`. The
@@ -152,7 +152,8 @@ process then share nothing, which fixes sijms/go-ora#692.
 Step 4 deleted `oracleDriver`, `GetDefaultDriver`, `AddSessionParam`,
 `DelSessionParam`, `AddParameterCoder`, `SetStringConverter`,
 `RegisterConnConfig` and the root `ParseConfig`. Four pieces of state for the
-whole process remain, and `BACKLOG.md` lists them.
+whole process remained, and step 9 removed them, as `DESIGN.md` says under
+Connector.
 
 Step 4b kept `RegisterType` with its `*sql.DB`, and wrote no `WithType`. A
 type is registered after the program creates it, through the same database,
@@ -196,8 +197,8 @@ The TLS settings follow `pgx` and the other `usql` drivers: `sslmode` with
 `sslcert`, `sslkey` and `sslservername`. dbimp has no one form to copy. Its
 drivers use `tls=true` with `insecure` or `validateservercertificate`, because
 each speaks HTTP, where TLS is one switch. Ken accepted these keys and values
-on 2026-10-31. `DESIGN.md` names every key. This
-changes what `dburl` sends, so `dburl` changes with it.
+on 2026-10-31. `DESIGN.md` names every key. This changes what `dburl` sends,
+so `dburl` changes with it.
 
 Step 4 built `ParseDSN`, `Config` and `Config.DSN` on 2026-10-31.
 
@@ -212,7 +213,7 @@ and the value types that a caller passes or scans stay public.
 Step 3 of `DESIGN.md` moved the packages of `go-ora` on 2026-10-31, and
 changed nothing else. The recorded exchanges passed before and after. Step 4b
 moved the TTC code of the root package to `internal/ttc` the same day, and the
-root package now exports 31 names, where `go-ora` exported 167.
+root package exported 31 names then, where `go-ora` exported 167.
 
 ## D13. The module requires Go 1.27.1
 
@@ -255,7 +256,7 @@ from 1 to 18 is an `int64`, and any other is an `*apd.Decimal`.
 
 ## D17. CI leaves out 19c
 
-Status: Decided. Amends D7.
+Status: Decided. Amends D7. Amended by D23.
 
 Ken decided on 2026-10-31 that the oracle job of CI leaves out 19c. Its image
 is built by `dbrun build` from an installer that Oracle does not publish, and
@@ -313,12 +314,12 @@ watches `ctx`. A CLOB reader returns UTF-8. A reader asks for pieces of
 A LOB of a row can be read until its rows close. A read after that fails
 with an error. A LOB reads through the connection of its rows, and after
 `rows.Close` `database/sql` can give that connection to another goroutine,
-so a later read would race with it. The `Clob.Read` of `go-ora` had that
+so a later read races with it. The `Clob.Read` of `go-ora` had that
 race.
 
 ## D23. No test runs on 19c
 
-Status: Decided. Amends D17.
+Status: Decided. Amends D17. Amended by D29.
 
 Ken decided on 2026-11-01 that no test runs on 19c, not even a change to the
 protocol. The tests on 18c and 26ai cover what lies between, so 19c repeats
@@ -355,8 +356,8 @@ element type. The main way is a named Go element type, such as
 `type Name string`, which `RegisterType` maps to the collection. The root
 package also exports `Object`, which names the type at the bind, as
 `go_ora.Object` did, for a basic type with no named Go type. Registering a
-`[]time.Time` or a `[][]byte` as the collection would take those types from
-every bind of the connector, PL/SQL arrays among them.
+`[]time.Time` or a `[][]byte` as the collection takes those types from every
+bind of the connector, PL/SQL arrays among them, so the driver does not do it.
 
 ## D26. No two-phase commit and no sessionless transactions
 
@@ -404,7 +405,7 @@ kept copy of its database in about 30 seconds, on an image of 2.28 GB. The
 first start on a machine builds that copy, in about 14 minutes. The suites
 run on 19c with the other releases of this machine. CI still leaves 19c out,
 as D17 says, because each run of CI starts on a new machine with no copy, so
-each would wait 14 minutes. Ken can change that, for instance with a nightly
+each waits 14 minutes. Ken can change that, for instance with a nightly
 job that keeps the copy in a cache.
 
 ## D30. The Go types of a VECTOR
@@ -453,8 +454,8 @@ and dropped it, so the caller did not know.
 
 A warning that the server sends in a message of its own, as at logon for a
 password that will expire, goes to the `Logger` of the `Config` at the level
-Warn. An error there would refuse the connection. go-ora wrote it to
-`os.Stderr`.
+Warn. An error there refuses the connection, so the driver returns none.
+go-ora wrote it to `os.Stderr`.
 
 ## D33. RegisterType takes the types of a package
 
@@ -522,9 +523,9 @@ Status: Decided.
 
 Ken decided on 2026-11-02 that the first tag of `github.com/xo/oracle` is
 v0.1.0. A v0 tag says that the API can still change, which suits a driver
-under rewrite. The tags v3.0.0 and v3.0.1 in the repository are those of
-sijms, whose `go.mod` declares `github.com/sijms/go-ora`, so a v3 tag would
-have needed the path `github.com/xo/oracle/v3`. The tag is made when Ken
+under rewrite. The tags v3.0.0 and v3.0.1 are those of `sijms/go-ora`, whose
+`go.mod` declares `github.com/sijms/go-ora`. A v3 tag here needs the path
+`github.com/xo/oracle/v3`. The tag is made when Ken
 says, and then `dburl` and `usql` are told.
 
 ## Open questions for Ken

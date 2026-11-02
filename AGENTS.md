@@ -81,8 +81,9 @@ yourself and do not write it as though it were settled.
   back with no server. `testdata/exchanges/<release>/` holds the recordings,
   and `exchange_test.go` the scenarios. `docs/DESIGN.md`, under Testing, says
   how to record them again (D15).
-- `integration` and `module_test` are the upstream integration tests. They need
-  a live database.
+- `integration` holds the integration tests, one file for each area. They need
+  a live database. The `python_` files hold the tests of python-oracledb,
+  written again here (D28).
 
 ## Go conventions
 

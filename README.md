@@ -41,15 +41,19 @@ this driver.
 
 ## Features
 
-- **Pure Go** -- no C dependencies, no Oracle client installation required
-- **`database/sql` compatible** -- works with any `database/sql` pool, retry logic, and health checking
-- **Oracle 23ai types** -- VECTOR, BOOLEAN, JSON
-- **Advanced Queuing** -- native AQ support (RAW, JSON, UDT, XML)
-- **Fast Authentication** -- reduced round-trips with cookie-based caching and token login
-- **TTC v24** -- latest protocol version with FSAP capability
-- **User-Defined Types** -- nested objects, collections, and struct mapping
-- **TLS/SSL** -- full support with wallet, mutual TLS, and Kerberos
-- **Logging** -- the packets and events of each connection, through a `*slog.Logger`
+- Pure Go. It needs no C compiler and no Oracle client.
+- It implements the context form of each interface of `database/sql`. A
+  context that ends breaks the call, and the connection stays usable.
+- It works with Oracle 11g, 18c, 19c, 21c, 23ai and 26ai, and with the
+  Autonomous Database.
+- It reads and binds `VECTOR`, `BOOLEAN`, `JSON`, LOBs, intervals and every
+  other Oracle type.
+- It binds and reads user defined types, collections and PL/SQL records
+  through Go structs.
+- It holds Advanced Queuing, in the `aq` package.
+- It connects with TLS, a wallet, native network encryption, Kerberos, NTS or
+  a token.
+- It logs the packets and events of each connection to a `*slog.Logger`.
 
 ## Installation
 
@@ -125,7 +129,8 @@ none of the key names of `go-ora`, such as `SSL VERIFY` or `SERVICE NAME`.
 A user named `SYS` gets no privilege by its name. Write `privilege=sysdba`.
 
 The server reads a user name in upper case unless the name is quoted, as in
-SQL. A user created as `"scott"` logs on as `oracle://%22scott%22:pass@host/service`.
+SQL. A user created as `"scott"` logs on as
+`oracle://%22scott%22:pass@host/service`.
 
 `Config.Client` names the program, the host, the user and the terminal that
 `v$session` shows for the session. An empty field takes the value of the
@@ -215,22 +220,29 @@ caller by then. An `oracle.BFile` reads the same way once it is open.
 
 ### VECTOR (Oracle 23ai)
 
+A `VECTOR` scans into the slice of its format:
+
+| Format | Go |
+| --- | --- |
+| `FLOAT32` | `[]float32` |
+| `FLOAT64` | `[]float64` |
+| `INT8` | `[]int8` |
+| `BINARY` | `[]byte`, 8 dimensions in each byte |
+| a sparse vector | `oracle.SparseVector` |
+
+A dense vector binds through `oracle.CreateVector`, because a slice binds as
+a PL/SQL array. A `SparseVector` binds as it is:
+
 ```go
-// Create from Go slices
-v1, _ := oracle.CreateVector([]uint8{10, 20, 30})          // INT8
-v2, _ := oracle.CreateVector([]float32{-10.1, -20.2})       // FLOAT32
-v3, _ := oracle.CreateVector([]float64{10.1, 20.2, 30.3})   // FLOAT64
+vec, err := oracle.CreateVector([]float32{1.5, 2.5, 3.5})
+_, err = db.ExecContext(ctx, "INSERT INTO items (v) VALUES (:1)", vec)
 
-// Scan from database
-var vec oracle.Vector
-err := row.Scan(&vec)
-
-// Value returns the slice of its element type
-v, err := vec.Value()
-data := v.([]float32)
+var v []float32
+err = db.QueryRowContext(ctx, "SELECT v FROM items").Scan(&v)
 ```
 
-Formats: `INT8` (`[]uint8`), `FLOAT32`, `FLOAT64` -- dense and sparse.
+A scan into `*any` gives the slice of the format. The server converts a
+vector between the formats.
 
 ### JSON (Oracle 21c+)
 
@@ -252,13 +264,15 @@ A JSON column scans into `*any` as a `jsontext.Value`. The driver turns JSON
 text into OSON, the binary JSON of Oracle, and back, and `encoding/json/v2`
 maps it to Go values, so a number keeps every digit.
 
-### BOOLEAN (Oracle 23c+)
+### BOOLEAN
+
+A `bool` binds as a `BOOLEAN` in SQL on 23ai and later, and in PL/SQL from
+12.1. In SQL before 23ai it binds as the `NUMBER` 1 or 0. A `BOOLEAN` scans
+into a `*bool` or a `*sql.Null[bool]`:
 
 ```go
-input := oracle.Bool{}
-input.SetValue(true)
-
-db.Exec("BEGIN my_proc(:1, :2); END;", input, oracle.Out{Dest: &message})
+var ok bool
+_, err := db.ExecContext(ctx, "BEGIN :1 := my_check(:2); END;", oracle.Out{Dest: &ok}, true)
 ```
 
 ## Advanced Queuing
@@ -266,8 +280,9 @@ db.Exec("BEGIN my_proc(:1, :2); END;", input, oracle.Out{Dest: &message})
 ```go
 import "github.com/xo/oracle/aq"
 
-// Create a queue
-queue, err := aq.CreateQueue(db, "my_queue", aq.RAW, "")
+// A queue uses one connection
+conn, err := db.Conn(ctx)
+queue, err := aq.CreateQueue(conn, "my_queue", aq.RAW, "")
 
 // Enqueue
 msg, _ := queue.NewMessage([]byte("hello"))
@@ -281,9 +296,11 @@ msg, err = queue.Dequeue(&aq.DequeueOptions{
 })
 ```
 
-Message types: `RAW`, `JSON`, `UDT`, `XML`
-
-Features: batch enqueue/dequeue, persistent and buffered delivery, visibility modes, navigation modes, message expiration, correlation filtering.
+A message holds `RAW`, `JSON`, a user defined type (`UDT`) or `XML`. A queue
+enqueues and dequeues one message or an array of them, in the persistent or
+the buffered delivery mode. A dequeue that finds no message returns nil and
+no error. The options set the visibility, the navigation, the expiration and
+the correlation of a message.
 
 ## User-Defined Types
 
@@ -295,7 +312,9 @@ err := oracle.RegisterType(db, "MY_OBJECT", "MY_ARRAY", MyStruct{})
 err = oracle.RegisterTypeWithOwner(db, "SCHEMA", "MY_OBJECT", "MY_ARRAY", MyStruct{})
 ```
 
-Supports nested objects, collections (VARRAY, TABLE OF), and struct mapping via `udt` tags.
+A struct maps to an object through its `udt` tags, and an object can hold
+other objects and collections, `VARRAY` and `TABLE OF`. A record of a PL/SQL
+package registers as `PKG.TYPE`, and the record of a row as `TABLE%ROWTYPE`.
 A type registers with the database of `db` alone. A value of the Go type that
 `RegisterType` names binds as its Oracle type, and a field of a named type,
 such as `type Status string`, binds as its kind.
@@ -353,6 +372,22 @@ usable. `WithPrefetch` and `WithLobFetch` are the keys `prefetch` and
 `WithDatabase` fail with `ErrNotSupported`, because Oracle has no such
 setting for one statement.
 
+A batch of DML binds a slice for each argument, and stops at the first row
+that fails. With `WithBatchErrors`, the batch runs every row that it can,
+and returns an `*oracle.BatchError` that holds the index and the error of
+each row that failed. `WithRowCounts` fills a slice with the count of the
+rows that each row of the batch changed:
+
+```go
+var counts []int64
+_, err := db.ExecContext(ctx, "UPDATE t SET n = n + 1 WHERE id = :1",
+    []int64{1, 2, 3}, oracle.WithBatchErrors(), oracle.WithRowCounts(&counts))
+var batchErr *oracle.BatchError
+if errors.As(err, &batchErr) {
+    // batchErr.Rows holds the index and the error of each row that failed
+}
+```
+
 ## DBMS_OUTPUT
 
 `DBMS_OUTPUT` belongs to one session, so the helpers take a `*sql.Conn` or a
@@ -406,20 +441,29 @@ oracle/
 │   ├── ttc/           # Connections, statements, rows, LOBs, types
 │   └── types/         # The values of each Oracle type
 ├── testdata/          # Exchanges recorded against each release
+├── conn.go            # The connection that database/sql uses
 ├── connector.go       # Connector, and the configuration of each connection
 ├── driver.go          # Driver registration, RegisterType
 ├── dsn.go             # Config and ParseDSN
-├── errors.go          # Sentinel errors
+├── errors.go          # The sentinel errors, ServerError and BatchError
+├── options.go         # The options of one statement
+├── output.go          # DBMS_OUTPUT
+├── rows.go            # The rows of a query
+├── stmt.go            # A prepared statement
+├── tx.go              # A transaction
 └── values.go          # Out, RefCursor and the other types a caller uses
 ```
 
 ### Design Principles
 
-- **One coder for each Oracle type** -- each type has its own `OracleParameterCoder`, and a type switch chooses the coder of a Go value
-- **A connector for each database** -- the registered types, session parameters and fast login cookies of one database reach no other
-- **Context on every call** -- a context that ends breaks the call with an Oracle Net break, and the connection stays usable
-- **MemorySession** -- lightweight in-memory buffer for parameter encoding and AQ message marshaling
-- **No driver-level failover** -- relies on `database/sql` connection pooling and retry logic
+- Each Oracle type has its own coder, and a type switch chooses the coder of
+  a Go value.
+- Each connector holds the registered types, the session parameters and the
+  fast login cookies of its own database, which reach no other.
+- Each call takes a context. A context that ends breaks the call with an
+  Oracle Net break, and the connection stays usable.
+- A connect tries each address of a descriptor in turn. After the connect,
+  the driver retries nothing, and `database/sql` drops a bad connection.
 
 ## Migration from go-ora
 

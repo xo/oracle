@@ -22,10 +22,22 @@ empty.
 Tests that need a database run against a release that `dbrun` starts. `dbrun`
 lives in the `test` module of [`dbmeta`](https://github.com/xo/dbmeta), and
 nothing else starts a database. Read the rules for a shared machine at the top
-of its `docs/DBRUN.md` first.
+of its `docs/DBRUN.md` first. Set `DBMETA_OWNER_NAME` to a name of your own on
+each command, and run `dbrun status` before you start a release, because
+another person can use the same machine:
 
 ```bash
-cd ../dbmeta/test && go run ./cmd/dbrun start oracle && go run ./cmd/dbrun dsn oracle
+cd ../dbmeta/test
+export DBMETA_OWNER_NAME=your-name
+go run ./cmd/dbrun status
+go run ./cmd/dbrun start oracle
+go run ./cmd/dbrun dsn oracle
+```
+
+Give the URL that `dsn` prints to the tests as `ORACLE_DSN`:
+
+```bash
+ORACLE_DSN='oracle://...' go test -count=1 . ./integration
 ```
 
 ## Upstream issues and pull requests

@@ -104,16 +104,13 @@ one job, so that a person or an agent finds a behavior by its file name.
 | `rows.go` | `rows`, with `NextRow`, `ScanColumn` and the column type methods |
 | `tx.go` | `tx` |
 | `dsn.go` | `ParseDSN` and `Config.DSN` |
-| `options.go` | `Option` and `WithOptions` |
-| `errors.go` | `Error`, the sentinel errors, and `*ServerError` |
-| `values.go` | The Oracle types that Go lacks, such as `IntervalYM`, `RowID`, `Vector` and `JSON` |
-| `lob.go` | `Clob`, `Blob` and `BFile` |
-| `object.go` | User defined types and collections |
+| `options.go` | `Option`, `WithOptions`, and the option of each setting |
+| `errors.go` | `Error`, the sentinel errors, `*ServerError`, `*BatchError` and `RowError` |
+| `values.go` | The Oracle types that Go lacks, such as `IntervalYM`, `RowID`, `Vector` and `JSON`, the LOB types, and `Object` |
+| `output.go` | The reader of `DBMS_OUTPUT` (D19) |
 
-The root package holds each file of the table but `lob.go` and `object.go`,
-whose types `values.go` names, and `output.go`, the reader of `DBMS_OUTPUT`
-(D19). `values.go` names the types of `internal/ttc` and `internal/types`
-that a caller uses, such as `Out`, `RefCursor` and `Clob`, as aliases.
+`values.go` names the types of `internal/ttc` and `internal/types` that a
+caller uses, such as `Out`, `RefCursor` and `Clob`, as aliases.
 `conn`, `stmt`, `rows` and `tx` implement the interfaces of `database/sql`,
 and each holds the `ttc.Conn`, `ttc.Stmt`, `ttc.Rows` or `ttc.Tx` that runs
 the protocol, and passes each call to it. Those were `Connection`, `Stmt`,
@@ -235,19 +232,20 @@ loaded there instead, and only for a destination that is not an
 `NewReader` reads in pieces (D22). A NULL LOB scans as nil, and a LOB whose
 locator holds its value scans as the value with no round trip. Both went to
 the destination as the LOB itself after D22, until `TestBatchBlob` found it.
-A locator of a row shares a guard with its `DataSet`: a flag that `Close`
+A locator of a row shares a guard with its `ttc.Rows`: a flag that `Close`
 sets, after which each operation of its `LobStream` fails with
 `ErrRowsClosed`, and a lock that each operation holds while it uses the
 connection. `Close` takes the lock, so a close from another goroutine, which
 `database/sql` runs when the context of a query ends, waits for a LOB call
 in flight. It wrote the close of the cursor in the middle of the call
 before.
+
 A fetch that brings LOB or LONG values inside it, as `lob_fetch=inline`
 does, asks for one row first. Each later fetch asks for the rows that fill
 4 MiB with values the size of the last ones. A prefetch that the caller sets
 is used as it is.
 
-`Driver.Open` and `Connection.Begin`, the forms with no context, fail with an
+`Driver.Open` and `conn.Begin`, the forms with no context, fail with an
 error that wraps `ErrNotSupported`. `database/sql` calls neither, as in dbimp.
 
 When the break fails, or the read after it fails, the connection is broken. The
@@ -279,7 +277,7 @@ committed it. `TestRollbackAtClose` holds it.
 The `aq` package is that of go-ora. `CreateQueue` takes an `Execer`, which
 needs `ExecContext` alone, so that a `*sql.Conn` is one. go-ora asked for
 `Exec` and `Prepare`, which a `*sql.Conn` lacks, and a queue of a `*sql.DB`
-held a connection that the pool could give to another caller. A dequeue
+held a connection that the pool can give to another caller. A dequeue
 that finds no message returns none and no error, as python-oracledb does,
 where go-ora returned ORA-25228 and an empty message. The server breaks a
 dequeue of an array that finds no message and sends ORA-25228 after the
@@ -377,7 +375,8 @@ DSN, then from the context through `WithOptions`, then from an argument of the
 type `Option`, and a later one wins. `CheckNamedValue` takes an `Option` out of
 the arguments. The common options are `WithTimeout`, the time that the server
 gives one statement, and `WithReadonly`. The options of this driver are
-`WithPrefetch` and `WithLobFetch`. dbimp holds the machinery in its root
+`WithPrefetch`, `WithLobFetch`, `WithBatchErrors` and `WithRowCounts` (D34).
+dbimp holds the machinery in its root
 package. This module cannot import it (hard rule 2), so it holds a copy of the
 part it needs, in `internal/ttc/options.go`, and `options.go` names it.
 
@@ -388,7 +387,7 @@ the keys `prefetch` and `lob_fetch` for one statement. A statement keeps its
 mode of LOBs and sets it on the connection before each of its round trips,
 so a statement after it gets the mode of the DSN. Oracle has no setting for
 one statement for `WithReadonly`, `WithParameter` or `WithDatabase`, so each
-fails with `ErrNotSupported`, and a value that the DSN would refuse fails
+fails with `ErrNotSupported`, and a value that the DSN refuses fails
 with `ErrInvalidValue`, as dbimp D109 asks. `TestOptions` holds them.
 
 ## Values
@@ -427,7 +426,7 @@ against a server.
 A `time.Time` with a fraction of a second binds as a `TIMESTAMP`, and one with
 none as a `DATE`. `go-ora` bound every one as a `DATE`, which dropped the
 fraction. A `DATE` bind keeps the index of a `DATE` column that it meets,
-which a `TIMESTAMP` bind would convert, and a `TIMESTAMP` that goes into a
+which a `TIMESTAMP` bind converts, and a `TIMESTAMP` that goes into a
 `DATE` column loses its fraction, as Oracle truncates it. The zone of a
 `time.Time` is dropped, and the server reads its wall clock in the zone of
 the session. `TimestampTZ` binds with its zone.
@@ -468,23 +467,23 @@ for a character that the end of a packet split. 19.33, 21c, 23ai and 26ai
 store it whole, and 19.3, which CI leaves out (D17), is not tested. So before
 19c a string that long with a character outside ASCII binds as a temporary
 `CLOB`, which a `CLOB` column stores whole. A `LONG` column of 18c stores it
-whole too, and one of 11g refuses it with ORA-22835, where it garbled it. A bind in the
-national charset fixed the `CLOB` too, and garbled a `LONG` on 11g.
-`TestStrings` and `TestLongColumn` hold it.
+whole too, and one of 11g refuses it with ORA-22835, where it garbled it. A
+bind in the national charset fixed the `CLOB` too, and garbled a `LONG` on
+11g. `TestStrings` and `TestLongColumn` hold it.
 
 A `[]byte` longer than the longest `RAW` binds as a `LONG RAW`. SQL takes a
 `LONG` or a `LONG RAW` bind only as a value to insert or set, and refuses one
 in an expression or in the `SELECT` of a `MERGE` with ORA-01461. A caller
-binds `CreateClob` or `CreateBlob` there (D24). PL/SQL takes a `VARCHAR2` or
-a `RAW` of up to 32,767 bytes on every release, and no `LONG` past that, so in
-a PL/SQL block a string or a `[]byte` binds as a `VARCHAR2` or a `RAW` up to
+binds `CreateClob` or `CreateBlob` there (D24). PL/SQL takes a `VARCHAR2` or a
+`RAW` of up to 32,767 bytes on every release, and no `LONG` past that, so in a
+PL/SQL block a string or a `[]byte` binds as a `VARCHAR2` or a `RAW` up to
 32,767 bytes, and as a temporary `CLOB` or `BLOB` past that, as
 python-oracledb binds it. An IN OUT value that long binds so too, and comes
 back as a string or a `[]byte`. An OUT with a larger size stays a `VARCHAR2`
 or a `RAW`, as a `LONG` column selects into one and not into a `CLOB`, so a
-longer CLOB comes back through an `oracle.Clob`. The driver used the limit of SQL in PL/SQL, so a
-value over 4,000 bytes on 11g and 32,767 bytes on 18c and later failed with
-ORA-01483. `TestPLSQLLongValues` holds it.
+longer CLOB comes back through an `oracle.Clob`. The driver used the limit of
+SQL in PL/SQL, so a value over 4,000 bytes on 11g and 32,767 bytes on 18c and
+later failed with ORA-01483. `TestPLSQLLongValues` holds it.
 
 A value of the Go type that `RegisterType` names binds as its user defined
 type. A collection of a basic type, such as a `TABLE OF VARCHAR2`, binds
@@ -504,9 +503,9 @@ each element before it. A slice binds with the keys from 1, and a
 takes the elements in their order. The bind of every object sends the version
 of its type, 1, as python-oracledb sends it. go-ora sent 0, which a SQL type
 takes and a type of a package fails with ORA-00600 [kocpnsh014].
-`TestPLSQLRecords` holds the cases of python-oracledb. `RegisterType` takes the record
-of the row of a table as `TABLE%ROWTYPE`, alone or as the element of a
-collection of a package. It is in no view, so its type OID comes from
+`TestPLSQLRecords` holds the cases of python-oracledb. `RegisterType` takes
+the record of the row of a table as `TABLE%ROWTYPE`, alone or as the element
+of a collection of a package. It is in no view, so its type OID comes from
 `DBMS_PICKLER.GET_TYPE_SHAPE` and its attributes from `ALL_TAB_COLS`, as
 python-oracledb reads them. A precision in the name of a type, as
 `TIMESTAMP(6)`, is dropped. `TestRowTypeRecords` holds it.
@@ -576,11 +575,12 @@ NULLs. Short and long strings in one argument bind as `LONG`, short and long
 other mix is an error. A statement that runs again sends the definition of
 its binds again when the type of one changed, where go-ora did so only for a
 few pairs of types, and a batch of NUMBER after a batch of NULLs went as
-text. A batch stops at the first row that
-fails, as python-oracledb runs one: go-ora asked for the errors of a batch,
-option `0x80000`, and the server went on past the row, so rows after an
-ORA-00001 were stored and the caller got the error alone. `TestBatches` holds
-the cases of python-oracledb.
+text. A batch stops at the first row that fails, as python-oracledb runs
+one, unless the caller asks for `WithBatchErrors`, which the section Errors
+describes. go-ora asked for the errors of every batch, option `0x80000`, and
+the server went on past the row, so rows after an ORA-00001 were stored and
+the caller got the error alone. `TestBatches` holds the cases of
+python-oracledb.
 
 An object takes an attribute of every type that `ALL_TYPE_ATTRS` names:
 `CHAR`, `NCHAR`, `INTEGER`, `SMALLINT`, `REAL`, `DOUBLE PRECISION`, `FLOAT`,
@@ -647,29 +647,29 @@ A sentinel error is a constant of the type `Error`, as in dbimp D6:
 `ErrInvalidValue`, `ErrConnectorClosed`, `ErrAuthentication` and
 `ErrCompilation`.
 
-An error from the server is a `*ServerError`, with the `ORA-` code, the message
-and the position in the statement. `Error` returns the message of the server
-alone, with no line feed at its end, and `ErrPos` the position. go-ora added a
-line with the position, which usql printed, and which held 0 for an error with
-no position. Its `Is` method makes ORA-01017 and
-ORA-01005, for no password, match `ErrAuthentication`, and ORA-24344 match
-`ErrCompilation`. An account that is locked, ORA-28000, or whose password
-expired, ORA-28001, does not match, since a new password does not help. This
-document said that ORA-28000 matched, as dbimp D197 asks, which the code never
-did. ORA-28041 matched until usql W66, but the driver raises it itself for
-logon data of the server that it cannot read. A statement that creates a unit that does not compile
-returns ORA-24344, and a warning of the server goes to the `Logger` (D32). A message is lower
-case, starts with a gerund and names what failed, such as
-`reading the accept packet: %w`.
+An error from the server is a `*ServerError`, with the `ORA-` code, the
+message and the position in the statement. `Error` returns the message of the
+server alone, with no line feed at its end, and `ErrPos` the position. go-ora
+added a line with the position, which usql printed, and which held 0 for an
+error with no position. Its `Is` method makes ORA-01017 and ORA-01005, for no
+password, match `ErrAuthentication`, and ORA-24344 match `ErrCompilation`. An
+account that is locked, ORA-28000, or whose password expired, ORA-28001, does
+not match, since a new password does not help. This document said that
+ORA-28000 matched, as dbimp D197 asks, which the code never did. ORA-28041
+matched until usql W66, but the driver raises it itself for logon data of the
+server that it cannot read. A statement that creates a unit that does not
+compile returns ORA-24344, and a warning of the server goes to the `Logger`
+(D32). A message is lower case, starts with a gerund and names what failed,
+such as `reading the accept packet: %w`.
 
-A `*ServerError` and an `Error` have the method `AuthenticationRefused() bool`,
-which usql asks an error for to decide that the server refused the
+A `*ServerError` and an `Error` have the method `AuthenticationRefused()
+bool`, which usql asks an error for to decide that the server refused the
 credential, and so prompts for a password (usql W66). It is true where
 `errors.Is(err, ErrAuthentication)` is: ORA-01017 and ORA-01005, and
 `ErrAuthentication` itself, so that a new password can succeed. It is false
 for a lack of a permission, ORA-01031 or ORA-01045, and for ORA-28000,
-ORA-28001 and ORA-28041. usql declares the interface, so the driver imports nothing of
-it. `TestAuthenticationRefused` and `TestConnectRefused` hold it.
+ORA-28001 and ORA-28041. usql declares the interface, so the driver imports
+nothing of it. `TestAuthenticationRefused` and `TestConnectRefused` hold it.
 
 A batch of DML with `WithBatchErrors` sends the execute option 0x80000, and
 the server runs the rows that it can. It answers with a break, a reset, and
@@ -790,38 +790,38 @@ server then closed the connection with ORA-03138. `TestParseNames` and
 
 ## Statements that run again
 
-A prepared statement keeps its cursor on the server, and runs it again with
-no parse. A run that fails returns the cursor with the error, and the next
-run parses again into that cursor. A parse sends the text with its pointer,
-as python-oracledb sends it. go-ora sent the pointer only for a new cursor,
-so the second run of a statement that failed got ORA-03120. A query with a
-LOB of the inline mode runs, then defines its columns, and then each later
-run executes again. go-ora left the execute out after the define, so each
-later run was a fetch with the binds, which failed with ORA-01002 once a
-bind changed type. `TestCursorOther` holds the cases of python-oracledb. The server keeps the types in which the cursor fetched its
-columns. When a view or a table under the cursor changes the type of a
-column, the server parses again and sends a new describe with the rows. It
-converts a new type to the old type of the fetch when it can, and the rows
-come in the old type: a CLOB that was a string or a LONG comes as a LONG, a
-BLOB that was a RAW comes as a LONG RAW, and a string that was a CLOB of the
-inline mode comes as a LONG. The driver reads each column so, as
-python-oracledb does. When the server cannot convert, it fails the execute
-with ORA-00932 or ORA-01007, and the driver closes the cursor and runs the
-query once more, with a parse. go-ora kept the flags of LOB and LONG columns
-from the first run and read the new rows in their new types, so 14 of 18
-changes failed. `TestTypeChanges` in `integration` holds the cases of
-python-oracledb.
+A prepared statement keeps its cursor on the server, and runs it again with no
+parse. A run that fails returns the cursor with the error, and the next run
+parses again into that cursor. A parse sends the text with its pointer, as
+python-oracledb sends it. go-ora sent the pointer only for a new cursor, so
+the second run of a statement that failed got ORA-03120. A query with a LOB of
+the inline mode runs, then defines its columns, and then each later run
+executes again. go-ora left the execute out after the define, so each later
+run was a fetch with the binds, which failed with ORA-01002 once a bind
+changed type. `TestCursorOther` holds the cases of python-oracledb. The server
+keeps the types in which the cursor fetched its columns. When a view or a
+table under the cursor changes the type of a column, the server parses again
+and sends a new describe with the rows. It converts a new type to the old type
+of the fetch when it can, and the rows come in the old type: a CLOB that was a
+string or a LONG comes as a LONG, a BLOB that was a RAW comes as a LONG RAW,
+and a string that was a CLOB of the inline mode comes as a LONG. The driver
+reads each column so, as python-oracledb does. When the server cannot convert,
+it fails the execute with ORA-00932 or ORA-01007, and the driver closes the
+cursor and runs the query once more, with a parse. go-ora kept the flags of
+LOB and LONG columns from the first run and read the new rows in their new
+types, so 14 of 18 changes failed. `TestTypeChanges` in `integration` holds
+the cases of python-oracledb.
 
 The driver sends the binds of a statement again when one grows or changes
 type. For DML RETURNING it sends the option of PL/SQL binds every time, as
 python-oracledb does, where go-ora left it out then, and the server refused
 the execute with ORA-03146 (sijms/go-ora#697). `RETURNING` is a word outside
-strings and comments, so `RETURNING(id)INTO` is DML RETURNING too. The server cuts a
-value of RETURNING to the size of its OUT, and sends the length that it had,
-and the driver returns an error for it, where go-ora returned the cut value.
-An `UPDATE` of no row gives each OUT of RETURNING a NULL. `TestRebind` and
-`TestReturning` hold it. A RETURNING of more than one row fills an OUT of a
-slice, one element for each row, and fails for an OUT of one value (D35).
+strings and comments, so `RETURNING(id)INTO` is DML RETURNING too. The server
+cuts a value of RETURNING to the size of its OUT, and sends the length that it
+had, and the driver returns an error for it, where go-ora returned the cut
+value. An `UPDATE` of no row gives each OUT of RETURNING a NULL. `TestRebind`
+and `TestReturning` hold it. A RETURNING of more than one row fills an OUT of
+a slice, one element for each row, and fails for an OUT of one value (D35).
 `TestReturningRows` holds it.
 
 ## Testing
@@ -876,12 +876,13 @@ was `TestIssues`, holds the integration tests of `go-ora`.
 In step 9 the root package and `integration` passed on 11g, 18c, 19c, 21c,
 23ai, 26ai, and the two Autonomous Database releases, `oracle-adb-19c` and
 `oracle-adb-26ai`. CI leaves 19c out (D17), because its first start on a new
-machine takes 14 minutes, and runs it on this machine (D29). `dbrun dsn` prints the URL of an Autonomous
-Database with the TLS options of `go-ora`, `ssl=true&ssl+verify=false`, which
-this parser refuses. A test gives it `sslmode=require` in their place.
-`oracle-nne-26ai` is a server that requires native network encryption and
-checksums, for `TestNetworkEncryption`. CI leaves it and the Autonomous
-Database releases out, because dbmeta verifies them on a machine.
+machine takes 14 minutes, and runs it on this machine (D29). `dbrun dsn`
+prints the URL of an Autonomous Database with the TLS options of `go-ora`,
+`ssl=true&ssl+verify=false`, which this parser refuses. A test gives it
+`sslmode=require` in their place. `oracle-nne-26ai` is a server that requires
+native network encryption and checksums, for `TestNetworkEncryption`. CI
+leaves it and the Autonomous Database releases out, because dbmeta verifies
+them on a machine.
 
 ## Idiomatic names and structure
 
@@ -894,7 +895,7 @@ each item names its fix.
 
 | Was | Fix |
 | --- | --- |
-| `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration`, done. One file for each area, and not for each upstream issue, is still to do |
+| `TestIssues/`, 50 files of integration tests, package `TestIssues` | `integration/`, package `integration`, done. One file for each area, and not for each upstream issue, done on 2026-11-02 |
 | `internal/utils` | Deleted. `Max` is the built in `max`. `CreateQuasiLocator`, `GetValue`, `GetType` and the `Ty` variables repeat code of `internal/types` and `internal/ttc`. `ExtractTag` moves to the code of user defined types |
 | `internal/lazyinit` | Deleted. `sync.OnceValue` does the same |
 | `internal/converters` | `internal/charset`, done in step 8. Its NUMBER code had no user, and is gone |
@@ -1011,7 +1012,8 @@ Then, with Ken's agreement on the names:
   `ValueStreamReader` and `ValueStreamer` had no user and are gone.
 
 The Oracle type IDs are constants of the type `types.TypeID`, which
-`ParameterCoder` takes. Left: one file of integration tests for each area.
+`ParameterCoder` takes. The integration tests are in one file for each area,
+and a test of an upstream fault names the issue in its doc comment.
 
 ### JSON
 
@@ -1036,12 +1038,12 @@ and nothing else:
   through `json.Unmarshal`.
 
 The interfaces `JSONCoder`, `JSONEncoder` and `JSONDecoder`, the `Coder`
-field, the type `Oson`, the global map of field encoders and the `reflect`
-of OSON are gone. `types.JSON` cannot import `oson`, which imports `types` for
-NUMBER and dates, so `codec` and `ttc` make the conversions. A later step can move
-NUMBER and dates below both. Binding JSON never worked in `go-ora`: it sent a
-NULL, because the coder was set after the value. `TestJSON` binds and reads it
-on 21c and 26ai.
+field, the type `Oson`, the global map of field encoders and the `reflect` of
+OSON are gone. `types.JSON` cannot import `oson`, which imports `types` for
+NUMBER and dates, so `codec` and `ttc` make the conversions. A later step can
+move NUMBER and dates below both. Binding JSON never worked in `go-ora`: it
+sent a NULL, because the coder was set after the value. `TestJSON` binds and
+reads it on 21c and 26ai.
 
 OSON holds a name of up to 255 bytes in version 1 and of up to 65535 bytes in
 version 3, which puts the long names in a segment of their own. The codec

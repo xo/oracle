@@ -5,11 +5,10 @@ This document records the open issues and pull requests of
 about each. Nothing from an upstream pull request comes in without Ken's
 agreement (D5). A fix can be written here from the issue instead.
 
-The list was read on 2026-10-31: 58 open issues and 12 open pull requests.
-It was read again on 2026-11-02, for one new issue and three new pull
-requests, which the sections below hold.
-Gemini 3.1 Pro gave a verdict on each item. DeepSeek V4 Pro timed out three
-times and gave none, so a second opinion is still owed. Each verdict below was
+The list was read on 2026-10-31: 58 open issues and 12 open pull requests. It
+was read again on 2026-11-02, for one new issue and three new pull requests,
+which the sections below hold. Gemini 3.1 Pro gave a verdict on each item.
+DeepSeek V4 Pro timed out three times and gave none. Each verdict below was
 then checked against the code at `62f8a42`, and a check overrides the model
 where the two differ. "Checked" means a person or an agent read the code. It
 does not mean the fault was reproduced against a database.
@@ -17,7 +16,9 @@ does not mean the fault was reproduced against a database.
 ## Already fixed in this code
 
 These are open upstream, but the `v3` code this project starts from already
-holds the fix. Each needs a test against an old release before it is closed.
+holds the fix. The exchanges of 11g and every logon test cover #759 and
+#764, and #686 names code that is gone. #774 has no test, and `BACKLOG.md`
+holds it.
 
 | Issue | Fault | What the code shows |
 | --- | --- | --- |
@@ -36,13 +37,13 @@ blocks a connection, P2 is a fault with a workaround.
 | sijms/go-ora#767 | P0 | A cancelled transaction can commit. `Rollback` runs under the cancelled context, and `breakConn` is read without the lock | Roll back under `context.WithoutCancel`, and read `breakConn` under the lock | Fixed in step 5. `TestCancelledTransactionDoesNotCommit` fails before and passes after, on 11g, 21c and 26ai |
 | sijms/go-ora#776 | P1 | `SELECT NULL a FROM dual` returns no row and no error. sijms/go-ora#755 is the same family in `v2` | Do not end the row loop on a row whose columns are all zero length | Fixed in step 9. A NULL of no type has a zero `MaxLen`, and `BasicRead` read it as a column that sends nothing. It reads the length now, and `Next` fetches when the execute brought no row. `TestUntypedNullRow` holds it, on 26ai |
 | sijms/go-ora#769 | P1 | A CLOB over about 8K UTF-16 units with characters outside the BMP reads back as U+FFFD with `LOB FETCH=INLINE` | Fetch inline CLOB text as AL16UTF16. sijms/go-ora#768 does this | Fixed in step 9, as the issue says and without the pull request. An inline CLOB is defined in the national charset when that is AL16UTF16. It reproduced on 11g as well, with the same 4 U+FFFD, and 26ai read it right. `TestClobOutsideBMP` holds it, on 11g and 26ai. A write had the same fault on 11g, which no issue names: a string of over 4000 bytes bound into a CLOB stored U+FFFD for a character that a piece split. Before 19c such a string binds as a temporary CLOB, since 18c has the fault too, and `TestStrings` and `TestLongColumn` hold it |
-| sijms/go-ora#765 | P1 | After a RAC SCAN redirect, TLS checks the certificate against the redirect address | Keep the host of the connect string as `ServerName`. sijms/go-ora#766 does this | Fixed in step 4. The configuration names the host of the DSN, and `negotiate` keeps it. No test with a redirect yet |
-| sijms/go-ora#757 | P1 | `negotiate` writes `ServerName` into the caller's `*tls.Config` on every dial | Clone the configuration before writing to it. Fix with sijms/go-ora#765 | Fixed in step 4. `negotiate` clones the configuration. No test with TLS yet |
+| sijms/go-ora#765 | P1 | After a RAC SCAN redirect, TLS checks the certificate against the redirect address | Keep the host of the connect string as `ServerName`. sijms/go-ora#766 does this | Fixed in step 4. The configuration names the host of the DSN, and `negotiate` keeps it. No test with a redirect, which `BACKLOG.md` holds |
+| sijms/go-ora#757 | P1 | `negotiate` writes `ServerName` into the caller's `*tls.Config` on every dial | Clone the configuration before writing to it. Fix with sijms/go-ora#765 | Fixed in step 4. `negotiate` clones the configuration. No test, which `BACKLOG.md` holds |
 | sijms/go-ora#771 | P1 | XMLType is NULL on Autonomous Database, whose flag word is 0x8014, and a value over about 254 bytes hangs | Test the flag bits, not equality. sijms/go-ora#770 does this in `v2` | Fixed in step 9. The `v3` code read no XMLType column at all, and gave "no parameter coder registered for name XMLTYPE". `xmlParameter` reads the image of an XMLType and tests each bit of its flag word, as python-oracledb does, so the 0x8014 of Autonomous Database reads as text. 11g sends the locator of a CLOB, which is loaded after the fetch. `TestParseXMLImage` holds the images that the issue captured, and `TestXMLType` passes on 11g, 18c, 21c, 23ai, 26ai, `oracle-adb-19c` and `oracle-adb-26ai` |
 | sijms/go-ora#692 | P1 | Two databases with different `NLS_CHARACTERSET` in one process garble text | Keep the charset per connection | Fixed in step 9. The converters were per connection already, and the fast login cookie, which names the charsets, was kept for the whole process under the UUID of the server and its service name, so two databases named XE could share one. Each `Connector` keeps its own cookies now. `TestCookiesPerRegistry` holds it. No test with two charsets, since every image of `dbrun` is AL32UTF8 |
 | sijms/go-ora#702 | P1 | The context deadline is not kept in `PrepareContext` and `ExecContext` | Set a deadline on the network connection | Fixed in step 5, unless the reporter saw another cause. The deadline breaks a query and an exec in about one second, on 11g, 21c and 26ai |
 | sijms/go-ora#703 | P1 | `INSERT ... RETURNING` into a string through `sql.Out` with no size breaks the connection | Give a default size, or return an error that does not break the connection | Fixed. An OUT string gets a buffer of its size in characters. `TestNullOutArguments` holds it, and the logon NLS query of 11g no longer fails. In step 9 an NCHAR OUT with no size gets the longest string, and its byte length counts the bytes of a character, so `RETURNING` no longer cuts the value. `TestReturningStringWithNoSize` holds it, on 26ai |
-| sijms/go-ora#762 | P2 | `DataSet.Close` on a nil `*DataSet` panics | Return early on a nil receiver | Fixed in step 9. `TestNilDataSetClose` holds it |
+| sijms/go-ora#762 | P2 | `DataSet.Close` on a nil `*DataSet` panics | Return early on a nil receiver | Fixed in step 9. `TestNilRowsClose` holds it |
 | sijms/go-ora#624 | P2 | Panic, slice bounds out of range in `Session.GetInt64` | Check the length before slicing | Fixed in the `v3` code, which rejects a size over 8. Step 9 adds `TestReadInt64Size`, and `ReadString` returns an error where it sliced past the end |
 | sijms/go-ora#695 | P2 | Index out of range in a batch insert | Check that every parameter array has the batch length | Fixed in step 9. An empty array panicked at `Index(0)`, and a shorter array cut the batch short. Both are errors now. `TestBatchLengths` holds it, on 11g and 26ai |
 | sijms/go-ora#699 | P2 | A named type such as `type S string` gives `unsupported go type` | Fall back to `reflect.Kind`. sijms/go-ora#747 does this | Fixed in step 9. `CheckNamedValue` returns `driver.ErrSkip` for a named type of a basic kind that the driver does not know, so `database/sql` converts it by its kind. `time.Duration` still binds as an interval. `TestNamedTypes` holds it, on 26ai, without sijms/go-ora#747 |
@@ -99,12 +100,12 @@ the `CipherSuites` of `Config.TLS`.
 
 sijms/go-ora#697 reports a malformed packet, ORA-03146, for statements run
 again, and for a BLOB over 50 KB in a `MERGE`. The packet reproduced, and the
-table above holds it. The BLOB in a `MERGE` did not. A `[]byte` longer than the longest `RAW`
-binds as a `LONG RAW`, and a string longer than the longest `VARCHAR2` as a
-`LONG`, and the server refuses either in a `SELECT` of a `MERGE` with
-ORA-01461, on 11g, 18c and 26ai. `CreateBlob` and `CreateClob` bind a
-temporary LOB, which works there at any size, and D24 keeps it so. In PL/SQL
-the same values failed with ORA-01483, which D24 fixed.
+table above holds it. The BLOB in a `MERGE` did not. A `[]byte` longer than
+the longest `RAW` binds as a `LONG RAW`, and a string longer than the longest
+`VARCHAR2` as a `LONG`, and the server refuses either in a `SELECT` of a
+`MERGE` with ORA-01461, on 11g, 18c and 26ai. `CreateBlob` and `CreateClob`
+bind a temporary LOB, which works there at any size, and D24 keeps it so. In
+PL/SQL the same values failed with ORA-01483, which D24 fixed.
 
 ## Features
 
@@ -112,29 +113,28 @@ sijms/go-ora#777 (Transparent Application Continuity), sijms/go-ora#707 and
 sijms/go-ora#619 (failover), sijms/go-ora#681, sijms/go-ora#559 and
 sijms/go-ora#664 (streaming LOBs and rows), sijms/go-ora#666 (scrollable
 cursors), sijms/go-ora#611 (skip the NLS query at connect), sijms/go-ora#584
-(`v$session.terminal`), sijms/go-ora#560 (`/ as sysdba`), sijms/go-ora#530 (OCI
-IAM tokens), sijms/go-ora#640 (pool settings), sijms/go-ora#618 (TimesTen) and
-sijms/go-ora#403 (ASM). Step 9 built #611 as the key `skip_nls`, and
-then deleted the query, and the key with it, so a logon runs no query.
-`TestLogonRunsNoQuery` holds it. It made a handshake that fails after the dial try the
-next address, as a gateway or a VPN that accepts the dial and resets the
-connection needs (#619), which also serves the failover of a descriptor of
-many addresses (#707), and `TestFailover` holds both. #530 asked for the
-logon with an OCI IAM token, which the `v3` code had already as
+(`v$session.terminal`), sijms/go-ora#560 (`/ as sysdba`), sijms/go-ora#530
+(OCI IAM tokens), sijms/go-ora#640 (pool settings), sijms/go-ora#618
+(TimesTen) and sijms/go-ora#403 (ASM). Step 9 built #611 as the key
+`skip_nls`, and then deleted the query, and the key with it, so a logon runs
+no query. `TestLogonRunsNoQuery` holds it. It made a handshake that fails
+after the dial try the next address, as a gateway or a VPN that accepts the
+dial and resets the connection needs (#619), which also serves the failover of
+a descriptor of many addresses (#707), and `TestFailover` holds both. #530
+asked for the logon with an OCI IAM token, which the `v3` code had already as
 `auth=token` with `token` and `token_key`, and which no `dbrun` release can
-test. Rows were read one fetch at a time already, so a query of 400,000
-plain rows held under 1 MiB (#664). Rows with LOB values did not: a fetch
-counted a LOB as its locator, or as 2 bytes when it came inline as a LONG,
-and so asked for up to 65,537 rows and held every value at once. 300 rows
-of 1 MB CLOBs held 300 MB. A fetch with LOB values inside it is sized by
-the size of the values now, and a LOB fetched as a locator is loaded one
-row at a time, in `Next`. The same rows hold 5 MB inline and 7 MB
-streamed, and `TestLobRows` holds it. `Clob`, `Blob` and `BFile` have
-`NewReader(ctx)`, which reads one LOB in pieces of 1 MiB (#681 and #559,
-D22). A read after the rows close fails with `ErrRowsClosed`, where
-`Clob.Read` raced with the next user of the connection. `TestLobReader`
-holds it, on 11g, 18c and 26ai. Ken decided to take #611, #530, #681, #559, #664,
-#707 and #619 (D21).
+test. Rows were read one fetch at a time already, so a query of 400,000 plain
+rows held under 1 MiB (#664). Rows with LOB values did not: a fetch counted a
+LOB as its locator, or as 2 bytes when it came inline as a LONG, and so asked
+for up to 65,537 rows and held every value at once. 300 rows of 1 MB CLOBs
+held 300 MB. A fetch with LOB values inside it is sized by the size of the
+values now, and a LOB fetched as a locator is loaded one row at a time, in
+`Next`. The same rows hold 5 MB inline and 7 MB streamed, and `TestLobRows`
+holds it. `Clob`, `Blob` and `BFile` have `NewReader(ctx)`, which reads one
+LOB in pieces of 1 MiB (#681 and #559, D22). A read after the rows close fails
+with `ErrRowsClosed`, where `Clob.Read` raced with the next user of the
+connection. `TestLobReader` holds it, on 11g, 18c and 26ai. Ken decided to
+take #611, #530, #681, #559, #664, #707 and #619 (D21).
 
 D27 settles the rest. #584 is built: `Client.Terminal` names the terminal of
 the session, and `Client.Host` and `Client.User` reach `v$session` as the
@@ -149,12 +149,14 @@ release can test. #666 (scrollable cursors) and #777 (Transparent Application
 Continuity) are not built now, and `DRIVERS.md` holds what each other driver
 offers for them.
 
-sijms/go-ora#649 asks for smaller charset tables, which step 8 built. sijms/go-ora#653 (VECTOR) and sijms/go-ora#365 (Advanced Queuing) are in
-the `v3` code already, as `types.Vector` and the `aq` package.
+sijms/go-ora#649 asks for smaller charset tables, which step 8 built.
+sijms/go-ora#653 (VECTOR) and sijms/go-ora#365 (Advanced Queuing) are in the
+`v3` code already, as `types.Vector` and the `aq` package.
 
 ## Not a fault in this code
 
-sijms/go-ora#690 is about the `v2` `go.mod`. This module requires nothing.
+sijms/go-ora#690 is about the `v2` `go.mod`. This module requires only
+`github.com/cockroachdb/apd/v3` (D16).
 sijms/go-ora#609 expects `rows.Err` to return `sql.ErrNoRows`, which
 `database/sql` returns only from `Row.Scan`. sijms/go-ora#602 is Oracle 8i,
 which is older than any release this project tests. sijms/go-ora#685 and
@@ -166,7 +168,8 @@ and the quoted name logs on. `TestLogonRefused` holds it, with a user named
 ## Pull requests
 
 None is applied as it is. Ken decided to take sijms/go-ora#734, #721, #770
-and #773, each written again for this code (D18). The rest wait for Ken (D5).
+and #773, each written again for this code (D18). The table gives the
+verdict on each of the rest, and none comes in without Ken (D5).
 
 | Pull request | What it does | Verdict |
 | --- | --- | --- |
