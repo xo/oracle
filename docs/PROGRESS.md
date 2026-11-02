@@ -389,3 +389,7 @@ pending, so the next call waited 10 seconds and the connection went bad. The
 session now marks the break pending before it sends it. The 18c job of the
 same run failed in `dbrun`, before any test, with ORA-04021 while the
 database started.
+
+CI passed on every release with the fix (`9d845bb`), and Ken had it tagged
+v0.1.1 and released on GitHub the same day. The `dburl` and `usql` sessions
+were told to take v0.1.1.
