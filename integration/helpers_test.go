@@ -2,12 +2,10 @@ package integration
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/url"
 
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -92,27 +90,6 @@ func isEqualTime(t1, t2 time.Time, compareNano bool) bool {
 		return ret && t1.Nanosecond() == t2.Nanosecond()
 	}
 	return ret
-}
-
-func queryStruct(row *sql.Row, s any) error {
-	sValue := reflect.ValueOf(s)
-	if sValue.Kind() != reflect.Pointer {
-		return errors.New("you should pass pointer")
-	}
-	if sValue.IsNil() {
-		return errors.New("you should pass non nil value")
-	}
-	if sValue.Elem().Kind() != reflect.Struct {
-		return errors.New("only accept pointer to struct")
-	}
-	sValue = sValue.Elem()
-	fieldCount := sValue.NumField()
-	scanValue := make([]any, fieldCount)
-	for x := range fieldCount {
-		fieldValue := sValue.Field(x)
-		scanValue[x] = fieldValue.Addr().Interface()
-	}
-	return row.Scan(scanValue...)
 }
 
 // requireRelease skips the test when the server is older than the major

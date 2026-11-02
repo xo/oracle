@@ -21,7 +21,6 @@ func newAuthService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo) (*authSer
 		version:     version,
 		status:      0xFCFF,
 	}
-	// var avaAuth []string
 	output.availableServiceNames = []string{"", "NTS", "KERBEROS5", "TCPS"}
 	output.availableServiceIDs = []int{0, 1, 1, 2}
 	err := output.buildServiceList(negoInfo.AuthService, false, false)
@@ -29,12 +28,6 @@ func newAuthService(ano *AdvNego, negoInfo *config.AdvNegoServiceInfo) (*authSer
 		return nil, err
 	}
 	return output, nil
-	/* user list is found in the dictionary
-	sessCtx.m_conops.SNOConfig["sqlnet.authentication_services"]
-	*/
-	/* you need to confirm that every item in user list found in avaAuth list
-	then for each item in userList you need to get index of it in the avaAuth
-	return output*/
 }
 
 func (serv *authService) writeServiceData() error {

@@ -55,7 +55,6 @@ func newDataPacketFromData(packetData []byte, sessionCtx *SessionContext, mu *sy
 	pck := &DataPacket{
 		sessionCtx: sessionCtx,
 		dataOffset: 0xA,
-		// length:     binary.BigEndian.Uint16(packetData),
 		packetType: PacketType(packetData[4]),
 		flag:       packetData[5],
 		dataFlag:   binary.BigEndian.Uint16(packetData[8:]),

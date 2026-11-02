@@ -91,3 +91,26 @@ END GOORA_CHARSET_PKG;`,
 	}
 
 }
+
+// TestKoreanLiteral reads a string literal that holds Korean characters and
+// checks it (sijms/go-ora#486).
+func TestKoreanLiteral(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	var value string
+	err = db.QueryRow("SELECT 'AAA안녕하세요' FROM dual").Scan(&value)
+	if err != nil {
+		t.Error(err)
+	}
+	if value != "AAA안녕하세요" {
+		t.Errorf("expected %s and got %s", "AAA안녕하세요", value)
+	}
+}

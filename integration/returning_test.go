@@ -203,3 +203,37 @@ func TestReturningRows(t *testing.T) {
 		t.Errorf("after: %v", err)
 	}
 }
+
+// TestReturningInsertID inserts a row with RETURNING ID INTO an oracle.Out
+// and checks the ID (sijms/go-ora#307).
+func TestReturningInsertID(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = createMainTable(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = dropMainTable(db)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	var id int
+	_, err = db.Exec("INSERT INTO TTB_MAIN(ID, NAME, LDATE) VALUES(:1, :2, :3) RETURNING ID INTO :4",
+		1, "TEST", time.Now(), oracle.Out{Dest: &id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != 1 {
+		t.Errorf("expected: %d and got: %d", 1, id)
+	}
+}

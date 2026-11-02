@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/apd/v3"
 
@@ -244,5 +246,243 @@ func TestJSONBatch(t *testing.T) {
 	want := []string{`{"a":"a value much longer than the short one"}`, `{"a":1}`, `{"a":"a value much longer than the short one"}`, "NULL"}
 	if strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+// TestMergeBatch runs a MERGE in a batch of 500 rows, with NULL in some
+// columns of every tenth row. Its USING clause selects a bind from dual, and
+// each bind name appears more than once (sijms/go-ora#343).
+func TestMergeBatch(t *testing.T) {
+	var createTable = func(db *sql.DB) error {
+		return execCmd(db, `CREATE TABLE TTB_343 
+   (	"ID" NUMBER(20,0) NOT NULL ENABLE, 
+		"TM" VARCHAR2(30), 
+		"SN" VARCHAR2(25) NOT NULL ENABLE, 
+		"CUS" VARCHAR2(20) NOT NULL ENABLE, 
+		"AID" VARCHAR2(20), 
+		"TR" VARCHAR2(8) NOT NULL ENABLE, 
+		"PID" VARCHAR2(20), 
+		"CODE" VARCHAR2(20) NOT NULL ENABLE, 
+		"TTNO" VARCHAR2(20), 
+		"UPDATETIME" TIMESTAMP (6) DEFAULT systimestamp, 
+		 PRIMARY KEY ("ID")
+	)`)
+	}
+	var dropTable = func(db *sql.DB) error {
+		return execCmd(db, "DROP TABLE TTB_343 PURGE")
+	}
+	var merge = func(db *sql.DB) error {
+		sqlText := `MERGE INTO TTB_343 t1 USING(select :ID ID from dual) tmp ON (tmp.ID=t1.ID) 
+    WHEN MATCHED THEN UPDATE SET TM=:TM,SN=:SN,CUS=:CUS, AID=:AID,TR=:TR,PID=:PID,CODE=:CODE,TTNO=:TTNO,UPDATETIME=:UPDATETIME WHERE t1.ID=:ID AND t1.UPDATETIME<=:UPDATETIME 
+    WHEN NOT MATCHED THEN INSERT (ID,TM,SN,CUS,AID,TR,PID,CODE,TTNO,UPDATETIME) VALUES (:ID,:TM,:SN,:CUS,:AID,:TR,:PID,:CODE,:TTNO,:UPDATETIME)`
+		length := 500
+		type TestShort struct {
+			Id         int            `db:"ID"`
+			Tm         sql.NullString `db:"TM"`
+			Sn         string         `db:"SN"`
+			Cus        string         `db:"CUS"`
+			Aid        sql.NullString `db:"AID"`
+			Tr         string         `db:"TR"`
+			Pid        string         `db:"PID"`
+			Code       string         `db:"CODE"`
+			Ttno       sql.NullString `db:"TTNO"`
+			UpdateTime time.Time      `db:"UPDATETIME,timestamp"`
+		}
+		data := make([]TestShort, length)
+		for index := range data {
+			data[index].Id = index + 1
+			if index > 0 && index%10 == 0 {
+				data[index].Tm = sql.NullString{Valid: false}
+				data[index].Aid = sql.NullString{Valid: false}
+				data[index].Ttno = sql.NullString{Valid: false}
+			} else {
+				data[index].Tm = sql.NullString{String: "tm text", Valid: true}
+				data[index].Aid = sql.NullString{String: "aid text", Valid: true}
+				data[index].Ttno = sql.NullString{String: "ttno text", Valid: true}
+			}
+			data[index].Sn = "sn text"
+			data[index].Cus = "cus text"
+			data[index].Tr = "tr text"
+			data[index].Pid = "pid text"
+			data[index].Code = "code text"
+			data[index].UpdateTime = time.Now()
+		}
+		_, err := db.Exec(sqlText, data)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = createTable(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = dropTable(db)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = merge(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestBatchLargeID inserts a batch of 100 rows with IDs from 1,000,000,000,
+// and reads the first ID back (sijms/go-ora#429).
+func TestBatchLargeID(t *testing.T) {
+	type TTBData struct {
+		Id   int64     `db:"ID"`
+		Name string    `db:"NAME"`
+		Val  float64   `db:"VAL"`
+		Date time.Time `db:"LDATE"`
+	}
+	var insert = func(db *sql.DB) error {
+		data := make([]TTBData, 100)
+		for x := range data {
+			data[x].Id = int64(1000000000 + x)
+			data[x].Name = "test_" + strconv.Itoa(x)
+			data[x].Val = 100.23 + 1
+			data[x].Date = time.Now()
+		}
+		_, err := db.Exec("INSERT INTO TTB_MAIN (ID, NAME, VAL, LDATE) VALUES(:ID, :NAME, :VAL, :LDATE)", data)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	var query = func(db *sql.DB) error {
+		var id int
+		err := db.QueryRow("SELECT ID FROM TTB_MAIN WHERE NAME = :1", "test_0").Scan(&id)
+		if err != nil {
+			return err
+		}
+		if id != 1000000000 {
+			return fmt.Errorf("expected: %d and got: %d", 1000000000, id)
+		}
+		return nil
+	}
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = createMainTable(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = dropMainTable(db)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = insert(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = query(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestBatchPreparedSizes runs one prepared INSERT with batches of 10, 10, 5,
+// 10 and 10 rows, and checks the count of rows that each inserts
+// (sijms/go-ora#466).
+func TestBatchPreparedSizes(t *testing.T) {
+	var createTable = func(db *sql.DB) error {
+		return execCmd(db, `CREATE TABLE TTB_466(ID varchar2(100))`)
+	}
+	var dropTable = func(db *sql.DB) error {
+		return execCmd(db, `DROP TABLE TTB_466 purge`)
+	}
+	var generateRows = func(startIndex, count int) []string {
+		rows := make([]string, count)
+		for i := range count {
+			rows[i] = fmt.Sprintf("ID%02d", i+startIndex)
+		}
+		return rows
+	}
+	var insert = func(stmt *sql.Stmt, rows []string) error {
+		result, err := stmt.Exec(rows)
+		if err != nil {
+			return err
+		}
+		inserted, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if int(inserted) != len(rows) {
+			return fmt.Errorf("expected to insert: %d but the actual insert: %d", len(rows), inserted)
+		}
+		return nil
+	}
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = createTable(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = dropTable(db)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	stmt, err := db.Prepare("INSERT INTO TTB_466 (ID) VALUES (:1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = stmt.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	err = insert(stmt, generateRows(1, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = insert(stmt, generateRows(11, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = insert(stmt, generateRows(21, 5))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = insert(stmt, generateRows(26, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = insert(stmt, generateRows(36, 10))
+	if err != nil {
+		t.Fatal(err)
 	}
 }

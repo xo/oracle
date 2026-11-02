@@ -48,7 +48,6 @@ func NewSessionContext(config *config.ConnectionConfig) *SessionContext {
 		Options:           1 | 2048, /*1024 for urgent data transport*/
 		OurOne:            1,
 		connConfig:        config,
-		// ConnOption:        connOption,
 	}
 	if config.EnableOOB {
 		ctx.Options |= 1024

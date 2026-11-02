@@ -40,7 +40,6 @@ func NewRegistry() *Registry {
 		goTypeCoder:     make(map[reflect.Type]codec.OracleParameterCoder),
 		oracleTypeCoder: make(map[types.TypeID]codec.OracleParameterCoder),
 		nameTypeCoder:   make(map[string]codec.OracleParameterCoder),
-		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
 	}
 	drv.init()
 	return drv

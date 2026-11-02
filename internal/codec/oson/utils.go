@@ -74,15 +74,6 @@ interval DS
 op = 62 and length = 11
 */
 
-/*
-	operation:
-
-1- determine type of json input like string, dictionary and objects
-2- parse input
-*/
-
-//var jsonDecoder map[int]FieldDecoder
-
 // Encode returns the OSON image of mainObj, a map or a slice, as
 // python-oracledb encodes one. Names of up to 255 bytes go in the segment of
 // short names and longer ones in the segment of long names, in version 3,

@@ -9,7 +9,9 @@ import (
 	"github.com/xo/oracle"
 )
 
-func TestIssue482(t *testing.T) {
+// TestAQDequeueArray enqueues an object with DBMS_AQ.ENQUEUE, and dequeues it
+// with DBMS_AQ.DEQUEUE_ARRAY into a slice of objects (sijms/go-ora#482).
+func TestAQDequeueArray(t *testing.T) {
 	type test1 struct {
 		Name string `udt:"name"`
 	}
@@ -75,8 +77,7 @@ END;`, (waitTime / time.Second), arraySize)
 
 	db, err := getDB(t)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer func() {
 		err = db.Close()
@@ -86,8 +87,7 @@ END;`, (waitTime / time.Second), arraySize)
 	}()
 	err = createTypes(db)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer func() {
 		err = dropTypes(db)
@@ -97,13 +97,11 @@ END;`, (waitTime / time.Second), arraySize)
 	}()
 	err = oracle.RegisterType(db, "test1", "test1collection", test1{})
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	err = setupQueue(db)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer func() {
 		err = stopQueue(db)
@@ -113,17 +111,14 @@ END;`, (waitTime / time.Second), arraySize)
 	}()
 	err = enqueue(db, test1{Name: "Test 1"})
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	messages, err := dequeueArray(db, 2, 5*time.Second)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	if len(messages) != 1 {
-		t.Errorf("expected message count: %d and received count: %d", 1, len(messages))
-		return
+		t.Fatalf("expected message count: %d and received count: %d", 1, len(messages))
 	}
 	if messages[0].Name != "Test 1" {
 		t.Errorf("expected message: %s and received message: %s", "Test 1", messages[0].Name)

@@ -216,7 +216,6 @@ func (w *Wallet) readCredentials(input []byte) error {
 	if err != nil {
 		return err
 	}
-	// var a []asn1.RawValue
 	for _, tmp := range temp1 {
 		// check the ContentType of the tmp first
 		switch tmp.Id.String() {
@@ -447,7 +446,6 @@ func (w *Wallet) decodeASN1(buffer []byte) (data []byte, err error) {
 			err = errors.New("pkcs12: only octet string salts are supported for pbkdf2")
 			return
 		}
-		// var prf hash.Hash
 		var h func() hash.Hash
 		var keyLen int
 		// get hash type

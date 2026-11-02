@@ -90,10 +90,9 @@ func NewSessionWithInputBufferForDebug(input []byte) *Session {
 	ret := &Session{
 		conn:       nil,
 		lastPacket: bytes.Buffer{},
-		// connOption:      *connOption,
-		Context: NewSessionContext(options),
-		Summary: nil,
-		logger:  slog.New(slog.DiscardHandler),
+		Context:    NewSessionContext(options),
+		Summary:    nil,
+		logger:     slog.New(slog.DiscardHandler),
 	}
 	ret.inBuffer = bytes.NewBuffer(input)
 	ret.terminal = ret

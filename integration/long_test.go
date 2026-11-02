@@ -7,7 +7,10 @@ import (
 	"testing"
 )
 
-func TestIssue205(t *testing.T) {
+// TestLongBatch inserts a batch of LONG values of 20,480 characters, with
+// NULL in every second row, and reads them back with a query and with the OUT
+// binds of a PL/SQL block (sijms/go-ora#205).
+func TestLongBatch(t *testing.T) {
 	var createTable = func(db *sql.DB) error {
 		return execCmd(db, `CREATE TABLE TTB_205(
 	ID NUMBER(10) NOT NULL,
@@ -24,7 +27,7 @@ func TestIssue205(t *testing.T) {
 			Name sql.NullString `db:"NAME"`
 		}
 		data := make([]ttb205, 100)
-		for index, _ := range data {
+		for index := range data {
 			data[index].Id = index + 1
 			if (index+1)%2 == 0 {
 				data[index].Name.Valid = false
@@ -94,8 +97,7 @@ func TestIssue205(t *testing.T) {
 	}
 	db, err := getDB(t)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer func() {
 		err = db.Close()
@@ -105,8 +107,7 @@ func TestIssue205(t *testing.T) {
 	}()
 	err = createTable(db)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer func() {
 		err = dropTable(db)
@@ -116,22 +117,47 @@ func TestIssue205(t *testing.T) {
 	}()
 	err = insert(db)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	err = sqlQuery(db)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	err = outputQuery(db, 1)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	err = outputQuery(db, 2)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
+	}
+}
+
+// TestLongIndexExpression reads the LONG column_expression of a function
+// based index (sijms/go-ora#543). The issue read an index of the APEX schema.
+// This test makes its own index.
+func TestLongIndexExpression(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	ctx := t.Context()
+	_, _ = db.ExecContext(ctx, "DROP TABLE TTB_543 PURGE")
+	if _, err := db.ExecContext(ctx, "CREATE TABLE TTB_543 (session_id NUMBER, security_group_id NUMBER)"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE TTB_543 PURGE") })
+	if _, err := db.ExecContext(ctx, `CREATE UNIQUE INDEX TTB_543_UK ON TTB_543 (CASE WHEN session_id IS NULL THEN security_group_id END)`); err != nil {
+		t.Fatal(err)
+	}
+	var result string
+	err = db.QueryRowContext(ctx, "SELECT column_expression FROM user_ind_expressions WHERE index_name = 'TTB_543_UK' AND column_position = 1").Scan(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const expected = `CASE  WHEN "SESSION_ID" IS NULL THEN "SECURITY_GROUP_ID" END `
+	if result != expected {
+		t.Errorf("expected: %q and got: %q", expected, result)
 	}
 }

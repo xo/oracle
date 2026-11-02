@@ -233,16 +233,6 @@ func (qu *queue) Enqueue(message *Message) error {
 	if err != nil {
 		return err
 	}
-	//if (this.isJSONQueue)
-	//{
-	//	int num2 = ((this.messageData != null) ? this.messageData.Length : 0);
-	//	byte[] array = TTCLob.CreateQuasiLocator((long)num2);
-	//	this.m_marshallingEngine.MarshalUB4((long)array.Length);
-	//	this.m_marshallingEngine.MarshalB1Array(array);
-	//	this.m_marshallingEngine.MarshalCLR(this.messageData, 0, num2);
-	//}
-	// read
-	// 08 3a b0 a2 6a 94 91 15 12 e0 63 02 00 11 ac e0 6d 00 09 01 02 01 06
 	return qu.afterReset(qu.readEnqueueResponse(message))
 }
 

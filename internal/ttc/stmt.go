@@ -130,19 +130,7 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	} else {
 		session.PutBytes(0, 0)
 	}
-	// switch (longFetchSize)
-	// {
-	// case -1:
-	// 	this.m_marshallingEngine.MarshalUB4((long) int.MaxValue);
-	// 	break;
-	// case 0:
-	// 	this.m_marshallingEngine.MarshalUB4(1L);
-	// 	break;
-	// default:
-	// 	this.m_marshallingEngine.MarshalUB4((long) longFetchSize);
-	// 	break;
-	// }
-	// we use here int.MaxValue
+	// the size of a LONG fetch
 	if stmt.connection.connOption.Lob == config.INLINE {
 		session.PutInt(0x3FFFFFFF, 4, true, true)
 	} else {
@@ -207,8 +195,6 @@ func (stmt *defaultStmt) basicWrite(exeOp int, parse, define bool) error {
 	case OTHERS:
 		al8i4[1] = 1
 	default:
-		// this.m_al8i4[1] = !fetch ? 0L : noOfRowsToFetch;
-		// al8i4[1] = stmt._noOfRowsToFetch
 		if stmt.connection.connOption.Lob == config.INLINE {
 			if parse {
 				al8i4[1] = 0
@@ -550,11 +536,6 @@ func (stmt *Stmt) getExeOption() int {
 		op |= 0x10
 	}
 	return op
-
-	/* HasReturnClause
-	if  stmt.PLSQL or cmdText == "" return false
-	Regex.IsMatch(cmdText, "\\bRETURNING\\b"
-	*/
 }
 
 // fetch get more rows from network stream
@@ -900,8 +881,7 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				if err != nil {
 					return err
 				}
-				// for (int index = 0; index < length3; ++index)
-				//	rowsAffectedByArrayBind[index] = this.m_marshallingEngine.UnmarshalSB8();
+				// the count of the rows that each row of the batch changed
 				stmt.counts = make([]int64, 0, length)
 				for range length {
 					n, err := session.ReadInt64(8, true, true)
@@ -2205,10 +2185,3 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 func (stmt *Stmt) NumInput() int {
 	return -1
 }
-
-/*
-parse = true
-execute = true
-fetch = true if hasReturn or PLSQL
-define = false
-*/
