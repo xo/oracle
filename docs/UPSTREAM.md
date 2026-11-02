@@ -6,6 +6,8 @@ about each. Nothing from an upstream pull request comes in without Ken's
 agreement (D5). A fix can be written here from the issue instead.
 
 The list was read on 2026-10-31: 58 open issues and 12 open pull requests.
+It was read again on 2026-11-02, for one new issue and three new pull
+requests, which the sections below hold.
 Gemini 3.1 Pro gave a verdict on each item. DeepSeek V4 Pro timed out three
 times and gave none, so a second opinion is still owed. Each verdict below was
 then checked against the code at `62f8a42`, and a check overrides the model
@@ -78,6 +80,14 @@ sijms/go-ora#683, #687, #672, #655 and #568, which the table above and the
 section below hold. It did not reproduce sijms/go-ora#704: in the root
 container of 18c and 26ai, `SELECT * FROM CONTAINERS(DUAL)` returns a row for
 the root and one for the PDB, as `system` and as `sys`.
+
+sijms/go-ora#781, opened on 2026-11-01, did not reproduce. A SELECT of an
+object that holds an object and two VARRAYs of NUMBER, registered as the
+issue registers `MDSYS.SDO_GEOMETRY`, reads both rows on 11g and 26ai. The
+`dbrun` image of 26ai has no Oracle Spatial, so the test used types of the
+same shape. The issue fails in `v3` at the check of the state of the
+connection, before a packet goes out, and this driver checks the
+connection with `IsValid` and keeps its registry for each `Connector`.
 
 Step 9 did not reproduce three more. sijms/go-ora#635: a descriptor with
 spaces around each `=` connects. sijms/go-ora#688: a user of a PDB that logs
@@ -171,3 +181,5 @@ and #773, each written again for this code (D18). The rest wait for Ken (D5).
 | sijms/go-ora#760 and sijms/go-ora#761 | Rewrite the column metadata, 1,934 and 2,570 lines | Skip for now. Too large to take before the tests run. Step 9 gives the names of the column types without them |
 | sijms/go-ora#616 | Reads `tnsnames.ora` with its own parser, 1,470 lines | Not applied. Step 9 reads `tnsnames.ora` with a parser of its own, through the keys `alias` and `tns_admin` (D20). `TestTNSAlias` connects through an alias |
 | sijms/go-ora#743 | Changes the CI of three modules | Skip. The workflow here is new (D7) |
+| sijms/go-ora#778 | Fixes four faults of a transaction, for sijms/go-ora#767 | Not applied. Step 5 fixed the race on the flag of the break, and a late break, the commit at `Close` and the last fault are fixed in the code of this driver: a `Commit` or a `Rollback` that fails makes the connection bad, so that the next statement does not commit what is open. `TestFailedCommit` holds that one |
+| sijms/go-ora#779 and sijms/go-ora#780 | Add `NewConnectorWithConfig`, a configuration for each connector | Not needed. `NewConnector(cfg)` takes a `Config` for each connector, and `RegisterConnConfig` is gone |

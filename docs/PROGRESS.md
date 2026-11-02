@@ -356,3 +356,8 @@ tag v0.1.0 at the start.
    BACKLOG, for when a caller needs them.
 7. Ken chose v0.1.0 as the first tag (D36). It is made in the local
    repository, and `dburl` and `usql` are told when it is pushed.
+
+The triage was read again on 2026-11-02. sijms/go-ora#781 did not
+reproduce, sijms/go-ora#779 and #780 are not needed, and the last fault of
+sijms/go-ora#778 is fixed: a failed commit or rollback makes the connection
+bad.

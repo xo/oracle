@@ -314,3 +314,35 @@ func mustUser(t *testing.T) string {
 	}
 	return strings.ToUpper(u.User.Username())
 }
+
+// TestFailedCommit commits a transaction that a deferred constraint fails,
+// as sijms/go-ora#778 names. The commit fails with ORA-02091, the row is not
+// stored, and the pool serves the next query, since the connection of the
+// failed commit is dropped.
+func TestFailedCommit(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := t.Context()
+	db.SetMaxOpenConns(1)
+	db.Exec("DROP TABLE go_failed_commit PURGE")
+	if err := execCmd(db, `CREATE TABLE go_failed_commit (n NUMBER,
+		CONSTRAINT go_failed_commit_n CHECK (n > 0) DEFERRABLE INITIALLY DEFERRED)`); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DROP TABLE go_failed_commit PURGE")
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO go_failed_commit VALUES (-1)"); err != nil {
+		t.Fatal(err)
+	}
+	requireErr(t, "the commit", tx.Commit(), "ORA-02091")
+	var n int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM go_failed_commit").Scan(&n); err != nil || n != 0 {
+		t.Errorf("got %d rows, %v, want 0", n, err)
+	}
+}
