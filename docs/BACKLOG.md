@@ -15,25 +15,6 @@ decided on the way (D3).
 list of authentication services or out of band breaks, which `go-ora` read.
 Add each when a caller needs it.
 
-### Tell dburl and usql when the first tag exists
-
-The first tag is v0.1.0 (D36). It is made when Ken says, and the two
-sessions are told then.
-
-usql moved to this module on 2026-11-02, at a pseudo-version, and keeps one
-hook, `IsPasswordErr`, until a release has `AuthenticationRefused`. When the
-first tag exists, tell the usql session, which then registers the driver
-with no hook.
-
-dburl staged its `oracle` scheme as provisional on 2026-10-31 (its D69), with
-`github.com/xo/oracle` as the package. Its `GenOracle` writes
-`oracle://user:pass@host:1521/service?<query>`. It adds the host `localhost`
-and the port 1521, and it passes the path and the query through as they are,
-so `%2F` in a service name and every `ssl*` key reach the parser unchanged.
-dburl maps no `tls` key to `sslmode` for any scheme, and will not. The parser
-of D11 landed in step 4. When the first tag exists, tell the dburl session,
-which then rechecks its tests and documents.
-
 ### Test the upstream fixes that have no test
 
 D27 finished the open issues of `sijms/go-ora`, and

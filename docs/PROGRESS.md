@@ -377,3 +377,8 @@ go-ora had. Its tests check the new mapping now, in
 `integration/number_test.go`, and the module is gone. The code that was
 commented out, most of it copied from decompiled C#, is gone, and so is
 `integration/clob.json`, which no test read.
+
+The suites passed on `oracle-nne-26ai`, `oracle-adb-19c` and
+`oracle-adb-26ai` in both LOB modes, and CI passed on `c3ce25b`. Ken then
+had v0.1.0 tagged on that commit and released on GitHub (D36). The `dburl`
+and `usql` sessions were told, and usql can drop its `IsPasswordErr` hook.

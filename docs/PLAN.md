@@ -525,8 +525,11 @@ Ken decided on 2026-11-02 that the first tag of `github.com/xo/oracle` is
 v0.1.0. A v0 tag says that the API can still change, which suits a driver
 under rewrite. The tags v3.0.0 and v3.0.1 are those of `sijms/go-ora`, whose
 `go.mod` declares `github.com/sijms/go-ora`. A v3 tag here needs the path
-`github.com/xo/oracle/v3`. The tag is made when Ken
-says, and then `dburl` and `usql` are told.
+`github.com/xo/oracle/v3`. The tag is made when Ken says, and then `dburl`
+and `usql` are told.
+
+Ken said so on 2026-11-02. v0.1.0 is the commit `c3ce25b`, and its release
+is on GitHub. The `dburl` and `usql` sessions were told the same day.
 
 ## Open questions for Ken
 

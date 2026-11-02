@@ -1125,8 +1125,8 @@ Each step leaves a driver that builds and passes its tests.
 9. Fix the upstream faults in `UPSTREAM.md`, each with a test.
 10. Tell the consumers about the package name and the keys of the DSN. They are
     `dburl`, `usql` and `dbmeta`. `dburl` staged a scheme on 2026-10-31 that
-    passes the query through. The parser landed in step 4, and `dburl`
-    rechecks when the first tag exists.
+    passes the query through. The parser landed in step 4. The first tag,
+    v0.1.0, exists since 2026-11-02, and `dburl` and `usql` were told.
 11. Make the names and the structure idiomatic, as the section above says.
     It runs before step 7, so that JSON and the charsets move into the new
     layout, in this order: delete the dead code, delete `internal/utils` and
@@ -1134,4 +1134,5 @@ Each step leaves a driver that builds and passes its tests.
     replace the maps keyed by `reflect.Type`, remove the interfaces, rename,
     and move `TestIssues` to `integration`.
 
-Steps 4 to 6 change what a caller sees. Nothing is tagged until they are done.
+Steps 4 to 6 change what a caller sees, and nothing was tagged until they were
+done. v0.1.0 is the first tag (D36).
