@@ -8,7 +8,7 @@ import (
 )
 
 type simpleObject struct {
-	connection  *Connection
+	connection  *Conn
 	operationID uint8
 	data        []byte
 	err         error

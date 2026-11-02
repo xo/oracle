@@ -103,10 +103,10 @@ func TestAssign(t *testing.T) {
 	}
 }
 
-// TestNilDataSetClose is sijms/go-ora#762: Close on a nil *DataSet panicked.
+// TestNilDataSetClose is sijms/go-ora#762: Close on a nil *Rows panicked.
 func TestNilDataSetClose(t *testing.T) {
-	var ds *DataSet
+	var ds *Rows
 	if err := ds.Close(); err != nil {
-		t.Errorf("Close of a nil DataSet: %v", err)
+		t.Errorf("Close of a nil Rows: %v", err)
 	}
 }

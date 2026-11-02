@@ -126,7 +126,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 // newConnection returns a connection that is not open yet, with its own copy
 // of the configuration, because a connection changes its copy as it connects.
-func (c *Connector) newConnection() (*ttc.Connection, error) {
+func (c *Connector) newConnection() (*ttc.Conn, error) {
 	c.mu.Lock()
 	closed := c.closed
 	c.mu.Unlock()

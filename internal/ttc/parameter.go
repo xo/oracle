@@ -60,7 +60,7 @@ type ParameterInfo struct {
 }
 
 // load get parameter information form network session
-func (par *ParameterInfo) load(conn *Connection) error {
+func (par *ParameterInfo) load(conn *Conn) error {
 	session := conn.session
 	par.getDataFromServer = true
 	dataType, err := session.ReadByte()
@@ -334,7 +334,7 @@ func (par *ParameterInfo) isLobType() bool {
 		par.DataType == types.JSONType
 }
 
-func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
+func (par *ParameterInfo) decodePrimValue(conn *Conn, udt bool) error {
 	session := conn.session
 	var err error
 	par.oPrimValue = nil
@@ -376,7 +376,7 @@ func (par *ParameterInfo) decodePrimValue(conn *Connection, udt bool) error {
 
 }
 
-func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
+func (par *ParameterInfo) decodeParameterValue(connection *Conn) error {
 	currentLobFetch := connection.connOption.Lob
 	connection.connOption.Lob = config.STREAM
 	defer func() {
@@ -389,7 +389,7 @@ func (par *ParameterInfo) decodeParameterValue(connection *Connection) error {
 	return nil
 }
 
-func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) error {
+func (par *ParameterInfo) decodeColumnValue(connection *Conn, udt bool) error {
 	if err := par.decodePrimValue(connection, udt); err != nil {
 		return err
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 type DataTypeNego struct {
-	conn                   *Connection
+	conn                   *Conn
 	MessageCode            uint8
 	Server                 *TCPNego
 	TypeAndRep             []uint16
@@ -25,10 +25,10 @@ type DataTypeNego struct {
 }
 
 const (
-	bufferGrow          int    = 2369
-	TNSTypeRepNative    uint16 = 0
-	TNSTypeRepUniversal uint16 = 1
-	TNSTypeRepOracle    uint16 = 10
+	bufferGrow          int          = 2369
+	TNSTypeRepNative    uint16       = 0
+	TNSTypeRepUniversal uint16       = 1
+	TNSTypeRepOracle    uint16       = 10
 	TNSDataTypeVBI      types.TypeID = 15
 	TNSDataTypeUB2      types.TypeID = 25
 	TNSDataTypeUB4      types.TypeID = 26
@@ -66,7 +66,7 @@ func (nego *DataTypeNego) addTypeRep(dty, ndty types.TypeID, rep uint16) {
 	}
 }
 
-func buildTypeNego(nego *TCPNego, conn *Connection) *DataTypeNego {
+func buildTypeNego(nego *TCPNego, conn *Conn) *DataTypeNego {
 	result := DataTypeNego{
 		conn:        conn,
 		MessageCode: 2,

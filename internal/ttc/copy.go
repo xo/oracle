@@ -11,7 +11,8 @@ import (
 
 // copyValue stores src in dest, which is a pointer, for an OUT argument, a
 // field of a user defined type, an element of an array and a field of a
-// struct that DataSet.Scan fills. Rows scan through ScanColumn and not here.
+// struct that Rows.Scan fills. The rows of database/sql scan through
+// ScanColumn and not here.
 //
 // A value type of the driver, such as a LOB, goes as its plain value, unless
 // dest is a value type of the driver too, which takes it through Scan. A

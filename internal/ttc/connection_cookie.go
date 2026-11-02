@@ -29,7 +29,7 @@ type cookieJar struct {
 	cookies map[string]*ConnectionCookie
 }
 
-func getCookieKey(conn *Connection) string {
+func getCookieKey(conn *Conn) string {
 	uuid := conn.session.Context.UUID
 	if len(uuid) == 0 {
 		return ""
@@ -46,7 +46,7 @@ func getCookieKey(conn *Connection) string {
 	return string(base64.StdEncoding.EncodeToString(h[:]))
 }
 
-func lookupCookie(conn *Connection) *ConnectionCookie {
+func lookupCookie(conn *Conn) *ConnectionCookie {
 	key := getCookieKey(conn)
 	if key == "" || conn.cookies == nil {
 		return nil
@@ -56,7 +56,7 @@ func lookupCookie(conn *Connection) *ConnectionCookie {
 	return conn.cookies.cookies[key]
 }
 
-func deleteCookie(conn *Connection) {
+func deleteCookie(conn *Conn) {
 	key := getCookieKey(conn)
 	if key == "" || conn.cookies == nil {
 		return
@@ -66,7 +66,7 @@ func deleteCookie(conn *Connection) {
 	delete(conn.cookies.cookies, key)
 }
 
-func saveCookie(conn *Connection) {
+func saveCookie(conn *Conn) {
 	key := getCookieKey(conn)
 	if key == "" || conn.cookies == nil || conn.tcpNego == nil {
 		return

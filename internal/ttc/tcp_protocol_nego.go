@@ -9,7 +9,7 @@ import (
 )
 
 type TCPNego struct {
-	conn                  *Connection
+	conn                  *Conn
 	MessageCode           uint8
 	ProtocolServerString  string
 	OracleVersion         int

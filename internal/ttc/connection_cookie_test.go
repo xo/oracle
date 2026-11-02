@@ -11,7 +11,7 @@ import (
 // service name shared one fast login cookie, and so the charset of the first.
 func TestCookiesPerRegistry(t *testing.T) {
 	uuid := []byte("0123456789abcdef")
-	conn := func(reg *Registry, charset int) *Connection {
+	conn := func(reg *Registry, charset int) *Conn {
 		t.Helper()
 		c, err := reg.NewConnection(&config.ConnectionConfig{DatabaseInfo: config.DatabaseInfo{ServiceName: "XE"}})
 		if err != nil {

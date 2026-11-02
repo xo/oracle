@@ -108,14 +108,14 @@ func (cursor *RefCursor) getExeOptions() int {
 	}
 }
 
-func (cursor *RefCursor) _query() (*DataSet, error) {
+func (cursor *RefCursor) _query() (*Rows, error) {
 	session := cursor.connection.session
 	session.ResetBuffer()
 	err := cursor.write()
 	if err != nil {
 		return nil, err
 	}
-	dataSet := new(DataSet)
+	dataSet := new(Rows)
 	err = cursor.read(dataSet.currentResultSet())
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (cursor *RefCursor) _query() (*DataSet, error) {
 	return dataSet, nil
 }
 
-func (cursor *RefCursor) Query() (*DataSet, error) {
+func (cursor *RefCursor) Query() (*Rows, error) {
 	if !cursor.connection.IsValid() {
 		cursor.connection.setBad()
 		return nil, driver.ErrBadConn
@@ -161,7 +161,7 @@ func (cursor *RefCursor) write() error {
 	return cursor.connection.session.Write()
 }
 
-func (cursor RefCursor) SetDataType(conn *Connection, par *ParameterInfo) error {
+func (cursor RefCursor) SetDataType(conn *Conn, par *ParameterInfo) error {
 	par.DataType = types.REFCURSOR
 	return nil
 }

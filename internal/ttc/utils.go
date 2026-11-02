@@ -87,7 +87,7 @@ func tFloat(input reflect.Type) bool {
 	return input.Kind() == reflect.Float32 || input.Kind() == reflect.Float64
 }
 
-func processReset(err error, conn *Connection) error {
+func processReset(err error, conn *Conn) error {
 	if errors.Is(err, tns.ErrConnReset) {
 		err = conn.read()
 	}

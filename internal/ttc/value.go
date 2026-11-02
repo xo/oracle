@@ -65,7 +65,7 @@ func columnValue(col *ParameterInfo, v any) (any, error) {
 
 // NextRow advances to the next row. It satisfies driver.RowsColumnScanner,
 // which database/sql calls in place of Next from Go 1.27.
-func (dataSet *DataSet) NextRow() error {
+func (dataSet *Rows) NextRow() error {
 	n := len(dataSet.Columns())
 	if cap(dataSet.row) < n {
 		dataSet.row = make([]driver.Value, n)
@@ -82,7 +82,7 @@ func (dataSet *DataSet) NextRow() error {
 
 // ScanColumn stores the column index of the current row in dest. It satisfies
 // driver.RowsColumnScanner.
-func (dataSet *DataSet) ScanColumn(scanCtx driver.ScanContext, index int, dest any) error {
+func (dataSet *Rows) ScanColumn(scanCtx driver.ScanContext, index int, dest any) error {
 	if index < 0 || index >= len(dataSet.row) {
 		return fmt.Errorf("scanning column %d of a row of %d columns: %w", index, len(dataSet.row), io.ErrUnexpectedEOF)
 	}
@@ -107,7 +107,7 @@ type rowLob interface {
 // dest takes as a LOB stays a locator, which reads until the rows close
 // (D22). For another dest, it loads the value, as the read mode auto asks,
 // and keeps it in the row for a second Scan.
-func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
+func (dataSet *Rows) lobValue(index int, dest any) (any, error) {
 	var lob rowLob
 	switch v := dataSet.row[index].(type) {
 	case *types.Clob:
@@ -153,7 +153,7 @@ func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
 }
 
 // own makes the LOB of stream read only until the rows close (D22).
-func (dataSet *DataSet) own(stream types.LobStreamer) {
+func (dataSet *Rows) own(stream types.LobStreamer) {
 	if s, ok := stream.(*LobStream); ok {
 		s.rows = &dataSet.guard
 	}

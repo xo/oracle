@@ -62,7 +62,7 @@ func IsOption(v any) bool {
 // ctx and of args applied, and args without the options, numbered again
 // from 1. It fails for an option that Oracle cannot honor for one
 // statement, so that a caller never believes that it holds.
-func resolve(ctx context.Context, conn *Connection, args []driver.NamedValue) (Options, []driver.NamedValue, error) {
+func resolve(ctx context.Context, conn *Conn, args []driver.NamedValue) (Options, []driver.NamedValue, error) {
 	opts := Options{
 		Prefetch: conn.connOption.PrefetchRows,
 		LobFetch: conn.lobFetch,

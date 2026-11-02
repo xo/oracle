@@ -7,24 +7,24 @@ import (
 )
 
 func TestValidatorInterface(t *testing.T) {
-	// Test that Connection implements driver.Validator interface
-	var conn any = &Connection{}
+	// Test that Conn implements driver.Validator interface
+	var conn any = &Conn{}
 	if _, ok := conn.(driver.Validator); !ok {
-		t.Error("Connection does not implement driver.Validator interface")
+		t.Error("Conn does not implement driver.Validator interface")
 	}
 }
 
 func TestSessionResetterInterface(t *testing.T) {
-	// Test that Connection implements driver.SessionResetter interface
-	var conn any = &Connection{}
+	// Test that Conn implements driver.SessionResetter interface
+	var conn any = &Conn{}
 	if _, ok := conn.(driver.SessionResetter); !ok {
-		t.Error("Connection does not implement driver.SessionResetter interface")
+		t.Error("Conn does not implement driver.SessionResetter interface")
 	}
 }
 
 func TestIsValidMethod(t *testing.T) {
 	// Create a basic connection instance
-	conn := &Connection{
+	conn := &Conn{
 		State: Closed,
 		bad:   false,
 	}
@@ -58,7 +58,7 @@ func TestResetSessionMethod(t *testing.T) {
 	ctx := context.Background()
 
 	// Test reset session on good connection
-	conn := &Connection{
+	conn := &Conn{
 		State: Opened,
 		bad:   false,
 	}

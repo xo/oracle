@@ -39,7 +39,7 @@ type AuthObject struct {
 	//customHash       bool
 	VerifierType int
 	tcpNego      *TCPNego
-	conn         *Connection
+	conn         *Conn
 }
 
 func (obj *AuthObject) read() error {

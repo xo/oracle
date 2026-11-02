@@ -9,14 +9,14 @@ import (
 
 // Compile time Sentinels for implemented Interfaces.
 var (
-	_ = driver.Rows((*DataSet)(nil))
-	_ = driver.RowsColumnTypeDatabaseTypeName((*DataSet)(nil))
-	_ = driver.RowsColumnTypeLength((*DataSet)(nil))
-	_ = driver.RowsColumnTypeNullable((*DataSet)(nil))
-	_ = driver.RowsColumnTypePrecisionScale((*DataSet)(nil))
+	_ = driver.Rows((*Rows)(nil))
+	_ = driver.RowsColumnTypeDatabaseTypeName((*Rows)(nil))
+	_ = driver.RowsColumnTypeLength((*Rows)(nil))
+	_ = driver.RowsColumnTypeNullable((*Rows)(nil))
+	_ = driver.RowsColumnTypePrecisionScale((*Rows)(nil))
 )
 
-type DataSet struct {
+type Rows struct {
 	resultSets []ResultSet
 	index      int
 	// row is the current row of NextRow, which ScanColumn reads
@@ -36,7 +36,7 @@ type DataSet struct {
 	//parent          parentStmt
 }
 
-func (dataSet *DataSet) currentResultSet() *ResultSet {
+func (dataSet *Rows) currentResultSet() *ResultSet {
 	if dataSet.resultSets == nil {
 		dataSet.resultSets = make([]ResultSet, 0)
 		dataSet.resultSets = append(dataSet.resultSets, ResultSet{})
@@ -45,7 +45,7 @@ func (dataSet *DataSet) currentResultSet() *ResultSet {
 	return &dataSet.resultSets[dataSet.index]
 }
 
-func (dataSet *DataSet) clear() {
+func (dataSet *Rows) clear() {
 	dataSet.resultSets = nil
 	dataSet.index = 0
 }
@@ -62,9 +62,9 @@ type rowGuard struct {
 	closed bool
 }
 
-// Close closes each result set. A nil DataSet has nothing to close, where it
+// Close closes each result set. A nil Rows has nothing to close, where it
 // panicked, which was sijms/go-ora#762.
-func (dataSet *DataSet) Close() error {
+func (dataSet *Rows) Close() error {
 	if dataSet == nil {
 		return nil
 	}
@@ -85,54 +85,54 @@ func (dataSet *DataSet) Close() error {
 }
 
 // Advance act like Next in sql package return false if no other rows in dataset
-func (dataSet *DataSet) Advance() bool {
+func (dataSet *Rows) Advance() bool {
 	return dataSet.currentResultSet().Advance()
 }
 
 // Scan act like scan in sql package return row values to dest variable pointers
-func (dataSet *DataSet) Scan(dest ...any) error {
+func (dataSet *Rows) Scan(dest ...any) error {
 	return dataSet.currentResultSet().Scan(dest...)
 }
 
-func (dataSet *DataSet) Err() error {
+func (dataSet *Rows) Err() error {
 	return dataSet.currentResultSet().Err()
 }
 
 // Next implement method need for sql.Rows interface
-func (dataSet *DataSet) Next(dest []driver.Value) error {
+func (dataSet *Rows) Next(dest []driver.Value) error {
 	return dataSet.currentResultSet().Next(dest)
 }
 
 // Columns return a string array that represent columns names
-func (dataSet *DataSet) Columns() []string {
+func (dataSet *Rows) Columns() []string {
 	return dataSet.currentResultSet().Columns()
 }
 
 // ColumnTypeDatabaseTypeName return Col DataType name
-func (dataSet *DataSet) ColumnTypeDatabaseTypeName(index int) string {
+func (dataSet *Rows) ColumnTypeDatabaseTypeName(index int) string {
 	return dataSet.currentResultSet().ColumnTypeDatabaseTypeName(index)
 }
 
 // ColumnTypeLength return length of column type
-func (dataSet *DataSet) ColumnTypeLength(index int) (int64, bool) {
+func (dataSet *Rows) ColumnTypeLength(index int) (int64, bool) {
 	return dataSet.currentResultSet().ColumnTypeLength(index)
 }
 
 // ColumnTypeNullable return if column allow null or not
-func (dataSet *DataSet) ColumnTypeNullable(index int) (nullable, ok bool) {
+func (dataSet *Rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return dataSet.currentResultSet().ColumnTypeNullable(index)
 }
 
 // ColumnTypePrecisionScale return the precision and scale for numeric types
-func (dataSet *DataSet) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
+func (dataSet *Rows) ColumnTypePrecisionScale(index int) (int64, int64, bool) {
 	return dataSet.currentResultSet().ColumnTypePrecisionScale(index)
 }
 
-func (dataSet *DataSet) ColumnTypeScanType(index int) reflect.Type {
+func (dataSet *Rows) ColumnTypeScanType(index int) reflect.Type {
 	return dataSet.currentResultSet().ColumnTypeScanType(index)
 }
 
-func (dataSet *DataSet) NextResultSet() error {
+func (dataSet *Rows) NextResultSet() error {
 	if dataSet.HasNextResultSet() {
 		dataSet.index++
 		return nil
@@ -140,6 +140,6 @@ func (dataSet *DataSet) NextResultSet() error {
 	return io.EOF
 }
 
-func (dataSet *DataSet) HasNextResultSet() bool {
+func (dataSet *Rows) HasNextResultSet() bool {
 	return dataSet.index < len(dataSet.resultSets)-1
 }

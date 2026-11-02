@@ -19,7 +19,7 @@ func TestDecodePrimValueUntypedNull(t *testing.T) {
 	par := &ParameterInfo{}
 	par.DataType = 0 // untyped NULL
 
-	// We can't create a full Connection without a real Oracle session,
+	// We can't create a full Conn without a real Oracle session,
 	// but we can test the core logic: DataType 0 should read ReadCLR
 	// and return nil without needing a registered coder.
 	bValue, err := session.ReadCLR()

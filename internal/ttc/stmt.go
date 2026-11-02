@@ -42,7 +42,7 @@ type parentStmt interface {
 	CanAutoClose() bool
 }
 type defaultStmt struct {
-	connection *Connection
+	connection *Conn
 	text       string
 	// disableCompression bool
 	_hasLONG     bool
@@ -340,7 +340,7 @@ func (rs *QueryResult) RowsAffected() (int64, error) {
 }
 
 // NewStmt create new stmt and set its connection properties
-func NewStmt(text string, conn *Connection) *Stmt {
+func NewStmt(text string, conn *Conn) *Stmt {
 	stmt := &Stmt{
 		reSendParDef: false,
 		parse:        true,
@@ -1164,7 +1164,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 		// as a statement, so that the counts of the rows of a batch that
 		// failed reach WithRowCounts (D34)
 		if stmt._hasReturnClause || stmt.stmtType == DML && stmt.arrayBindCount > 0 {
-			dataSet := &DataSet{}
+			dataSet := &Rows{}
 			err = stmt.read(dataSet.currentResultSet())
 			if !errors.Is(err, tns.ErrConnReset) {
 				if stmt.rowCounts != nil {
@@ -1588,7 +1588,7 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		stmt.connection.setBad()
 		return nil, err
 	}
-	dataSet := new(DataSet)
+	dataSet := new(Rows)
 	err = stmt.read(dataSet.currentResultSet())
 	if err != nil {
 		return nil, err
@@ -1886,7 +1886,7 @@ func (stmt *Stmt) setParam(pos int, par ParameterInfo) {
 // RunQuery execute a query command and return oracle dataset object
 //
 // args is an array of values that corresponding to parameters in sql
-func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
+func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*Rows, error) {
 	if !stmt.connection.IsValid() {
 		stmt.connection.setBad()
 		return nil, driver.ErrBadConn
@@ -2011,15 +2011,15 @@ func (stmt *Stmt) QueryContext(ctx context.Context, namedArgs []driver.NamedValu
 	return rows, nil
 }
 
-func (stmt *Stmt) _query() (*DataSet, error) {
+func (stmt *Stmt) _query() (*Rows, error) {
 	var err error
-	var dataSet *DataSet
+	var dataSet *Rows
 	stmt.connection.session.ResetBuffer()
 	err = stmt.write()
 	if err != nil {
 		return nil, err
 	}
-	dataSet = new(DataSet)
+	dataSet = new(Rows)
 	err = stmt.read(dataSet.currentResultSet())
 	if err != nil {
 		return nil, err
@@ -2188,7 +2188,7 @@ func (stmt *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	}
 	logger := stmt.connection.logger
 	logger.Debug("query", "query", stmt.text)
-	var dataSet *DataSet
+	var dataSet *Rows
 	var err error
 	if len(args) == 0 {
 		dataSet, err = stmt.RunQuery(nil)

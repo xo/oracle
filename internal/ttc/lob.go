@@ -16,7 +16,7 @@ import (
 var errEmptyLocator = errors.New("call lob operation on an empty locator")
 
 type LobStream struct {
-	conn          *Connection
+	conn          *Conn
 	sourceLocator types.Locator
 	destLocator   types.Locator
 	scn           []byte

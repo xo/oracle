@@ -137,7 +137,7 @@ type SessionParam struct {
 
 // InitFromConn records the user of the first connection, which RegisterType
 // takes as the owner of a type, and sets params on conn.
-func (driver *Registry) InitFromConn(conn *Connection, params []SessionParam) error {
+func (driver *Registry) InitFromConn(conn *Conn, params []SessionParam) error {
 	driver.mu.Lock()
 	if !driver.dataCollected {
 		driver.UserId = conn.connOption.UserID
@@ -266,7 +266,7 @@ func (drv *Registry) RegisterTypeWithOwner(db *sql.DB, owner, typeName, arrayTyp
 
 // NewConnection returns a connection for config, not open yet, with the
 // coders and the types of drv.
-func (drv *Registry) NewConnection(config *config.ConnectionConfig) (*Connection, error) {
+func (drv *Registry) NewConnection(config *config.ConnectionConfig) (*Conn, error) {
 	conn, err := NewConnection(config)
 	if err != nil {
 		return nil, err

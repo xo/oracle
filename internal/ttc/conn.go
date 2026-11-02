@@ -61,7 +61,7 @@ type Querier interface {
 
 // ///
 
-type Connection struct {
+type Conn struct {
 	State      ConnectionState
 	LogonMode  LogonMode
 	autoCommit bool
@@ -114,7 +114,7 @@ type Connection struct {
 	newKey   []byte
 }
 
-func (conn *Connection) buildParameterCoderMap(drv *Registry) {
+func (conn *Conn) buildParameterCoderMap(drv *Registry) {
 	conn.goTypeCoder = drv.goTypeCoder
 	conn.nameTypeCoder = drv.nameTypeCoder
 	conn.oracleTypeCoder = drv.oracleTypeCoder
@@ -122,13 +122,13 @@ func (conn *Connection) buildParameterCoderMap(drv *Registry) {
 }
 
 // Prepare take a query string and create a stmt object
-func (conn *Connection) Prepare(query string) (driver.Stmt, error) {
+func (conn *Conn) Prepare(query string) (driver.Stmt, error) {
 	conn.logger.Debug("prepare", "query", query)
 	return NewStmt(query, conn), nil
 }
 
 // Ping test if connection is online
-func (conn *Connection) Ping(ctx context.Context) error {
+func (conn *Conn) Ping(ctx context.Context) error {
 	conn.logger.Debug("ping")
 	if !conn.IsValid() {
 		return driver.ErrBadConn
@@ -143,7 +143,7 @@ func (conn *Connection) Ping(ctx context.Context) error {
 	}).exec()
 }
 
-func (conn *Connection) MaxStringLength() int64 {
+func (conn *Conn) MaxStringLength() int64 {
 	if conn.maxLen.varchar == 0 {
 		return 0x7FFF
 	}
@@ -151,33 +151,33 @@ func (conn *Connection) MaxStringLength() int64 {
 }
 
 // restoreLobFetch puts back the mode of LOBs of the DSN after a statement.
-func (conn *Connection) restoreLobFetch() {
+func (conn *Conn) restoreLobFetch() {
 	conn.connOption.Lob = conn.lobFetch
 }
 
 // ServerRelease returns the major release of the server, such as 11 or 23.
-func (conn *Connection) ServerRelease() int {
+func (conn *Conn) ServerRelease() int {
 	if conn.dBVersion == nil {
 		return 0
 	}
 	return conn.dBVersion.MajorVersion
 }
 
-func (conn *Connection) MaxRawLength() int64 {
+func (conn *Conn) MaxRawLength() int64 {
 	if conn.maxLen.raw == 0 {
 		return 0x7FFF
 	}
 	return conn.maxLen.raw
 }
-func (conn *Connection) getDefaultCharsetID() int {
+func (conn *Conn) getDefaultCharsetID() int {
 
 	return conn.tcpNego.ServerCharset
 }
-func (conn *Connection) DefaultStringCoder() (*charset.Converter, error) {
+func (conn *Conn) DefaultStringCoder() (*charset.Converter, error) {
 	return conn.StringCoder(conn.getDefaultCharsetID(), 1)
 }
 
-func (conn *Connection) StringCoder(charsetID, charsetForm int) (*charset.Converter, error) {
+func (conn *Conn) StringCoder(charsetID, charsetForm int) (*charset.Converter, error) {
 	errStringCoder := fmt.Errorf("server requested charset id: %d which is not supported by the driver", charsetID)
 	if charsetID == 0 {
 		if charsetForm == 1 {
@@ -214,13 +214,13 @@ func (conn *Connection) StringCoder(charsetID, charsetForm int) (*charset.Conver
 	return temp, nil
 }
 
-func (conn *Connection) ServerStringCoder() *charset.Converter {
+func (conn *Conn) ServerStringCoder() *charset.Converter {
 	return conn.sStrConv
 }
-func (conn *Connection) ServerNStringCoder() *charset.Converter {
+func (conn *Conn) ServerNStringCoder() *charset.Converter {
 	return conn.nStrConv
 }
-func (conn *Connection) Logoff() error {
+func (conn *Conn) Logoff() error {
 	conn.logger.Debug("logoff")
 	session := conn.session
 	session.ResetBuffer()
@@ -232,7 +232,7 @@ func (conn *Connection) Logoff() error {
 	return conn.read()
 }
 
-func (conn *Connection) read() error {
+func (conn *Conn) read() error {
 	loop := true
 	session := conn.session
 	for loop {
@@ -254,7 +254,7 @@ func (conn *Connection) read() error {
 // Open the connection = bring it online
 
 // OpenWithContext open the connection with timeout context
-func (conn *Connection) OpenWithContext(ctx context.Context) error {
+func (conn *Conn) OpenWithContext(ctx context.Context) error {
 	logger := conn.logger
 	switch conn.connOption.DBAPrivilege {
 	case config.SYSDBA:
@@ -441,8 +441,8 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 }
 
 // Begin is the form of BeginTx with no context, which database/sql does not
-// call, because Connection implements driver.ConnBeginTx.
-func (conn *Connection) Begin() (driver.Tx, error) {
+// call, because Conn implements driver.ConnBeginTx.
+func (conn *Conn) Begin() (driver.Tx, error) {
 	return nil, fmt.Errorf("beginning a transaction without a context: %w", tns.ErrNotSupported)
 }
 
@@ -450,7 +450,7 @@ func (conn *Connection) Begin() (driver.Tx, error) {
 // serializable, and a read only transaction. Any other isolation level fails
 // with an error that wraps ErrNotSupported. A read only transaction is read
 // committed, because Oracle has no read only serializable transaction.
-func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+func (conn *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	var stmt string
 	switch sql.IsolationLevel(opts.Isolation) {
 	case sql.LevelDefault, sql.LevelReadCommitted:
@@ -473,11 +473,11 @@ func (conn *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 			return nil, fmt.Errorf("beginning a transaction: %w", err)
 		}
 	}
-	return &Transaction{conn: conn}, nil
+	return &Tx{conn: conn}, nil
 }
 
 // NewConnection create a new connection from databaseURL string or configuration
-func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
+func NewConnection(cfg *config.ConnectionConfig) (*Conn, error) {
 	var err error
 	if cfg == nil {
 		return nil, errors.New("database url or configuration is required")
@@ -504,7 +504,7 @@ func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}
-	return &Connection{
+	return &Conn{
 		State:           Closed,
 		connOption:      temp,
 		cStrConv:        charset.New(cfg.CharsetID),
@@ -525,7 +525,7 @@ func NewConnection(cfg *config.ConnectionConfig) (*Connection, error) {
 	}, nil
 }
 
-func (conn *Connection) freeTemporaryLobs() error {
+func (conn *Conn) freeTemporaryLobs() error {
 	if len(conn.temporaryLocs) == 0 {
 		return nil
 	}
@@ -570,7 +570,7 @@ func (conn *Connection) freeTemporaryLobs() error {
 // drainBreak reads the answer of a break that came after the call that it
 // broke had ended: the marker, the reset, and ORA-01013, which it drops. A
 // read that fails makes the connection bad.
-func (conn *Connection) drainBreak() error {
+func (conn *Conn) drainBreak() error {
 	err := conn.read()
 	if errors.Is(err, tns.ErrConnReset) {
 		err = conn.read()
@@ -587,7 +587,7 @@ func (conn *Connection) drainBreak() error {
 // transaction is open.
 const eocsTxnInProgress = 0x2
 
-func (conn *Connection) Close() (err error) {
+func (conn *Conn) Close() (err error) {
 	err = conn.freeTemporaryLobs()
 	if err != nil {
 		conn.logger.Debug("freeing temporary LOBs", "error", err)
@@ -616,7 +616,7 @@ func (conn *Connection) Close() (err error) {
 	return
 }
 
-func (conn *Connection) isFastLoginEnabled() bool {
+func (conn *Conn) isFastLoginEnabled() bool {
 	return conn.session.Context.FastAuthEnabled && conn.connOption.FastLogin
 }
 
@@ -624,7 +624,7 @@ func (conn *Connection) isFastLoginEnabled() bool {
 // readNegotiation reads the replies of the protocol and data type
 // negotiations that a fast logon sends with its first message, once. A logon
 // with a cookie gets no reply to the protocol negotiation.
-func (conn *Connection) readNegotiation() error {
+func (conn *Conn) readNegotiation() error {
 	if conn.negotiated {
 		return nil
 	}
@@ -644,7 +644,7 @@ func (conn *Connection) readNegotiation() error {
 	return nil
 }
 
-func (conn *Connection) doAuth() error {
+func (conn *Conn) doAuth() error {
 	conn.logger.Debug("authenticate")
 	authObject := &AuthObject{
 		conn:       conn,
@@ -732,7 +732,7 @@ func (conn *Connection) doAuth() error {
 }
 
 // loadNLSData get nls data for v2
-func (conn *Connection) loadNLSData() error {
+func (conn *Conn) loadNLSData() error {
 	_, err := conn.session.ReadInt(2, true, true)
 	if err != nil {
 		return err
@@ -760,7 +760,7 @@ func (conn *Connection) loadNLSData() error {
 	return err
 }
 
-func (conn *Connection) getServerNetworkInformation(code uint8) error {
+func (conn *Conn) getServerNetworkInformation(code uint8) error {
 	session := conn.session
 	if code == 0 {
 		_, err := session.ReadByte()
@@ -871,7 +871,7 @@ func (conn *Connection) getServerNetworkInformation(code uint8) error {
 	return nil
 }
 
-func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, error) {
+func (conn *Conn) Exec(text string, args ...driver.Value) (driver.Result, error) {
 	stmt := NewStmt(text, conn)
 	defer func() {
 		_ = stmt.Close()
@@ -879,7 +879,7 @@ func (conn *Connection) Exec(text string, args ...driver.Value) (driver.Result, 
 	return stmt.Exec(args)
 }
 
-func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
+func (conn *Conn) CheckNamedValue(nv *driver.NamedValue) error {
 	// an option goes to the statement as it is (D109)
 	if IsOption(nv.Value) {
 		return nil
@@ -896,18 +896,18 @@ func (conn *Connection) CheckNamedValue(nv *driver.NamedValue) error {
 	return nil
 }
 
-func (conn *Connection) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *DataSet {
+func (conn *Conn) QueryRowContext(ctx context.Context, query string, args []driver.NamedValue) *Rows {
 	stmt := NewStmt(query, conn)
 	stmt.autoClose = true
 	rows, err := stmt.QueryContext(ctx, args)
 	if err != nil {
-		dataSet := &DataSet{}
+		dataSet := &Rows{}
 		dataSet.currentResultSet().lastErr = err
 		return dataSet
 	}
-	dataSet, ok := rows.(*DataSet)
+	dataSet, ok := rows.(*Rows)
 	if !ok {
-		dataSet.currentResultSet().lastErr = fmt.Errorf("expected DataSet, got %T", rows)
+		dataSet.currentResultSet().lastErr = fmt.Errorf("expected Rows, got %T", rows)
 		return dataSet
 	}
 	dataSet.Advance()
@@ -922,7 +922,7 @@ func WrapRefCursor(ctx context.Context, q Querier, cursor *RefCursor) (*sql.Rows
 	return q.QueryContext(ctx, wrapResultset, rows)
 }
 
-func (conn *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (conn *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if query == createLob {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("CreateLob: expected 1 arguments, got %d", len(args))
@@ -955,7 +955,7 @@ func (conn *Connection) ExecContext(ctx context.Context, query string, args []dr
 	return result, err
 }
 
-func (conn *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (conn *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if query == wrapResultset {
 		return args[0].Value.(driver.Rows), nil
 	}
@@ -968,7 +968,7 @@ func (conn *Connection) QueryContext(ctx context.Context, query string, args []d
 	return rows, err
 }
 
-func (conn *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+func (conn *Conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	if !conn.IsValid() || !conn.session.Connected {
 		// database/sql discards the connection and opens another. go-ora
 		// opened this one again here, printed the result to standard
@@ -982,7 +982,7 @@ func (conn *Connection) PrepareContext(ctx context.Context, query string) (drive
 	return NewStmt(query, conn), nil
 }
 
-func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
+func (conn *Conn) ProcessTCCResponse(msgCode uint8) error {
 	session := conn.session
 	var err error
 	switch msgCode {
@@ -1111,12 +1111,12 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 	// cancel loop if = 4 or 9
 }
 
-func (conn *Connection) setBad() {
+func (conn *Conn) setBad() {
 	conn.bad = true
 }
 
 // ResetSession decides responsible for resetting a connection. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.
-func (conn *Connection) ResetSession(_ context.Context) error {
+func (conn *Conn) ResetSession(_ context.Context) error {
 	if conn.bad {
 		return driver.ErrBadConn
 	}
@@ -1124,12 +1124,12 @@ func (conn *Connection) ResetSession(_ context.Context) error {
 }
 
 // IsValid validates if a connection has to be discarded. Part of a keepConnOnRollback condition to decide if to keep a transaction after rollback.
-func (conn *Connection) IsValid() bool {
-	// Connection is valid if it's not marked as bad and is in opened state
+func (conn *Conn) IsValid() bool {
+	// the connection is valid when it is not bad and is open
 	return !conn.bad && conn.State == Opened
 }
 
-func (conn *Connection) dataTypeNegotiation() error {
+func (conn *Conn) dataTypeNegotiation() error {
 	var err error
 	conn.logger.Debug("data type negotiation")
 	conn.dataNego = buildTypeNego(conn.tcpNego, conn)
@@ -1140,7 +1140,7 @@ func (conn *Connection) dataTypeNegotiation() error {
 	return conn.dataNego.read()
 }
 
-func (conn *Connection) protocolNegotiation() error {
+func (conn *Conn) protocolNegotiation() error {
 	var err error
 	conn.logger.Debug("protocol negotiation")
 	conn.tcpNego = &TCPNego{conn: conn}
@@ -1157,7 +1157,7 @@ func (conn *Connection) protocolNegotiation() error {
 	return nil
 }
 
-func (conn *Connection) appendTemporaryLoc(loc types.Locator) {
+func (conn *Conn) appendTemporaryLoc(loc types.Locator) {
 	for _, locator := range conn.temporaryLocs {
 		if bytes.Equal(loc, locator) {
 			return
@@ -1166,15 +1166,15 @@ func (conn *Connection) appendTemporaryLoc(loc types.Locator) {
 	conn.temporaryLocs = append(conn.temporaryLocs, loc)
 }
 
-func (conn *Connection) Session() tns.SessionReadWriter {
+func (conn *Conn) Session() tns.SessionReadWriter {
 	return conn.session
 }
 
-func (conn *Connection) NewLobStreamer() types.LobStreamer {
+func (conn *Conn) NewLobStreamer() types.LobStreamer {
 	return &LobStream{conn: conn}
 }
 
-func (conn *Connection) ParameterCoder(input any) (codec.OracleParameterCoder, error) {
+func (conn *Conn) ParameterCoder(input any) (codec.OracleParameterCoder, error) {
 	switch input := input.(type) {
 	case reflect.Type:
 		if coder, ok := conn.goTypeCoder[input]; ok {
@@ -1217,14 +1217,14 @@ func (conn *Connection) ParameterCoder(input any) (codec.OracleParameterCoder, e
 	}
 }
 
-func (conn *Connection) SendTimeAsUTC() bool {
+func (conn *Conn) SendTimeAsUTC() bool {
 	return conn.dataNego.serverTZVersion > 0 && conn.dataNego.clientTZVersion == conn.dataNego.serverTZVersion
 }
 
-func (conn *Connection) DBTimeZone() (*time.Location, error) {
+func (conn *Conn) DBTimeZone() (*time.Location, error) {
 	return conn.dbTimeZone, conn.dbTimeZoneErr
 }
 
-func (conn *Connection) TTCVersion() uint8 {
+func (conn *Conn) TTCVersion() uint8 {
 	return conn.session.TTCVersion
 }

@@ -22,7 +22,7 @@ const plsqlMaxLen = 32767
 
 // plsqlConn is a connection whose longest string is that of PL/SQL.
 type plsqlConn struct {
-	*Connection
+	*Conn
 }
 
 func (plsqlConn) MaxStringLength() int64 {
@@ -190,7 +190,7 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 
 // encodeLob encodes value, a string or a []byte, as a temporary CLOB or
 // BLOB.
-func (par *ParameterInfo) encodeLob(value any, connection *Connection) error {
+func (par *ParameterInfo) encodeLob(value any, connection *Conn) error {
 	var lob codec.OracleParameterCoder
 	if par.DataType == types.LongRaw {
 		lob = &codec.BlobParameter{}

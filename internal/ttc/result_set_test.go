@@ -10,7 +10,7 @@ import (
 // TestResultSetColumnsNilSafe verifies that Columns() does not panic when the
 // ResultSet is uninitialized (cols == nil). This guards against the nil-pointer
 // panic reported in issue #691, where a connection reset during _query() could
-// yield a DataSet with an uninitialized ResultSet.
+// yield a Rows with an uninitialized ResultSet.
 func TestResultSetColumnsNilSafe(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
