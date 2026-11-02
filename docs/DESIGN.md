@@ -210,7 +210,12 @@ server then answers it at the start of the next call, with a marker and
 ORA-01013. The session marks a break pending until a marker answers it, and
 `ResetBuffer`, which starts each call, first reads and drops that answer.
 go-ora read it as the reply of the next call, which failed with ORA-01013, or
-which waited for good. `TestLobReadDeadline` holds it.
+which waited for good. `TestLobReadDeadline` holds it. The session marks the
+break pending before it sends the break, because the reader can read the
+answer before the write returns. It marked the break after the write, and on
+a fast machine the next call then waited 10 seconds for an answer that had
+come already, and the connection went bad. `TestBreakAnsweredAtOnce` holds
+it.
 
 A LOB that the driver reads while it fetches rows, or uploads while it binds a
 statement, runs inside a call that is watched already, or under `Next`, where

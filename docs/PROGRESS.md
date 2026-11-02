@@ -382,3 +382,10 @@ The suites passed on `oracle-nne-26ai`, `oracle-adb-19c` and
 `oracle-adb-26ai` in both LOB modes, and CI passed on `c3ce25b`. Ken then
 had v0.1.0 tagged on that commit and released on GitHub (D36). The `dburl`
 and `usql` sessions were told, and usql can drop its `IsPasswordErr` hook.
+
+The CI run after the tag failed on 26ai in `TestLobReadDeadline`. A break
+that the server answered before the write of the break returned stayed
+pending, so the next call waited 10 seconds and the connection went bad. The
+session now marks the break pending before it sends it. The 18c job of the
+same run failed in `dbrun`, before any test, with ORA-04021 while the
+database started.

@@ -406,26 +406,30 @@ func (session *Session) IsBreak() bool {
 // BreakConnection elicit connection break to cancel the current operation
 func (session *Session) BreakConnection() error {
 	session.logger.Info("break")
-	var err error
-
-	done := false
-	if session.Context.NegotiatedOptions&0x400 > 0 {
-		done, err = sendOOB(session.conn)
-		if err != nil {
-			return err
-		}
-	}
-	if !done {
-		err = session.writePacket(newMarkerPacket(markerTypeInterrupt, session.Context))
-		if err != nil {
-			return err
-		}
-	}
+	// the break is pending before it goes out, because the reader can read
+	// its answer, and clear the flag, before the write returns
 	session.mu.Lock()
 	session.breakConn = true
 	session.mu.Unlock()
 	session.breakPending.Store(true)
-	return nil
+	err := session.sendBreak()
+	if err != nil {
+		session.ResetBreak()
+		session.breakPending.Store(false)
+	}
+	return err
+}
+
+// sendBreak sends the break, by out of band data where the server supports
+// it and by a marker packet where not.
+func (session *Session) sendBreak() error {
+	if session.Context.NegotiatedOptions&0x400 > 0 {
+		done, err := sendOOB(session.conn)
+		if err != nil || done {
+			return err
+		}
+	}
+	return session.writePacket(newMarkerPacket(markerTypeInterrupt, session.Context))
 }
 
 // Connect perform network connection on address:port

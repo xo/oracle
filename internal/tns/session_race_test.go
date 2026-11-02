@@ -3,6 +3,7 @@ package tns
 import (
 	"context"
 	"log/slog"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -46,5 +47,35 @@ func TestConnectDisconnectRace(t *testing.T) {
 
 		wg.Wait()
 		cancel()
+	}
+}
+
+// answerConn is a net.Conn whose Write stands for a server that answers a
+// break at once: the reader of the session reads the answer, and clears the
+// pending break, before Write returns.
+type answerConn struct {
+	net.Conn
+	session *Session
+}
+
+func (c answerConn) Write(b []byte) (int, error) {
+	c.session.breakPending.Store(false)
+	return len(b), nil
+}
+
+func (answerConn) SetWriteDeadline(time.Time) error { return nil }
+
+// TestBreakAnsweredAtOnce checks that a break whose answer comes before the
+// write of the break returns is not left pending. The session marked the
+// break pending after the write, so the next call waited 10 seconds for an
+// answer that had come already, and the connection went bad.
+func TestBreakAnsweredAtOnce(t *testing.T) {
+	session := NewSessionWithInputBufferForDebug(nil)
+	session.conn = answerConn{session: session}
+	if err := session.BreakConnection(); err != nil {
+		t.Fatal(err)
+	}
+	if session.breakPending.Load() {
+		t.Error("the break is pending after its answer")
 	}
 }
