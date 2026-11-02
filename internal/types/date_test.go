@@ -10,7 +10,7 @@ import (
 func TestDateBindType(t *testing.T) {
 	tests := []struct {
 		in   time.Time
-		want uint16
+		want TypeID
 		size int
 	}{
 		{time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC), DATE, int(MaxLenDate)},

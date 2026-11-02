@@ -30,7 +30,7 @@ func TestResultSetColumnsNilSafe(t *testing.T) {
 func TestColumnTypeScanTypeInlineLOB(t *testing.T) {
 	cases := []struct {
 		name     string
-		dataType uint16
+		dataType types.TypeID
 		want     reflect.Type
 	}{
 		{"CLOB_inline", types.LongVarChar, reflect.TypeFor[string]()},

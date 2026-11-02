@@ -704,14 +704,14 @@ func (stmt *defaultStmt) queryLobPrefetch(exeOp int, resultSet *ResultSet) error
 // ORA-00932, and the query parses again.
 func adjustFetchType(col, previous *ParameterInfo) {
 	switch {
-	case col.DataType == types.OCIClobLocator && slices.Contains([]uint16{types.CHAR, types.NCHAR, types.LONG, types.LongVarChar}, previous.DataType):
+	case col.DataType == types.OCIClobLocator && slices.Contains([]types.TypeID{types.CHAR, types.NCHAR, types.LONG, types.LongVarChar}, previous.DataType):
 		col.DataType = types.LONG
 		col.CharsetForm, col.CharsetID = previous.CharsetForm, previous.CharsetID
-	case col.DataType == types.OCIBlobLocator && slices.Contains([]uint16{types.RAW, types.LongRaw, types.LongVarRaw}, previous.DataType):
+	case col.DataType == types.OCIBlobLocator && slices.Contains([]types.TypeID{types.RAW, types.LongRaw, types.LongVarRaw}, previous.DataType):
 		col.DataType = types.LongRaw
 	// the define of an inline LOB, which fetched it as a LONG, holds for a
 	// string that the column becomes, in the charset of the string
-	case slices.Contains([]uint16{types.CHAR, types.NCHAR}, col.DataType) && previous.DataType == types.LongVarChar:
+	case slices.Contains([]types.TypeID{types.CHAR, types.NCHAR}, col.DataType) && previous.DataType == types.LongVarChar:
 		col.DataType = types.LONG
 	case col.DataType == types.RAW && previous.DataType == types.LongRaw:
 		col.DataType = types.LongRaw
@@ -1096,7 +1096,7 @@ func (stmt *defaultStmt) calculateParameterValue(param *ParameterInfo) error {
 	}
 	// only a string or a RAW is cut. After an object, 11g sends the length
 	// of its image there
-	if length > 0 && param.oPrimValue != nil && slices.Contains([]uint16{types.NCHAR, types.CHAR, types.RAW}, param.DataType) {
+	if length > 0 && param.oPrimValue != nil && slices.Contains([]types.TypeID{types.NCHAR, types.CHAR, types.RAW}, param.DataType) {
 		return fmt.Errorf("reading an OUT value: the server cut a value of length %d to the %d bytes of the OUT: %w", length, param.MaxLen, tns.ErrInvalidValue)
 	}
 	return nil
@@ -1492,9 +1492,9 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 				}
 				maxLen := int64(0)
 				maxCharLen := int64(0)
-				dataType := uint16(0)
-				seen := map[uint16]bool{}
-				nullType := uint16(0)
+				dataType := types.TypeID(0)
+				seen := map[types.TypeID]bool{}
+				nullType := types.TypeID(0)
 				var encoder codec.OracleParameterEncoder
 				arrayValues := make([][]byte, stmt.arrayBindCount)
 				for y := 0; y < stmt.arrayBindCount; y++ {
@@ -2148,7 +2148,7 @@ func (stmt *defaultStmt) decodeRow(row Row, lazy bool) error {
 }
 
 // onlyTypes reports whether each type of seen is one of allowed.
-func onlyTypes(seen map[uint16]bool, allowed ...uint16) bool {
+func onlyTypes(seen map[types.TypeID]bool, allowed ...types.TypeID) bool {
 	for t := range seen {
 		if !slices.Contains(allowed, t) {
 			return false

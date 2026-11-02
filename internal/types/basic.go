@@ -2,7 +2,7 @@ package types
 
 type Basic struct {
 	bValue   []byte
-	dataType uint16
+	dataType TypeID
 }
 
 func (b *Basic) Bytes() []byte {
@@ -13,13 +13,13 @@ func (b *Basic) SetBytes(input []byte) {
 	b.bValue = input
 }
 
-func (b *Basic) SetDataType(dt uint16) {
+func (b *Basic) SetDataType(dt TypeID) {
 	if b.dataType == 0 {
 		b.dataType = dt
 	}
 }
 
-func (b *Basic) DataType() uint16 {
+func (b *Basic) DataType() TypeID {
 	return b.dataType
 }
 

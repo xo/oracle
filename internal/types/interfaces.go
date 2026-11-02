@@ -30,8 +30,8 @@ type LobStreamer interface {
 type OracleType interface {
 	SetValue(input any) error
 	Value() (any, error)
-	SetDataType(dt uint16)
-	DataType() uint16
+	SetDataType(dt TypeID)
+	DataType() TypeID
 	MaxLen() int64
 	sql.Scanner
 }

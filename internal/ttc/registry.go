@@ -18,7 +18,7 @@ import (
 // none of it (D9).
 type Registry struct {
 	dataCollected   bool
-	oracleTypeCoder map[uint16]codec.OracleParameterCoder
+	oracleTypeCoder map[types.TypeID]codec.OracleParameterCoder
 	goTypeCoder     map[reflect.Type]codec.OracleParameterCoder
 	nameTypeCoder   map[string]codec.OracleParameterCoder
 	cookies         cookieJar
@@ -38,7 +38,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	drv := &Registry{
 		goTypeCoder:     make(map[reflect.Type]codec.OracleParameterCoder),
-		oracleTypeCoder: make(map[uint16]codec.OracleParameterCoder),
+		oracleTypeCoder: make(map[types.TypeID]codec.OracleParameterCoder),
 		nameTypeCoder:   make(map[string]codec.OracleParameterCoder),
 		//typeDecoder:  make(map[uint16]type_coder.OracleTypeDecoder),
 	}

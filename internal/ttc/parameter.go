@@ -67,7 +67,7 @@ func (par *ParameterInfo) load(conn *Connection) error {
 	if err != nil {
 		return err
 	}
-	par.DataType = uint16(dataType)
+	par.DataType = types.TypeID(dataType)
 	par.Flag, err = session.ReadByte()
 	if err != nil {
 		return err
@@ -410,7 +410,7 @@ func (par *ParameterInfo) decodeColumnValue(connection *Connection, udt bool) er
 // writes it. form is the charset form, 2 for the national charset, and float
 // is a NUMBER with a binary precision. An object or a collection is the name
 // of its type.
-func databaseTypeName(dataType uint16, form int, float bool, typeName string) string {
+func databaseTypeName(dataType types.TypeID, form int, float bool, typeName string) string {
 	national := form == 2
 	switch dataType {
 	case types.NCHAR:

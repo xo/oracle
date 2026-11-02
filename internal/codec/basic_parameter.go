@@ -9,7 +9,7 @@ type BasicParameter struct {
 	TypeName    string
 	Flag        uint8
 	ContFlag    int
-	DataType    uint16
+	DataType    types.TypeID
 	CharsetID   int
 	CharsetForm int
 	MaxLen      int64

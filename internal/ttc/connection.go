@@ -86,7 +86,7 @@ type Connection struct {
 	nStrConv          *charset.Converter
 	cStrConv          *charset.Converter
 	goTypeCoder       map[reflect.Type]codec.OracleParameterCoder
-	oracleTypeCoder   map[uint16]codec.OracleParameterCoder
+	oracleTypeCoder   map[types.TypeID]codec.OracleParameterCoder
 	nameTypeCoder     map[string]codec.OracleParameterCoder
 	//typeDecoder       map[uint16]type_coder.OracleTypeDecoder
 	maxLen struct {
@@ -1193,16 +1193,21 @@ func (conn *Connection) ParameterCoder(input any) (codec.OracleParameterCoder, e
 			return coder.Copy(), nil
 		}
 		return nil, fmt.Errorf("no parameter coder registered for name %s", input)
+	case types.TypeID:
+		if coder, ok := conn.oracleTypeCoder[input]; ok {
+			return coder.Copy(), nil
+		}
+		return nil, fmt.Errorf("no parameter coder registered for oracle type %d", input)
 	case int, int16, int32, int64:
 		index := reflect.ValueOf(input).Int()
-		if coder, ok := conn.oracleTypeCoder[uint16(index)]; ok {
+		if coder, ok := conn.oracleTypeCoder[types.TypeID(index)]; ok {
 			return coder.Copy(), nil
 		}
 
 		return nil, fmt.Errorf("no parameter coder registered for oracle type %d", index)
 	case uint, uint16, uint32, uint64:
 		index := reflect.ValueOf(input).Uint()
-		if coder, ok := conn.oracleTypeCoder[uint16(index)]; ok {
+		if coder, ok := conn.oracleTypeCoder[types.TypeID(index)]; ok {
 			return coder.Copy(), nil
 		}
 
