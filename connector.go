@@ -104,11 +104,11 @@ func NewConnector(cfg Config, opts ...ConnectorOption) (*Connector, error) {
 
 // Connect opens a connection, logs on, and sets the session parameters.
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
-	conn, err := c.newConnection()
+	tc, err := c.newConnection()
 	if err != nil {
 		return nil, err
 	}
-	if err := conn.OpenWithContext(ctx); err != nil {
+	if err := tc.OpenWithContext(ctx); err != nil {
 		if errors.Is(err, io.EOF) {
 			// a server at its limit of sessions can close the connection
 			// in the middle of the logon, and go-ora returned a bare EOF,
@@ -117,11 +117,11 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		}
 		return nil, err
 	}
-	if err := c.reg.InitFromConn(conn, c.params); err != nil {
-		_ = conn.Close()
+	if err := c.reg.InitFromConn(tc, c.params); err != nil {
+		_ = tc.Close()
 		return nil, err
 	}
-	return conn, nil
+	return &conn{c: tc}, nil
 }
 
 // newConnection returns a connection that is not open yet, with its own copy

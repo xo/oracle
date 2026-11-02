@@ -67,7 +67,9 @@ yourself and do not write it as though it were settled.
   `ParseDSN`, `connector.go` the `Connector`, `driver.go` the `Driver` and
   `RegisterType`, `errors.go` the sentinel errors, `values.go` the types
   of `internal/ttc` that a caller uses, `options.go` the options of one
-  statement, and `output.go` the reader of `DBMS_OUTPUT`.
+  statement, and `output.go` the reader of `DBMS_OUTPUT`. `conn.go`,
+  `stmt.go`, `rows.go` and `tx.go` hold what `database/sql` calls, and pass
+  each call to the type of the same name in `internal/ttc`.
 - `internal/ttc` holds the connection, statements, rows and the rest of the
   protocol above TNS (D12).
 - `aq` is public. `internal/types` holds the value types, and `values.go`

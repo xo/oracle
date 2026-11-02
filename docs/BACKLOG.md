@@ -9,14 +9,11 @@ decided on the way (D3).
 
 ## Repository
 
-### Reshape the TTC code
+### Add the keys of NTS when a caller needs them
 
-Step 4b moved the TTC code to `internal/ttc` as it was, and steps 5 and 6
-reshaped it in place. Its names are still the ones of `go-ora`: `Connection`,
-`Stmt`, `DataSet`, `ParameterInfo`, `Transaction`. `DESIGN.md`, under The root
-package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
-type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
-list of authentication services or out of band breaks, which `go-ora` read. Add each when a caller needs it.
+`Config` has no keys for the OS user and password of NTS, the domain, the
+list of authentication services or out of band breaks, which `go-ora` read.
+Add each when a caller needs it.
 
 ### Tell dburl and usql when the first tag exists
 

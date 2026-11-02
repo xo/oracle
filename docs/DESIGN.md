@@ -110,13 +110,15 @@ one job, so that a person or an agent finds a behavior by its file name.
 | `lob.go` | `Clob`, `Blob` and `BFile` |
 | `object.go` | User defined types and collections |
 
-The table is the target. The root package holds `driver.go`, `connector.go`,
-`dsn.go`, `errors.go`, `values.go`, `options.go`, and `output.go`, the reader
-of `DBMS_OUTPUT` (D19), today. `values.go` names the types of
-`internal/ttc` and `internal/types` that a caller uses, such as `Out`,
-`RefCursor` and `Clob`, as aliases. `conn`, `stmt`, `rows` and `tx` are still
-`ttc.Connection`, `ttc.Stmt`, `ttc.DataSet` and `ttc.Transaction`, which steps
-5 and 6 reshaped in place.
+The root package holds each file of the table but `lob.go` and `object.go`,
+whose types `values.go` names, and `output.go`, the reader of `DBMS_OUTPUT`
+(D19). `values.go` names the types of `internal/ttc` and `internal/types`
+that a caller uses, such as `Out`, `RefCursor` and `Clob`, as aliases.
+`conn`, `stmt`, `rows` and `tx` implement the interfaces of `database/sql`,
+and each holds the `ttc.Conn`, `ttc.Stmt`, `ttc.Rows` or `ttc.Tx` that runs
+the protocol, and passes each call to it. Those were `Connection`, `Stmt`,
+`DataSet` and `Transaction` of go-ora, and live in `conn.go`, `stmt.go`,
+`rows.go` and `tx.go` of `internal/ttc`.
 
 ## Connector
 
@@ -1008,8 +1010,8 @@ Then, with Ken's agreement on the names:
   names `negoService`, `Negotiator`, `terminalReader` and `ValueWriter`, and
   `ValueStreamReader` and `ValueStreamer` had no user and are gone.
 
-Left: one file of integration tests for each area, and a named type for the
-Oracle type IDs, which are constants of `uint16` in `internal/types`.
+The Oracle type IDs are constants of the type `types.TypeID`, which
+`ParameterCoder` takes. Left: one file of integration tests for each area.
 
 ### JSON
 

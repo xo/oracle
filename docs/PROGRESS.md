@@ -348,3 +348,9 @@ tag v0.1.0 at the start.
    its reply after the reset is now read as a statement, which keeps the
    counts.
 5. A RETURNING of more than one row fills an OUT of a slice (D35).
+6. The TTC code is reshaped. The root package holds `conn`, `stmt`, `rows`
+   and `tx`, which implement the interfaces of `database/sql` and pass each
+   call to `ttc.Conn`, `ttc.Stmt`, `ttc.Rows` and `ttc.Tx`, the names that
+   replace `Connection`, `DataSet` and `Transaction` of go-ora. The Oracle
+   type IDs are of the type `types.TypeID`. The keys of NTS stay in the
+   BACKLOG, for when a caller needs them.
