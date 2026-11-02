@@ -750,6 +750,24 @@ func (session *Session) HasError() bool {
 	return session.Summary != nil && (session.Summary.RetCode != 0 && session.Summary.RetCode != 1403)
 }
 
+// BatchError returns the errors of the rows of a batch that failed, or nil.
+func (session *Session) BatchError() *BatchError {
+	if !session.Summary.HasBatchErrors() {
+		return nil
+	}
+	be := &BatchError{}
+	for _, e := range session.Summary.bindErrors {
+		oerr := &OracleError{ErrCode: e.errorCode, errPos: -1}
+		if session.StrConv != nil {
+			oerr.ErrMsg = session.StrConv.Decode(e.errorMsg)
+		} else {
+			oerr.ErrMsg = string(e.errorMsg)
+		}
+		be.Rows = append(be.Rows, RowError{Row: e.rowOffset, Err: oerr})
+	}
+	return be
+}
+
 // ServerError Return the error in form or OracleError
 func (session *Session) ServerError() *OracleError {
 	err := &OracleError{}

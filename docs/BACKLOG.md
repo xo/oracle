@@ -18,16 +18,6 @@ package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
 type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
 list of authentication services or out of band breaks, which `go-ora` read. Add each when a caller needs it.
 
-### Report batch errors and the count of each row
-
-A batch of DML stops at its first error, and returns the count of all its
-rows. python-oracledb can go on past the rows that fail and return the error
-of each, with `batcherrors`, and return the count of each row, with
-`arraydmlrowcounts`. Their cases of `cursor/test_2700_features_12_1.py`
-(2700, 2701, 2717 to 2719, 2722 to 2724, 2726, 2727, 2730 and 2731) are not
-written. Each needs an API of its own, as [`DRIVERS.md`](DRIVERS.md) says.
-Find a form for `database/sql`, and ask Ken.
-
 ### Return the rows of a RETURNING of more than one row
 
 A RETURNING that touches more than one row fails with an error, because an

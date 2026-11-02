@@ -37,6 +37,22 @@ func WithPrefetch(rows int) Option {
 	return func(o *ttc.Options) { o.Prefetch = rows }
 }
 
+// WithBatchErrors runs a batch of DML past the rows that fail. The batch
+// returns a *BatchError, which holds the index and the error of each row
+// that failed, and the other rows run. A statement that is not DML fails
+// with ErrNotSupported (D34).
+func WithBatchErrors() Option {
+	return func(o *ttc.Options) { o.BatchErrors = true }
+}
+
+// WithRowCounts fills counts with the count of the rows that each row of a
+// batch of DML changed, or with the count of the one row of a statement
+// that is not a batch. A statement that is not DML fails with
+// ErrNotSupported (D34).
+func WithRowCounts(counts *[]int64) Option {
+	return func(o *ttc.Options) { o.RowCounts = counts }
+}
+
 // WithLobFetch sets how a query returns a LOB, as the key lob_fetch does.
 func WithLobFetch(f LobFetch) Option {
 	return func(o *ttc.Options) {

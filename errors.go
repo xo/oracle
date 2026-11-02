@@ -39,3 +39,12 @@ const (
 // refused the credential, as usql asks an error, and matches
 // errors.Is(err, ErrAuthentication).
 type ServerError = tns.OracleError
+
+// BatchError is the error of a batch of DML that ran with WithBatchErrors:
+// the rows that failed, each with the index of the row from 0 and the error
+// of the server. The other rows ran. errors.As finds the error of each row
+// (D34).
+type BatchError = tns.BatchError
+
+// RowError is the error of one row of a BatchError.
+type RowError = tns.RowError

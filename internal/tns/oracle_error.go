@@ -2,6 +2,7 @@ package tns
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -170,3 +171,35 @@ func (err *OracleError) Bad() bool {
 }
 
 var ErrConnReset = errors.New("connection break due to context timeout")
+
+// BatchError is the error of a batch of DML that ran with batch errors: the
+// rows that failed, each with its error. The other rows ran (D34).
+type BatchError struct {
+	Rows []RowError
+}
+
+// RowError is the error of one row of a batch. Row is the index of the row
+// in the batch, from 0.
+type RowError struct {
+	Row int
+	Err *OracleError
+}
+
+// Error returns the count of the rows that failed, and the first of them.
+func (err *BatchError) Error() string {
+	if len(err.Rows) == 0 {
+		return "no row of the batch failed"
+	}
+	first := err.Rows[0]
+	return fmt.Sprintf("%d rows of the batch failed, the first row %d: %v", len(err.Rows), first.Row, first.Err)
+}
+
+// Unwrap returns the error of each row, so that errors.Is and errors.As find
+// them.
+func (err *BatchError) Unwrap() []error {
+	errs := make([]error, len(err.Rows))
+	for i, row := range err.Rows {
+		errs[i] = row.Err
+	}
+	return errs
+}

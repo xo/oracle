@@ -45,9 +45,14 @@ type defaultStmt struct {
 	connection *Connection
 	text       string
 	// disableCompression bool
-	_hasLONG          bool
-	_hasBLOB          bool
-	_hasMoreRows      bool
+	_hasLONG     bool
+	_hasBLOB     bool
+	_hasMoreRows bool
+	// batchErrors and rowCounts are the options of D34. counts holds the
+	// count of each row of the last batch
+	batchErrors       bool
+	rowCounts         *[]int64
+	counts            []int64
 	_hasReturnClause  bool
 	_noOfRowsToFetch  int
 	stmtType          StmtType
@@ -515,6 +520,10 @@ func (stmt *Stmt) getExeOption() int {
 	if stmt.connection.autoCommit && (stmt.stmtType == DML || stmt.stmtType == PLSQL) {
 		op |= 0x100
 	}
+	// a batch of DML that runs past the rows that fail (D34)
+	if stmt.batchErrors && stmt.stmtType == DML && stmt.arrayBindCount > 0 {
+		op |= 0x80000
+	}
 	if stmt.parse {
 		op |= 1
 	}
@@ -881,11 +890,13 @@ func (stmt *defaultStmt) read(resultSet *ResultSet) (err error) {
 				}
 				// for (int index = 0; index < length3; ++index)
 				//	rowsAffectedByArrayBind[index] = this.m_marshallingEngine.UnmarshalSB8();
+				stmt.counts = make([]int64, 0, length)
 				for range length {
-					_, err = session.ReadInt(8, true, true)
+					n, err := session.ReadInt64(8, true, true)
 					if err != nil {
 						return err
 					}
+					stmt.counts = append(stmt.counts, n)
 				}
 			}
 		case 11:
@@ -1115,6 +1126,13 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 	if err != nil {
 		return nil, err
 	}
+	if (opts.BatchErrors || opts.RowCounts != nil) && stmt.stmtType != DML {
+		return nil, fmt.Errorf("applying the options WithBatchErrors and WithRowCounts: the statement is not DML: %w", tns.ErrNotSupported)
+	}
+	// the server sends the count of each row from TTC 7, 12.1
+	if opts.RowCounts != nil && stmt.connection.session.TTCVersion < 7 {
+		return nil, fmt.Errorf("applying the option WithRowCounts: the server sends no count of each row before 12.1: %w", tns.ErrNotSupported)
+	}
 	ctx, cancel := stmt.apply(ctx, opts)
 	defer cancel()
 	defer stmt.connection.restoreLobFetch()
@@ -1124,12 +1142,22 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (dr
 
 	// the call runs here, and the watch of StartContext breaks it when ctx
 	// ends, so no goroutine waits for it (D10)
+	stmt.counts = nil
 	result, err := stmt._exec(args)
+	if stmt.rowCounts != nil {
+		*stmt.rowCounts = stmt.rowCountsOf(result)
+	}
 	if errors.Is(err, tns.ErrConnReset) {
-		if stmt._hasReturnClause {
+		// RETURNING and a batch of DML read the reply that follows the reset
+		// as a statement, so that the counts of the rows of a batch that
+		// failed reach WithRowCounts (D34)
+		if stmt._hasReturnClause || stmt.stmtType == DML && stmt.arrayBindCount > 0 {
 			dataSet := &DataSet{}
 			err = stmt.read(dataSet.currentResultSet())
 			if !errors.Is(err, tns.ErrConnReset) {
+				if stmt.rowCounts != nil {
+					*stmt.rowCounts = stmt.rowCountsOf(nil)
+				}
 				return nil, stmt.execError(ctx, err)
 			}
 		}
@@ -1886,6 +1914,18 @@ func (stmt *Stmt) RunQuery(namedArgs []driver.NamedValue) (*DataSet, error) {
 	return dataSet, nil
 }
 
+// rowCountsOf returns the count of each row of the last statement: those of
+// a batch, as the server sent them, or that of the one row of the result.
+func (stmt *Stmt) rowCountsOf(result *QueryResult) []int64 {
+	if stmt.counts != nil {
+		return slices.Clone(stmt.counts)
+	}
+	if result == nil {
+		return nil
+	}
+	return []int64{result.rowsAffected}
+}
+
 // execError returns the error of a call that failed. When ctx ended, it is
 // the error of ctx, because the server answered the break with ORA-01013.
 // Otherwise it is the error of the server, when there is one, and it marks
@@ -1895,6 +1935,9 @@ func (stmt *Stmt) execError(ctx context.Context, err error) error {
 		return ctxErr
 	}
 	session := stmt.connection.session
+	if be := session.BatchError(); be != nil && stmt.batchErrors {
+		return be
+	}
 	if session.HasError() {
 		err = session.ServerError()
 	}

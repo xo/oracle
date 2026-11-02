@@ -343,3 +343,7 @@ tag v0.1.0 at the start.
    `integration` pass on 21c.
 3. `RegisterType` takes a record of `TABLE%ROWTYPE`, whose type OID comes
    from `DBMS_PICKLER` and whose attributes are the columns of the table.
+4. `WithBatchErrors` and `WithRowCounts` give the batch errors and the count
+   of each row of a batch of DML (D34). A batch that fails is a break, and
+   its reply after the reset is now read as a statement, which keeps the
+   counts.

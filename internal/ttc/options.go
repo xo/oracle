@@ -28,6 +28,11 @@ type Options struct {
 	Readonly bool
 	Params   map[string]any
 	Database string
+	// BatchErrors runs a batch of DML past the rows that fail, and returns
+	// a *BatchError with the error of each, and RowCounts receives the count
+	// of each row of a batch (D34).
+	BatchErrors bool
+	RowCounts   *[]int64
 	// Invalid is the error of an option whose value the DSN would refuse,
 	// which fails the statement before it is sent.
 	Invalid error
@@ -100,6 +105,7 @@ func unsupported(option string) error {
 
 // apply sets the options on stmt, and returns the context of its call.
 func (stmt *Stmt) apply(ctx context.Context, opts Options) (context.Context, context.CancelFunc) {
+	stmt.batchErrors, stmt.rowCounts = opts.BatchErrors, opts.RowCounts
 	stmt.prefetch = opts.Prefetch
 	stmt.lob = opts.LobFetch
 	stmt.connection.connOption.Lob = stmt.lob

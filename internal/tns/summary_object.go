@@ -1,10 +1,17 @@
 package tns
 
+// BindError is the error of one row of a batch, which the summary holds.
 type BindError struct {
 	errorCode int
 	rowOffset int
 	errorMsg  []byte
 }
+
+// HasBatchErrors reports whether rows of a batch failed.
+func (summary *SummaryObject) HasBatchErrors() bool {
+	return summary != nil && len(summary.bindErrors) > 0
+}
+
 type SummaryObject struct {
 	EndOfCallStatus      int // uint32
 	EndToEndECIDSequence int // uint16

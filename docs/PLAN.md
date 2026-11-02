@@ -42,6 +42,7 @@ conclusion.
 | [D31](#d31-an-nvarchar-binds-as-nvarchar2) | Decided |
 | [D32](#d32-a-unit-that-does-not-compile-is-an-error) | Decided |
 | [D33](#d33-registertype-takes-the-types-of-a-package) | Decided |
+| [D34](#d34-batch-errors-and-the-count-of-each-row-are-options) | Decided |
 
 ## Purpose
 
@@ -478,6 +479,27 @@ does not change.
 python-oracledb binds these types as a `DbObject` of the type that
 `Connection.gettype` returns. go-ora looked a type up in `ALL_TYPES` alone,
 which holds no type of a package.
+
+## D34. Batch errors and the count of each row are options
+
+Status: Decided.
+
+Ken decided on 2026-11-02 that a caller asks for the batch errors and the
+count of each row of a batch of DML through options in the arguments of the
+statement, as python-oracledb asks through `batcherrors` and
+`arraydmlrowcounts`. The public API gains `WithBatchErrors`,
+`WithRowCounts`, `BatchError` and `RowError`.
+
+- `WithBatchErrors()` runs a batch past the rows that fail. The statement
+  returns a `*BatchError`, which holds the index of each row that failed,
+  from 0, and its `*ServerError`, in the order of the server. The other rows
+  run. `errors.As` finds the error of each row.
+- `WithRowCounts(&counts)` fills counts with the count of the rows that each
+  row of the batch changed, or with one count for a statement that is not a
+  batch. The server sends them from 12.1, so on 11g the option fails with
+  `ErrNotSupported`.
+- Either option on a statement that is not DML fails with `ErrNotSupported`,
+  as python-oracledb refuses them for PL/SQL.
 
 ## Open questions for Ken
 

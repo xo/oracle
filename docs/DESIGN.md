@@ -669,6 +669,15 @@ for a lack of a permission, ORA-01031 or ORA-01045, and for ORA-28000,
 ORA-28001 and ORA-28041. usql declares the interface, so the driver imports nothing of
 it. `TestAuthenticationRefused` and `TestConnectRefused` hold it.
 
+A batch of DML with `WithBatchErrors` sends the execute option 0x80000, and
+the server runs the rows that it can. It answers with a break, a reset, and
+the return parameters, which hold the count of each row, then ORA-24381 with
+the error and the index of each row that failed. The statement reads that
+reply after the reset as its own, so that `WithRowCounts` gets the counts,
+and returns a `*BatchError` (D34). The driver asked for the counts of every
+batch already, and dropped them. `TestBatchErrors` holds the cases of
+python-oracledb.
+
 `driver.ErrBadConn` is returned only when the statement did not reach the
 server, so that `database/sql` runs it again only when that is safe.
 

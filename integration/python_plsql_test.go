@@ -602,3 +602,136 @@ END;`); err != nil {
 		t.Errorf("an array: got %+v, %v", all, err)
 	}
 }
+
+// TestBatchErrors runs batches of DML with WithBatchErrors and
+// WithRowCounts, as 2701, 2717 to 2719, 2722 to 2724, 2726, 2727, 2730 and
+// 2731 of tests/cursor/test_2700_features_12_1.py of python-oracledb do with
+// batcherrors and arraydmlrowcounts (D34).
+func TestBatchErrors(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := t.Context()
+	db.Exec("DROP TABLE go_array_dml PURGE")
+	if err := execCmd(db, `CREATE TABLE go_array_dml (int_col NUMBER(9) PRIMARY KEY,
+		string_col VARCHAR2(100), int_col2 NUMBER(3))`); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DROP TABLE go_array_dml PURGE")
+	insert := "INSERT INTO go_array_dml (int_col, string_col, int_col2) VALUES (:1, :2, :3)"
+	reset := func(t *testing.T) {
+		t.Helper()
+		if _, err := db.ExecContext(ctx, "TRUNCATE TABLE go_array_dml"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	errs := func(err error) []string {
+		var be *oracle.BatchError
+		if !errors.As(err, &be) {
+			return []string{fmt.Sprint(err)}
+		}
+		var out []string
+		for _, row := range be.Rows {
+			out = append(out, fmt.Sprintf("%d ORA-%05d", row.Row, row.Err.ErrCode))
+		}
+		return out
+	}
+
+	var release int
+	if err := db.QueryRowContext(ctx, `SELECT TO_NUMBER(REGEXP_SUBSTR(version, '^[0-9]+'))
+		FROM product_component_version WHERE product LIKE 'Oracle%' AND ROWNUM = 1`).Scan(&release); err != nil {
+		t.Fatal(err)
+	}
+	// the server sends the count of each row from 12.1
+	if release < 12 {
+		_, err := db.ExecContext(ctx, insert, 1, "First", 1, oracle.WithRowCounts(new([]int64)))
+		if !errors.Is(err, oracle.ErrNotSupported) {
+			t.Errorf("WithRowCounts on %d: got %v, want ErrNotSupported", release, err)
+		}
+	}
+
+	t.Run("2701, 2718 and 2719 the count of each row", func(t *testing.T) {
+		requireRelease(t, db, 12)
+		reset(t)
+		var counts []int64
+		if _, err := db.ExecContext(ctx, insert, []int{1, 2, 3, 4, 5}, []string{"First", "Second", "Third", "Fourth", "Fifth"},
+			[]int{100, 200, 300, 300, 300}, oracle.WithRowCounts(&counts)); err != nil || !slices.Equal(counts, []int64{1, 1, 1, 1, 1}) {
+			t.Errorf("insert: got %v, %v", counts, err)
+		}
+		if _, err := db.ExecContext(ctx, "UPDATE go_array_dml SET string_col = :1 WHERE int_col2 = :2",
+			[]string{"a", "b"}, []int{300, 900}, oracle.WithRowCounts(&counts)); err != nil || !slices.Equal(counts, []int64{3, 0}) {
+			t.Errorf("update: got %v, %v", counts, err)
+		}
+		if _, err := db.ExecContext(ctx, "DELETE FROM go_array_dml WHERE int_col2 = :1",
+			[]int{100, 300, 200}, oracle.WithRowCounts(&counts)); err != nil || !slices.Equal(counts, []int64{1, 3, 1}) {
+			t.Errorf("delete: got %v, %v", counts, err)
+		}
+		// one row that is not a batch
+		if _, err := db.ExecContext(ctx, insert, 9, "Ninth", 9, oracle.WithRowCounts(&counts)); err != nil || !slices.Equal(counts, []int64{1}) {
+			t.Errorf("one row: got %v, %v", counts, err)
+		}
+	})
+
+	t.Run("2717 and 2723 an error with no batch errors", func(t *testing.T) {
+		reset(t)
+		_, err := db.ExecContext(ctx, insert, []int{1, 2, 2}, []string{"First", "Second", "Third"}, []int{100, 200, 300})
+		requireErr(t, "a duplicate", err, "ORA-00001")
+	})
+
+	t.Run("2722 errors of more than one kind", func(t *testing.T) {
+		requireRelease(t, db, 12)
+		reset(t)
+		var counts []int64
+		_, err := db.ExecContext(ctx, insert, []int{1, 2, 2, 4, 5}, []string{"First", "Second", "Third", "Fourth", "Fourth"},
+			[]int{100, 200, 300, 400, 1000}, oracle.WithBatchErrors(), oracle.WithRowCounts(&counts))
+		if got := errs(err); !slices.Equal(got, []string{"4 ORA-01438", "2 ORA-00001"}) {
+			t.Errorf("got the errors %q", got)
+		}
+		if !slices.Equal(counts, []int64{1, 1, 0, 1, 0}) {
+			t.Errorf("got the counts %v", counts)
+		}
+		var n int
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM go_array_dml").Scan(&n); err != nil || n != 3 {
+			t.Errorf("got %d rows, %v, want 3", n, err)
+		}
+	})
+
+	t.Run("2724 and 2727 batches in succession", func(t *testing.T) {
+		requireRelease(t, db, 12)
+		reset(t)
+		_, err := db.ExecContext(ctx, insert, []int{1, 2, 3, 4, 5, 6, 6, 8},
+			[]string{"First", "Second", "Third", "Second", "Fifth", "Sixth", "Seventh", "Eighth"},
+			[]int{100, 200, 300, 300, 300, 400, 400, 100}, oracle.WithBatchErrors())
+		if got := errs(err); !slices.Equal(got, []string{"6 ORA-00001"}) {
+			t.Errorf("insert: got the errors %q", got)
+		}
+		var counts []int64
+		_, err = db.ExecContext(ctx, "UPDATE go_array_dml SET int_col2 = :1 WHERE string_col = :2",
+			[]int{101, 201, 3000, 900, 301}, []string{"First", "Second", "Third", "Ninth", "Third"},
+			oracle.WithBatchErrors(), oracle.WithRowCounts(&counts))
+		if got := errs(err); !slices.Equal(got, []string{"2 ORA-01438"}) {
+			t.Errorf("update: got the errors %q", got)
+		}
+		if !slices.Equal(counts, []int64{1, 2, 0, 0, 1}) {
+			t.Errorf("update: got the counts %v", counts)
+		}
+	})
+
+	t.Run("2726 no error", func(t *testing.T) {
+		reset(t)
+		if _, err := db.ExecContext(ctx, insert, []int{1, 2, 3}, []string{"First", "Second", "Third"}, []int{100, 200, 300},
+			oracle.WithBatchErrors()); err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("2730 and 2731 PL/SQL", func(t *testing.T) {
+		for _, opt := range []oracle.Option{oracle.WithBatchErrors(), oracle.WithRowCounts(new([]int64))} {
+			if _, err := db.ExecContext(ctx, "BEGIN NULL; END;", opt); !errors.Is(err, oracle.ErrNotSupported) {
+				t.Errorf("got %v, want ErrNotSupported", err)
+			}
+		}
+	})
+}
