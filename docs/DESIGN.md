@@ -1061,6 +1061,13 @@ row, so the server refused a row longer than the last with ORA-51803, and a
 NULL last row went as a `VARCHAR2` and hung the connection. `TestJSONBatch`
 and the batch of `TestVectorColumns` hold the cases.
 
+On 21c, `SELECT CAST(:1 AS JSON) FROM dual` with a JSON bind fails inside the
+server, with ORA-00600 [kcbgtcr_1] or [25026]. python-oracledb fails on it
+too, and the server drops its session. It is a fault of 21c. The driver
+marks the connection bad on ORA-00600, and the pool serves the next query.
+The same bind inserts into a JSON column, `JSON_SERIALIZE(CAST(:1 AS JSON))`
+works, and 26ai returns it.
+
 ### VECTOR
 
 D30 sets the Go types of a `VECTOR`: `[]float32`, `[]float64`, `[]int8`,

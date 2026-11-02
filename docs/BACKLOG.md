@@ -18,14 +18,6 @@ package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
 type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
 list of authentication services or out of band breaks, which `go-ora` read. Add each when a caller needs it.
 
-### Report SELECT CAST(:1 AS JSON) on 21c
-
-On 21c, `SELECT CAST(:1 AS JSON) FROM dual` with a JSON bind fails inside the
-server with ORA-00600 [25026] or [kcbgtcr_1]. The same bind inserts into a JSON
-column, `JSON_SERIALIZE(CAST(:1 AS JSON))` works, and 26ai returns it. Find
-whether the driver can send the bind so that 21c accepts it, as python-oracledb
-does, or record it as a fault of 21c.
-
 ### Register a record of %ROWTYPE
 
 `RegisterType` takes a type of SQL and a type of a package (D33). A record

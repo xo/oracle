@@ -328,7 +328,6 @@ line of the position, which `ErrPos` still returns.
 passed only while `Error` added that line. It checks the message now.
 `TestLobReader` hung on 11g, at `898b212` too.
 
-
 Ken asked for items 1 to 7 of the BACKLOG in one chain, with a commit for
 each and no push until he confirms. He chose the forms of D34 and D35 and the
 tag v0.1.0 at the start.
@@ -339,3 +338,6 @@ tag v0.1.0 at the start.
    the break, which are fixed: a close of the rows from another goroutine
    wrote in the middle of a LOB call, and the answer of a break that came
    after its call ended went to the next call.
+2. `SELECT CAST(:1 AS JSON)` fails inside 21c for python-oracledb too, so it
+   is a fault of 21c, which DESIGN records. The root package and
+   `integration` pass on 21c.
