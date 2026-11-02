@@ -18,14 +18,6 @@ package, holds the target, with `conn`, `stmt`, `rows` and `tx`. The Oracle
 type IDs are constants of `uint16`, and want a named type. `Config` has no keys for the OS user and password of NTS, the domain, the
 list of authentication services or out of band breaks, which `go-ora` read. Add each when a caller needs it.
 
-### Register a record of %ROWTYPE
-
-`RegisterType` takes a type of SQL and a type of a package (D33). A record
-of `TABLE%ROWTYPE`, alone or as the element of a collection of a package, is
-in neither view. python-oracledb reads its type OID from
-`DBMS_PICKLER.GET_TYPE_SHAPE` and its attributes from `ALL_TAB_COLS`, and the
-driver can do the same.
-
 ### Report batch errors and the count of each row
 
 A batch of DML stops at its first error, and returns the count of all its

@@ -118,8 +118,18 @@ func isBadConn(err error) bool {
 // packageType splits name into a package and a type, in upper case, when it
 // names a type of a package, as PKG.TYPE.
 func packageType(name string) (pkg, typ string, ok bool) {
+	if _, ok := rowType(name); ok {
+		return "", "", false
+	}
 	pkg, typ, ok = strings.Cut(name, ".")
 	return strings.ToUpper(pkg), strings.ToUpper(typ), ok
+}
+
+// rowType returns the table of name, in upper case, when name is the record
+// of a row of a table, as TABLE%ROWTYPE.
+func rowType(name string) (table string, ok bool) {
+	table, ok = strings.CutSuffix(strings.ToUpper(name), "%ROWTYPE")
+	return table, ok
 }
 
 // getTOID2 returns the type OID of a type, from ALL_TYPES, or of a type of a
@@ -127,7 +137,29 @@ func packageType(name string) (pkg, typ string, ok bool) {
 func getTOID2(conn *sql.DB, owner, typeName string) ([]byte, error) {
 	var toid []byte
 	var err error
-	if pkg, typ, ok := packageType(typeName); ok {
+	if table, ok := rowType(typeName); ok {
+		// the record of a row is in no view, and python-oracledb reads its
+		// OID from the pickler
+		_, err = conn.Exec(`DECLARE
+	t_name VARCHAR2(400) := :1;
+	t_oid RAW(16);
+	t_version PLS_INTEGER;
+	t_tds BLOB;
+	t_instantiable VARCHAR2(3);
+	t_super_owner VARCHAR2(128);
+	t_super_name VARCHAR2(128);
+	t_attrs SYS_REFCURSOR;
+	t_subtypes SYS_REFCURSOR;
+	t_result PLS_INTEGER;
+BEGIN
+	t_result := DBMS_PICKLER.GET_TYPE_SHAPE(t_name, t_oid, t_version, t_tds,
+		t_instantiable, t_super_owner, t_super_name, t_attrs, t_subtypes);
+	:2 := t_oid;
+END;`, strings.ToUpper(owner)+"."+table+"%ROWTYPE", Out{Dest: &toid, Size: 16})
+		if err == nil && len(toid) == 0 {
+			err = sql.ErrNoRows
+		}
+	} else if pkg, typ, ok := packageType(typeName); ok {
 		err = conn.QueryRow(`SELECT type_oid FROM ALL_PLSQL_TYPES WHERE owner = :1 AND package_name = :2 AND type_name = :3`,
 			strings.ToUpper(owner), pkg, typ).Scan(&toid)
 	} else {

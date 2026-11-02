@@ -530,3 +530,75 @@ END;`); err != nil {
 		t.Errorf("holes: got %q, want %q", holes, want)
 	}
 }
+
+// rowRecord is the record go_rowtype%ROWTYPE.
+type rowRecord struct {
+	ID        int       `udt:"ID"`
+	Name      string    `udt:"NAME"`
+	Timestamp time.Time `udt:"TS"`
+}
+
+// TestRowTypeRecords binds a record of the row of a table, %ROWTYPE, IN and
+// OUT, and an index-by table of them, as 2728 and 2729 of
+// tests/cursor/test_2700_features_12_1.py of python-oracledb read their
+// types. RegisterType takes the record as TABLE%ROWTYPE. Its type OID comes
+// from DBMS_PICKLER, as python-oracledb reads it, and its attributes are the
+// columns of the table.
+func TestRowTypeRecords(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	requireRelease(t, db, 18)
+	db.Exec("DROP TABLE go_rowtype PURGE")
+	if err := execCmd(db, "CREATE TABLE go_rowtype (id NUMBER(9), name VARCHAR2(30), ts TIMESTAMP(6))",
+		`CREATE OR REPLACE PACKAGE go_rowtype_pkg AS
+	TYPE rows IS TABLE OF go_rowtype%ROWTYPE INDEX BY BINARY_INTEGER;
+	FUNCTION text (a go_rowtype%ROWTYPE) RETURN VARCHAR2;
+	PROCEDURE fill (a OUT go_rowtype%ROWTYPE);
+	PROCEDURE fill_all (a OUT rows);
+END;`, `CREATE OR REPLACE PACKAGE BODY go_rowtype_pkg AS
+	FUNCTION text (a go_rowtype%ROWTYPE) RETURN VARCHAR2 IS
+	BEGIN
+		RETURN a.id || ' ' || a.name || ' ' || TO_CHAR(a.ts, 'YYYY-MM-DD HH24:MI:SS');
+	END;
+	PROCEDURE fill (a OUT go_rowtype%ROWTYPE) IS
+	BEGIN
+		a.id := 7;
+		a.name := 'seven';
+		a.ts := TIMESTAMP '2020-01-02 03:04:05';
+	END;
+	PROCEDURE fill_all (a OUT rows) IS
+	BEGIN
+		FOR i IN 1..3 LOOP
+			a(i).id := i;
+			a(i).name := 'row ' || i;
+			a(i).ts := TIMESTAMP '2020-01-01 00:00:00' + i;
+		END LOOP;
+	END;
+END;`); err != nil {
+		t.Fatal(err)
+	}
+	defer execCmd(db, "DROP PACKAGE go_rowtype_pkg", "DROP TABLE go_rowtype PURGE")
+	if err := oracle.RegisterType(db, "go_rowtype%ROWTYPE", "go_rowtype_pkg.rows", rowRecord{}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	ts := time.Date(2021, 5, 6, 7, 8, 9, 0, time.UTC)
+	var text string
+	if _, err := db.ExecContext(ctx, "BEGIN :1 := go_rowtype_pkg.text(:2); END;", oracle.Out{Dest: &text, Size: 100}, rowRecord{1, "one", ts}); err != nil ||
+		text != "1 one 2021-05-06 07:08:09" {
+		t.Errorf("IN: got %q, %v", text, err)
+	}
+	var out rowRecord
+	if _, err := db.ExecContext(ctx, "BEGIN go_rowtype_pkg.fill(:1); END;", sql.Out{Dest: &out}); err != nil ||
+		out.ID != 7 || out.Name != "seven" || !out.Timestamp.Equal(time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)) {
+		t.Errorf("OUT: got %+v, %v", out, err)
+	}
+	var all []rowRecord
+	if _, err := db.ExecContext(ctx, "BEGIN go_rowtype_pkg.fill_all(:1); END;", sql.Out{Dest: &all}); err != nil || len(all) != 3 ||
+		all[2].Name != "row 3" || !all[2].Timestamp.Equal(time.Date(2020, 1, 4, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("an array: got %+v, %v", all, err)
+	}
+}

@@ -341,3 +341,5 @@ tag v0.1.0 at the start.
 2. `SELECT CAST(:1 AS JSON)` fails inside 21c for python-oracledb too, so it
    is a fault of 21c, which DESIGN records. The root package and
    `integration` pass on 21c.
+3. `RegisterType` takes a record of `TABLE%ROWTYPE`, whose type OID comes
+   from `DBMS_PICKLER` and whose attributes are the columns of the table.

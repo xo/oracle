@@ -502,7 +502,12 @@ each element before it. A slice binds with the keys from 1, and a
 takes the elements in their order. The bind of every object sends the version
 of its type, 1, as python-oracledb sends it. go-ora sent 0, which a SQL type
 takes and a type of a package fails with ORA-00600 [kocpnsh014].
-`TestPLSQLRecords` holds the cases of python-oracledb.
+`TestPLSQLRecords` holds the cases of python-oracledb. `RegisterType` takes the record
+of the row of a table as `TABLE%ROWTYPE`, alone or as the element of a
+collection of a package. It is in no view, so its type OID comes from
+`DBMS_PICKLER.GET_TYPE_SHAPE` and its attributes from `ALL_TAB_COLS`, as
+python-oracledb reads them. A precision in the name of a type, as
+`TIMESTAMP(6)`, is dropped. `TestRowTypeRecords` holds it.
 
 A slice binds to PL/SQL as a host array, as an index-by table that PL/SQL
 reads with the keys from 1. A `[]bool` is refused with `ErrNotSupported`,

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -41,6 +42,9 @@ func (param *ObjectParameter) loadActiveFields() {
 	}
 }
 
+// typePrecision is the precision in the name of a type, as (6).
+var typePrecision = regexp.MustCompile(`\(\d+\)`)
+
 // plsqlAttribCoders are the coders of the attributes of a record of a package
 // whose types SQL has not, or writes in another form. ALL_PLSQL_TYPE_ATTRS
 // names a BOOLEAN BOOLEAN from 23ai, and PL/SQL BOOLEAN before it.
@@ -71,7 +75,14 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, drv *Registry, owne
 					ORDER BY ATTR_NO`
 	args := []any{strings.ToUpper(owner), strings.ToUpper(name)}
 	pkg, typ, inPackage := packageType(name)
-	if inPackage {
+	if table, ok := rowType(name); ok {
+		// the record of a row of a table, whose attributes are its columns
+		sqlText = `SELECT column_name, data_type, NULL, data_length, column_id
+			FROM all_tab_cols
+			WHERE owner = :1 AND table_name = :2 AND hidden_column = 'NO'
+			ORDER BY column_id`
+		args = []any{strings.ToUpper(owner), table}
+	} else if inPackage {
 		// a record of a package
 		sqlText = `SELECT attr_name, attr_type_name, attr_type_package, length, attr_no
 			FROM all_plsql_type_attrs
@@ -101,7 +112,9 @@ func (param *ObjectParameter) loadObjectTypeInfo(db *sql.DB, drv *Registry, owne
 			return
 		}
 		param.fields = append(param.fields, attName.String)
-		attType := strings.ToUpper(attTypeName.String)
+		// ALL_TAB_COLS writes a precision in the name of a type, as
+		// TIMESTAMP(6) WITH TIME ZONE, which the coders do not
+		attType := strings.ToUpper(typePrecision.ReplaceAllString(attTypeName.String, ""))
 		if attPackage.Valid {
 			// a record or a collection of a package, which RegisterType
 			// registered as PKG.TYPE
