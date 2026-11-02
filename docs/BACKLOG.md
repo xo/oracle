@@ -17,8 +17,8 @@ Add each when a caller needs it.
 
 ### Tell dburl and usql when the first tag exists
 
-The tag v0.1.0 exists in the local repository (D36), and goes to the remote
-when Ken confirms the push. Tell the two sessions then.
+The first tag is v0.1.0 (D36). It is made when Ken says, and the two
+sessions are told then.
 
 usql moved to this module on 2026-11-02, at a pseudo-version, and keeps one
 hook, `IsPasswordErr`, until a release has `AuthenticationRefused`. When the
