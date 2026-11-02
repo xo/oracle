@@ -354,3 +354,5 @@ tag v0.1.0 at the start.
    replace `Connection`, `DataSet` and `Transaction` of go-ora. The Oracle
    type IDs are of the type `types.TypeID`. The keys of NTS stay in the
    BACKLOG, for when a caller needs them.
+7. Ken chose v0.1.0 as the first tag (D36). It is made in the local
+   repository, and `dburl` and `usql` are told when it is pushed.

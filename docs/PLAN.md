@@ -44,6 +44,7 @@ conclusion.
 | [D33](#d33-registertype-takes-the-types-of-a-package) | Decided |
 | [D34](#d34-batch-errors-and-the-count-of-each-row-are-options) | Decided |
 | [D35](#d35-a-returning-of-rows-fills-an-out-of-a-slice) | Decided |
+| [D36](#d36-the-first-tag-is-v010) | Decided |
 
 ## Purpose
 
@@ -515,12 +516,17 @@ a slice of a type that `RegisterType` registered stays one collection. An
 OUT of one value still fails when more than one row returns, with an error
 that names the slice.
 
+## D36. The first tag is v0.1.0
+
+Status: Decided.
+
+Ken decided on 2026-11-02 that the first tag of `github.com/xo/oracle` is
+v0.1.0. A v0 tag says that the API can still change, which suits a driver
+under rewrite. The tags v3.0.0 and v3.0.1 in the repository are those of
+sijms, whose `go.mod` declares `github.com/sijms/go-ora`, so a v3 tag would
+have needed the path `github.com/xo/oracle/v3`. The tag goes to the remote
+when Ken confirms the push, and then `dburl` and `usql` are told.
+
 ## Open questions for Ken
 
-1. When is the first tag, and which? Ken will say. Step 6 is done, and
-   `dburl` and `usql` wait on it. usql moved to this module on 2026-11-02, at
-   a pseudo-version, and registers it with no hook once a release has
-   `AuthenticationRefused`. The tags v3.0.0 and v3.0.1 in the repository are
-   those of sijms, whose `go.mod` declares `github.com/sijms/go-ora`. So the
-   first tag of `github.com/xo/oracle` is a v0 or a v1 tag, or the module path
-   becomes `github.com/xo/oracle/v3`.
+None.
