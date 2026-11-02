@@ -18,6 +18,10 @@ type QAExtension struct {
 	num   uint8
 }
 
+// arrayReturnMessageID is the flag of an array of messages that returns the
+// ID of each.
+const arrayReturnMessageID = 0x01
+
 func (qu *queue) writeArrayHeader(messages []*Message) {
 	session := qu.conn.Session()
 	session.PutBytes(6)
@@ -103,13 +107,9 @@ func (qu *queue) EnqueueMessages(messages []*Message) error {
 	// Field 1: null pointer + SWORD(0) — no dequeue input array
 	session.PutBytes(0x00, 0x00)
 
-	// Field 2: flags (AQXDEF_ARR=1, AQXDEF_RETMID=2)
-	flag := 1
-	needMsgID := len(messages) > 0 && len(messages[0].messageID) == 0
-	if needMsgID {
-		flag |= 2
-	}
-	session.PutUint(flag, 4, true, true)
+	// Field 2: flags, which return the ID of each message, as
+	// python-oracledb sends them
+	session.PutUint(arrayReturnMessageID, 4, true, true)
 
 	// Field 3: pointer + UB4(0) — dequeue output array
 	session.PutBytes(0x01, 0x00)
@@ -147,7 +147,8 @@ func (qu *queue) EnqueueMessages(messages []*Message) error {
 		return err
 	}
 
-	return qu.readArrayResponse(messages, true)
+	_, err = qu.readArrayResponse(messages, true)
+	return qu.afterReset(err)
 }
 
 func (qu *queue) DequeueMessages(options *DequeueOptions, count int) ([]*Message, error) {
@@ -165,9 +166,10 @@ func (qu *queue) DequeueMessages(options *DequeueOptions, count int) ([]*Message
 	// messages length
 	session.PutUint(count, 2, true, true)
 
-	// Field 2: flags (AQXDEF_ARR=1, AQXDEF_RETMID=2)
-	flag := 1 | 2
-	session.PutUint(flag, 4, true, true)
+	// Field 2: flags, which return the ID of each message, as
+	// python-oracledb sends them. go-ora sent 3, which it read as an array
+	// and the IDs, and the server broke the dequeue
+	session.PutUint(arrayReturnMessageID, 4, true, true)
 
 	// Field 3: pointer + UB4(1) — dequeue output array
 	session.PutBytes(1, 1)
@@ -248,6 +250,12 @@ func (qu *queue) DequeueMessages(options *DequeueOptions, count int) ([]*Message
 	if err != nil {
 		return nil, err
 	}
-	err = qu.readArrayResponse(messages, false)
-	return messages, err
+	// the messages that the server returned, and none for ORA-25228. go-ora
+	// returned count messages, empty past the last
+	n, err := qu.readArrayResponse(messages, false)
+	err = qu.afterReset(err)
+	if noMessage(err) {
+		return messages[:0], nil
+	}
+	return messages[:min(n, len(messages))], err
 }

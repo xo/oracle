@@ -30,6 +30,12 @@ func CreateBFile(ctx context.Context, db *sql.DB, dirName, fileName string) (*BF
 	if err != nil {
 		return nil, err
 	}
+	// the names are in the character set of the database. go-ora wrote them
+	// in AL16UTF16, and the server found no file for the BFILE
+	ret.Conv, err = ret.stream.StringCoder().DefaultStringCoder()
+	if err != nil {
+		return nil, err
+	}
 	filePath := ""
 	if len(dirName) != 0 && len(fileName) != 0 {
 		filePath = dirName + "/" + fileName
@@ -140,11 +146,17 @@ func (file *BFile) IsOpen() bool {
 	return file.isOpened
 }
 
+// IsInit reports whether the BFile has a locator and a streamer to read it
+// with. A BFile of a row holds its locator in its streamer alone, which
+// go-ora did not look at, so it was never initialized and did not open.
 func (file *BFile) IsInit() bool {
-	if file.stream != nil && file.stream.Locator() == nil && file.bValue != nil {
+	if file.stream == nil {
+		return false
+	}
+	if file.stream.Locator() == nil && file.bValue != nil {
 		file.stream.SetLocator(file.bValue)
 	}
-	return len(file.bValue) > 0 && file.stream != nil
+	return len(file.stream.Locator()) > 0
 }
 
 func (file *BFile) Open(ctx context.Context) error {
@@ -205,10 +217,10 @@ func (file *BFile) FileName() string {
 	return fileName
 }
 
+// Exists reports whether the file of the BFile exists, open or not, as the
+// fileexists of python-oracledb does. go-ora asked for an open file, and a
+// file that does not exist cannot open.
 func (file *BFile) Exists() (bool, error) {
-	if !file.isOpened {
-		return false, errors.New("invalid operation on closed object")
-	}
 	if !file.IsInit() {
 		return false, errors.New("BFile is not initialized")
 	}

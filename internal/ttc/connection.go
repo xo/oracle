@@ -65,11 +65,14 @@ type Connection struct {
 	State      ConnectionState
 	LogonMode  LogonMode
 	autoCommit bool
-	logger     *slog.Logger
-	connOption *config.ConnectionConfig
-	session    *tns.Session
-	tcpNego    *TCPNego
-	dataNego   *DataTypeNego
+	// txnInProgress is the flag of the end of a call that says that a
+	// transaction is open
+	txnInProgress bool
+	logger        *slog.Logger
+	connOption    *config.ConnectionConfig
+	session       *tns.Session
+	tcpNego       *TCPNego
+	dataNego      *DataTypeNego
 	// negotiated is true when the replies of the negotiations that a fast
 	// logon sends with its first message have been read.
 	negotiated        bool
@@ -563,6 +566,10 @@ func (conn *Connection) freeTemporaryLobs() error {
 }
 
 // Close the connection by disconnect network session
+// eocsTxnInProgress is the flag of the end of a call that says that a
+// transaction is open.
+const eocsTxnInProgress = 0x2
+
 func (conn *Connection) Close() (err error) {
 	err = conn.freeTemporaryLobs()
 	if err != nil {
@@ -570,6 +577,15 @@ func (conn *Connection) Close() (err error) {
 	}
 	logger := conn.logger
 	logger.Debug("close")
+	// the server commits an open transaction at a logoff, so a transaction
+	// that the server says is open, or that BeginTx began, is rolled back
+	// first, as python-oracledb does. go-ora committed it
+	if conn.session != nil && conn.IsValid() && (conn.txnInProgress || !conn.autoCommit) {
+		conn.session.ResetBuffer()
+		if err := (&simpleObject{connection: conn, operationID: 0xF}).exec(); err != nil {
+			logger.Debug("rollback at close", "error", err)
+		}
+	}
 	if conn.session != nil {
 		err = conn.Logoff()
 		if err != nil {
@@ -1030,6 +1046,7 @@ func (conn *Connection) ProcessTCCResponse(msgCode uint8) error {
 			if session.Summary != nil {
 				session.Summary.EndOfCallStatus = temp
 			}
+			conn.txnInProgress = temp&eocsTxnInProgress != 0
 		}
 		if session.HasFSAPCapability {
 			if session.Summary == nil {

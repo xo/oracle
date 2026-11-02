@@ -1,6 +1,7 @@
 package aq
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,10 +12,13 @@ import (
 	"github.com/xo/oracle/internal/types"
 )
 
-// Execer runs statements. *sql.DB, *sql.Conn and *sql.Tx are each one.
+// Execer runs statements. *sql.DB, *sql.Conn and *sql.Tx are each one. A
+// queue holds the connection of the Execer that made it, so a *sql.Conn or a
+// *sql.Tx is the one to use. The connection of a *sql.DB goes back to its
+// pool, which can give it to another caller while the queue uses it. go-ora
+// asked for Exec and Prepare, which a *sql.Conn lacks.
 type Execer interface {
-	Exec(query string, args ...any) (sql.Result, error)
-	Prepare(query string) (*sql.Stmt, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 type Queue interface {
@@ -42,7 +46,7 @@ func CreateQueue(db Execer, name string, messageType MessageType, udtName string
 		udtName:     udtName,
 		version:     1,
 	}
-	_, err := db.Exec("--GET-CONNECTION-REF--", &ret.conn)
+	_, err := db.ExecContext(context.Background(), "--GET-CONNECTION-REF--", &ret.conn)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +94,7 @@ func (qu *queue) NewMessage(data any) (*Message, error) {
 		Priority:         0,
 		ID:               "",
 		propModified:     false,
-		shareNum:         0xFFFF,
+		shareNum:         0xFFFFFFFF,
 		senderName:       "",
 		senderAddress:    "",
 		senderProtocol:   0,
@@ -239,7 +243,7 @@ func (qu *queue) Enqueue(message *Message) error {
 	//}
 	// read
 	// 08 3a b0 a2 6a 94 91 15 12 e0 63 02 00 11 ac e0 6d 00 09 01 02 01 06
-	return qu.readEnqueueResponse(message)
+	return qu.afterReset(qu.readEnqueueResponse(message))
 }
 
 func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
@@ -294,9 +298,12 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	if qu.AutoCommit {
 		num = 32
 	}
-	if outMsg.DeliveryMode == DeliveryModeBuffered {
+	// the delivery mode of the options. go-ora took it from the new message,
+	// which has none, so a buffered message never dequeued
+	switch options.Delivery {
+	case DeliveryModeBuffered:
 		num |= 2
-	} else if outMsg.DeliveryMode == DeliveryModeAny {
+	case DeliveryModeAny:
 		num |= 16
 	}
 	session.PutUint(num, 4, true, true)
@@ -317,7 +324,8 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 		session.PutBytes(0)
 	}
 	if qu.conn.TTCVersion() >= 16 {
-		session.PutInt(0xFFFF, 4, true, true)
+		// the shard, -1, as python-oracledb writes it
+		session.PutUint(uint32(0xFFFFFFFF), 4, true, true)
 	}
 	if len(queueNameBytes) > 0 {
 		session.PutClr(queueNameBytes)
@@ -342,8 +350,19 @@ func (qu *queue) Dequeue(options *DequeueOptions) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = qu.readDequeueResponse(outMsg)
+	err = qu.afterReset(qu.readDequeueResponse(outMsg))
+	if noMessage(err) {
+		return nil, nil
+	}
 	return outMsg, err
+}
+
+// noMessage reports whether err is ORA-25228, which a dequeue that finds no
+// message ends with. python-oracledb returns no message for it, and so does
+// a dequeue here. go-ora returned the error and an empty message.
+func noMessage(err error) bool {
+	var oerr *tns.OracleError
+	return errors.As(err, &oerr) && oerr.ErrCode == 25228
 }
 
 func (qu *queue) readEnqueueResponse(message *Message) error {
@@ -448,39 +467,63 @@ func (qu *queue) readTypeInformation() (dataLen int, err error) {
 	return
 }
 
-func (qu *queue) readArrayResponse(messages []*Message, isEnqueue bool) error {
+// readArrayResponse reads the reply to an array of messages, and returns
+// the count of messages that the server returned.
+func (qu *queue) readArrayResponse(messages []*Message, isEnqueue bool) (int, error) {
 	session := qu.conn.Session()
-	loop := true
-	for loop {
+	count := 0
+	for {
 		msgCode, err := session.ReadByte()
 		if err != nil {
-			return err
+			return count, qu.afterReset(err)
 		}
 		switch msgCode {
 		case 8:
-			err = qu.readArrayRPA(messages, isEnqueue)
+			count, err = qu.readArrayRPA(messages, isEnqueue)
 			if err != nil {
-				return err
+				return count, err
 			}
 		default:
 			err = qu.conn.ProcessTCCResponse(msgCode)
 			if err != nil {
-				return err
+				return count, err
 			}
 			if msgCode == 4 || msgCode == 9 {
-				loop = false
+				return count, nil
 			}
 		}
 	}
-	return nil
 }
 
-func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
+// afterReset reads the reply that follows a break of the server, which ends
+// with the error of the call, as the statements of the driver do. The server
+// breaks a dequeue of an array that finds no message, and sends ORA-25228
+// after the reset. go-ora returned the reset as a timeout.
+func (qu *queue) afterReset(err error) error {
+	if !errors.Is(err, tns.ErrConnReset) {
+		return err
+	}
+	session := qu.conn.Session()
+	for {
+		msg, err := session.ReadByte()
+		if err != nil {
+			return err
+		}
+		if err := qu.conn.ProcessTCCResponse(msg); err != nil {
+			return err
+		}
+		if msg == 4 || msg == 9 {
+			return nil
+		}
+	}
+}
+
+func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) (int, error) {
 	session := qu.conn.Session()
 
 	numResp, err := session.ReadInt(4, true, true)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	for i := range numResp {
@@ -490,66 +533,68 @@ func (qu *queue) readArrayRPA(messages []*Message, isEnqueue bool) error {
 		var num int
 		num, err = session.ReadInt(2, true, true)
 		if err != nil {
-			return err
+			return numResp, err
 		}
 		if num > 0 {
 			_, err = session.ReadByte()
 			if err != nil {
-				return err
+				return numResp, err
 			}
 			err = messages[i].read(qu.conn)
 			if err != nil {
-				return err
+				return numResp, err
 			}
 		}
 		_, err = session.ReadInt(2, true, true)
 		if err != nil {
-			return err
+			return numResp, err
 		}
 		var dataLen int
 		dataLen, err = session.ReadInt(2, true, true)
 		if err != nil {
-			return err
+			return numResp, err
 		}
 		if !isEnqueue {
 			// get type information
 			dataLen, err = qu.readTypeInformation()
 			if err != nil {
-				return err
+				return numResp, err
 			}
 		}
 		if dataLen > 0 {
 			err = messages[i].readData(qu.conn, qu.messageType, qu.udtName)
 			if err != nil {
-				return err
+				return numResp, err
 			}
 		}
 		msgID, err := session.ReadDLC()
 		if err != nil {
-			return err
+			return numResp, err
 		}
 		if len(msgID) == 0x10 {
 			messages[i].messageID = make([]byte, 0x10)
 			copy(messages[i].messageID, msgID)
 		}
+		// an enqueue returns the IDs of every message at once. go-ora gave
+		// each message the ID of the first
 		if len(msgID)/0x10 == len(messages) {
 			for j := range messages {
 				messages[j].messageID = make([]byte, 0x10)
-				copy(messages[j].messageID, msgID[i*16:(i+1)*0x10])
+				copy(messages[j].messageID, msgID[j*16:(j+1)*0x10])
 			}
 		}
 		_, err = session.ReadInt(2, true, true)
 		if err != nil {
-			return err
+			return numResp, err
 		}
 		_, err = session.ReadInt(2, true, true)
 		if err != nil {
-			return err
+			return numResp, err
 		}
 
 	}
 	if isEnqueue {
 		_ /*count*/, err = session.ReadInt(4, true, true)
 	}
-	return err
+	return numResp, err
 }

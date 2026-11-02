@@ -283,7 +283,7 @@ found these faults, which are fixed:
   changed type.
 - An argument matched a bind name in quotes in any case.
 
-The twenty-fifth part of step 9 is done. The types of
+The twenty-fifth part of step 9 is done (`898b212`). The types of
 `cursor/test_2000_var.py` go through a PL/SQL variable of each type, OUT and
 IN OUT, with a NULL of each, and the PL/SQL `BOOLEAN` cases of
 `test_2400_boolean.py`, which round twenty left out, are written. They found
@@ -297,3 +297,33 @@ these faults, which are fixed:
 - A NULL `RAW`, `LONG RAW` or `BLOB` read as a valid empty `[]byte`.
 - An OUT string of PL/SQL held 8,191 characters on AL32UTF8, where the size
   was 32,767.
+
+The twenty-sixth part of step 9 is done, and it finishes the tests of
+python-oracledb (D28). Ken asked for the rest in one part. The cases of
+`connection/test_1000_basic.py`, `aq/`, `ext/test_ext_2100_bfile_type.py`
+and `misc/test_1600_defaults.py` that test this driver are written, and the
+other files test the API of Python or what this driver does not do. They
+found these faults, which are fixed:
+
+- A connection that closed with a transaction open committed it.
+- `aq` had no test. A `*sql.Conn` could not make a queue. A dequeue of an
+  empty queue returned ORA-25228, and of an array broke the connection. A
+  buffered message never dequeued, and an array returned empty messages and
+  gave every message the ID of one.
+- A `BFILE` of a row never opened, `Exists` failed on a file that is not
+  open, and `CreateBFile` wrote its names in AL16UTF16.
+
+The batch errors and the count of each row of `test_2700_features_12_1.py`
+wait for Ken, in the BACKLOG.
+
+Ken asked, from the usql session, for the method `AuthenticationRefused()
+bool` of usql W66. A `*ServerError` and an `Error` have it, true for
+ORA-01017 and ORA-01005 and for `ErrAuthentication`. ORA-28041 no longer
+matches `ErrAuthentication`, since the driver raises it for logon data that
+it cannot read, and DESIGN no longer says that ORA-28000 matches, which the
+code never did. usql waits for a release of this module. At its request,
+`Error` of a `*ServerError` returns the message of the server alone, with no
+line of the position, which `ErrPos` still returns.
+`TestSessionPars` of go-ora checked its error the wrong way round, and
+passed only while `Error` added that line. It checks the message now.
+`TestLobReader` hangs on 11g, at `898b212` too, and is in the BACKLOG.

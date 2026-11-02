@@ -26,62 +26,6 @@ column, `JSON_SERIALIZE(CAST(:1 AS JSON))` works, and 26ai returns it. Find
 whether the driver can send the bind so that 21c accepts it, as python-oracledb
 does, or record it as a fault of 21c.
 
-### Write the tests of python-oracledb again
-
-D28 asks for the tests of python-oracledb that test what this driver does.
-Written: `tnsnames.ora` (`test_1500_tnsnames.py`), descriptors
-(`test_1300_connect_params.py`), statements that change type
-(`test_2500_type_changes.py`), runs with other binds (`test_1000_execute.py`
-and `test_2000_char.py`), DML RETURNING of one row
-(`test_2200_dml_returning.py`), batches of DML (`test_1200_executemany.py`),
-the sizes of LOBs and the order of their binds (`test_1500_lobs.py`), and the
-bounds of NUMBER (`test_1800_number.py`), objects
-(`test_1900_dbobject.py`), LONG (`test_1600_longs.py`), ROWID
-(`test_3400_rowid.py`), and cases of `test_1400_callproc.py`,
-`test_2000_char.py` and the intervals, the bounds of dates
-(`test_1100_date.py`), BOOLEAN (`test_2400_boolean.py`), JSON
-(`test_3100_json.py` and `test_3200_json_26ai.py`), NCHAR
-(`test_1700_nchar.py`), and VECTOR (`test_2700_vector.py`,
-`test_2900_binary_vector.py` and `test_3000_sparse_vector.py`). The files of
-`data_types` are done, and so are `cursor/test_2400_sql_parser.py`,
-`misc/test_1100_error.py`, `cursor/test_2700_features_12_1.py`,
-`cursor/test_1800_other.py`, `cursor/test_2000_var.py` and
-`cursor/test_2100_arrayvar.py`. Of the
-last, the batch errors and the count of each row (2700, 2701, 2717 to 2719,
-2722 to 2724, 2726, 2727, 2730 and 2731) need an API of their own, as
-[`DRIVERS.md`](DRIVERS.md) says, and wait for Ken. A `%ROWTYPE` record (2728
-and 2729) waits for the item below. The metadata of a type (2734) has no API
-here. Of `cursor/test_1800_other.py`, the last ROWID (1821) and the count of
-the rows of a query (1856) have no API in `database/sql`, and the rest test
-the API of Python.
-
-The files outside `data_types` that test what this driver does, in the order
-to write them:
-
-1. `connection/test_1000_basic.py`: a bad password, a password with `/` and
-   `@`, a rollback at close, connections from many goroutines, a ping,
-   `current_schema`, `DBMS_OUTPUT`, a timeout of a call, a proxy user, the
-   names of the client, the session ID, and an error in the middle of a
-   response.
-2. `aq/test_1000_dbobject.py`, `aq/test_1200_bulk.py`, `aq/test_1400_raw.py`
-   and `aq/test_1600_json.py`, for the `aq` package.
-3. `ext/test_ext_2100_bfile_type.py`, which needs a directory and a file on
-   the server, and `misc/test_1600_defaults.py`, for `prefetch` and
-   `lob_fetch`.
-
-The other files test what this driver does not do, or the API of Python:
-
-- Two-phase commit, sessionless transactions, subscriptions, direct path load
-  and external logon (`connection/`).
-- Scrollable cursors (`cursor/test_1600_scroll.py`), because `database/sql`
-  reads forward only, and statements of OCI (`cursor/test_2600`).
-- Pools (`pool/`, `misc/test_1400_pool_params.py`), because `database/sql`
-  holds the pool.
-- `misc/test_1000_module.py`, `misc/test_1700_unsupported_features_thin.py`,
-  `hooks/`, `dataframe/`, `soda/`, `stc/` and `py314/`.
-- The rest of `ext/`, which needs a set up of its own, such as DRCP, the
-  providers of a cloud and the cache of statements.
-
 ### Register a record of %ROWTYPE
 
 `RegisterType` takes a type of SQL and a type of a package (D33). A record
@@ -90,13 +34,37 @@ in neither view. python-oracledb reads its type OID from
 `DBMS_PICKLER.GET_TYPE_SHAPE` and its attributes from `ALL_TAB_COLS`, and the
 driver can do the same.
 
+### Find why TestLobReader hangs on 11g
+
+On 2026-11-02, `TestLobReader` of the root package hung on 11g, in both LOB
+modes, waiting for the reply to a read of 3 characters at offset 1,296 of a
+CLOB. It hung at `898b212` too, which passed on 11g earlier that day, and
+after a restart of the server. The other releases pass it. Find whether the
+server or the driver stops, and whether a piece that ends inside a pair of
+UTF-16 surrogates has to do with it.
+
+### Report batch errors and the count of each row
+
+A batch of DML stops at its first error, and returns the count of all its
+rows. python-oracledb can go on past the rows that fail and return the error
+of each, with `batcherrors`, and return the count of each row, with
+`arraydmlrowcounts`. Their cases of `cursor/test_2700_features_12_1.py`
+(2700, 2701, 2717 to 2719, 2722 to 2724, 2726, 2727, 2730 and 2731) are not
+written. Each needs an API of its own, as [`DRIVERS.md`](DRIVERS.md) says.
+Find a form for `database/sql`, and ask Ken.
+
 ### Return the rows of a RETURNING of more than one row
 
 A RETURNING that touches more than one row fails with an error, because an
 OUT takes one value. python-oracledb returns an array for each OUT. Find a
 form for `database/sql`, such as an OUT of a slice, and ask Ken.
 
-### Tell dburl when the first tag exists
+### Tell dburl and usql when the first tag exists
+
+usql moved to this module on 2026-11-02, at a pseudo-version, and keeps one
+hook, `IsPasswordErr`, until a release has `AuthenticationRefused`. When the
+first tag exists, tell the usql session, which then registers the driver
+with no hook.
 
 dburl staged its `oracle` scheme as provisional on 2026-10-31 (its D69), with
 `github.com/xo/oracle` as the package. Its `GenOracle` writes

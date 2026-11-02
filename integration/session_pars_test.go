@@ -1,7 +1,7 @@
 package integration
 
 import (
-	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/xo/oracle"
@@ -23,15 +23,19 @@ func TestSessionPars(t *testing.T) {
 	}()
 	_, err = db.Exec("INSERT INTO TEST_S(ID, name) VALUES(1, 's')")
 	if err != nil {
-		expected := []byte{79, 82, 65, 45, 48, 48, 57, 52, 50, 58, 32, 216, 167, 217,
-			132, 216, 172, 216, 175, 217, 136, 217, 132, 32, 216, 163, 217, 136, 32,
-			216, 167, 217, 132, 216, 172, 216, 175, 217, 136, 217, 132, 32, 216, 167,
-			217, 132, 216, 167, 216, 185, 216, 170, 216, 168, 216, 167, 216, 177, 217,
-			138, 32, 216, 186, 217, 138, 216, 177, 32, 217, 133, 217, 136, 216, 172, 217,
-			136, 216, 175}
-		got := []byte(err.Error())
-		if bytes.Equal(got, expected) {
-			t.Errorf("expected: %v and got: %v", string(expected), err.Error())
+		// the message is in Arabic, the language of the session, and 26ai
+		// names the table in it. The check was the wrong way round, and
+		// passed while Error added a line with the position
+		// 11g XE has the messages of English alone
+		want := "ORA-00942: الجدول"
+		var release int
+		if db.QueryRow(`SELECT TO_NUMBER(REGEXP_SUBSTR(version, '^[0-9]+'))
+			FROM product_component_version WHERE product LIKE 'Oracle%' AND ROWNUM = 1`).Scan(&release); release < 12 {
+			want = "ORA-00942: table or view does not exist"
+		}
+		got := err.Error()
+		if !strings.HasPrefix(got, want) || strings.Contains(got, "\n") {
+			t.Errorf("got %q, want %q on one line", got, want)
 		}
 		return
 	}

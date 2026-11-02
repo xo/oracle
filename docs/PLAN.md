@@ -481,5 +481,10 @@ which holds no type of a package.
 
 ## Open questions for Ken
 
-1. When is the first tag? Ken will say. Step 6 is done, and `dburl` waits on
-   it.
+1. When is the first tag, and which? Ken will say. Step 6 is done, and
+   `dburl` and `usql` wait on it. usql moved to this module on 2026-11-02, at
+   a pseudo-version, and registers it with no hook once a release has
+   `AuthenticationRefused`. The tags v3.0.0 and v3.0.1 in the repository are
+   those of sijms, whose `go.mod` declares `github.com/sijms/go-ora`. So the
+   first tag of `github.com/xo/oracle` is a v0 or a v1 tag, or the module path
+   becomes `github.com/xo/oracle/v3`.

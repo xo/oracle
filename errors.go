@@ -35,5 +35,7 @@ const (
 )
 
 // ServerError is an error that the server returned, with its ORA code in
-// ErrCode.
+// ErrCode. Its method AuthenticationRefused reports whether the server
+// refused the credential, as usql asks an error, and matches
+// errors.Is(err, ErrAuthentication).
 type ServerError = tns.OracleError

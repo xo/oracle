@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 // Error is the type of a sentinel error. The root package names it Error too,
@@ -13,6 +14,13 @@ type Error string
 // Error satisfies the error interface.
 func (err Error) Error() string {
 	return string(err)
+}
+
+// AuthenticationRefused reports whether err is ErrAuthentication. usql asks
+// an error for the method, which it declares itself, to decide that the
+// server refused the credential.
+func (err Error) AuthenticationRefused() bool {
+	return err == ErrAuthentication
 }
 
 // ErrAuthentication is a server that refused the credential: a wrong user or
@@ -48,10 +56,11 @@ func NewCompilationError() *OracleError {
 }
 
 // authCodes are the codes of the errors that refuse a credential.
+// The driver raises ORA-28041 itself for logon data of the server that it
+// cannot read, where a new password does not help, so it is not one.
 var authCodes = []int{
-	1005,  // null password given
-	1017,  // invalid username or password
-	28041, // authentication protocol internal error
+	1005, // null password given
+	1017, // invalid username or password
 }
 
 // OracleError is an error that the server returned, with its ORA code.
@@ -64,17 +73,26 @@ type OracleError struct {
 func NewOracleError(errCode int) *OracleError {
 	return &OracleError{ErrCode: errCode, errPos: -1}
 }
+
+// Error returns the message of the server, with no line feed at its end.
+// ErrPos returns the position of the error in the statement. go-ora added a
+// line " error occur at position: N", which usql printed as it was, and
+// which held 0 for an error with no position, such as ORA-01017.
 func (err *OracleError) Error() string {
 	if len(err.ErrMsg) == 0 {
 		err.translate()
 	}
-	var output string
-	if err.errPos >= 0 {
-		output = err.ErrMsg + " error occur at position: " + strconv.Itoa(err.errPos)
-	} else {
-		output = err.ErrMsg
-	}
-	return output
+	return strings.TrimRight(err.ErrMsg, "\n")
+}
+
+// AuthenticationRefused reports whether the server refused the credential,
+// so that asking for it again can succeed, as errors.Is(err,
+// ErrAuthentication) does: ORA-01017, or ORA-01005 for no password. It is
+// false for a lack of a permission, a locked account and an expired password. usql asks
+// an error for the method, which it declares itself, so that a driver needs
+// neither usql nor a shared sentinel.
+func (err *OracleError) AuthenticationRefused() bool {
+	return slices.Contains(authCodes, err.ErrCode)
 }
 
 // Is reports whether target is ErrAuthentication and the server refused the

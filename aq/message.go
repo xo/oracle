@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/xo/oracle/internal/codec"
+	"github.com/xo/oracle/internal/tns"
 	"github.com/xo/oracle/internal/types"
-	//"github.com/xo/oracle/type_coder"
 )
 
 var XMLTypeTOID = []byte{
@@ -238,7 +238,7 @@ func (message *Message) write(conn Conn) {
 	session := conn.Session()
 	session.PutInt(message.Priority, 4, true, true)
 	session.PutInt(message.Delay, 4, true, true)
-	session.PutInt(message.Expiration, 4, true, true)
+	putSB4(session, message.Expiration)
 	if len(message.correlation) > 0 {
 		temp := conn.ServerStringCoder().Encode(message.correlation)
 		session.PutInt(len(temp), 2, true, true)
@@ -278,8 +278,26 @@ func (message *Message) write(conn Conn) {
 		session.PutBytes(0)
 	}
 	if conn.TTCVersion() >= 16 {
-		session.PutUint(message.shareNum, 2, true, true)
+		// the shard, 0xFFFFFFFF, as python-oracledb writes it. go-ora wrote
+		// 0xFFFF in two bytes, and the server broke a bulk dequeue
+		session.PutUint(uint32(message.shareNum), 4, true, true)
 	}
+}
+
+// putSB4 writes n as a signed number of up to four bytes, as the server
+// reads an expiration: the count of bytes with 0x80 for a negative number,
+// and the bytes of its magnitude. go-ora wrote -1 as four bytes of 0xFF, and
+// the server broke a bulk dequeue.
+func putSB4(session tns.SessionWriter, n int) {
+	if n >= 0 {
+		session.PutInt(n, 4, true, true)
+		return
+	}
+	var b []byte
+	for m := uint32(-n); m > 0; m >>= 8 {
+		b = append([]byte{byte(m)}, b...)
+	}
+	session.PutBytes(append([]byte{0x80 | byte(len(b))}, b...)...)
 }
 
 func (message *Message) ServerMessageID() []byte {

@@ -212,6 +212,12 @@ statement, runs inside a call that is watched already, or under `Next`, where
 nothing, so one call never has two watches. `CreateBlob`, `CreateClob` and
 `CreateBFile` take the context first, and the LOB types keep none.
 
+A `BFile` of a row keeps its locator in its streamer, which `IsInit` reads, and
+`Exists` runs on a file that is not open. go-ora read neither, so a `BFile`
+of a row did not open and a missing file did not answer. `CreateBFile` writes
+the names in the character set of the database, where go-ora wrote them in
+AL16UTF16. `TestBFile` holds the cases of python-oracledb.
+
 `Next` loads the LOB values of a row as it returns the row, and not of every
 row of a fetch, so the driver holds the values of one row (sijms/go-ora#664).
 Under `database/sql`, which scans through `ScanColumn`, a CLOB or a BLOB is
@@ -249,6 +255,30 @@ passes after it.
 The isolation levels that Oracle has, read committed and serializable, are
 accepted. A read only transaction is `SET TRANSACTION READ ONLY`. Any other
 level fails with an error that wraps `ErrNotSupported`.
+
+The server commits an open transaction when a session logs off. So `Close`
+rolls back first when the end of the last call said that a transaction is
+open, or when a `BeginTx` has not ended, as python-oracledb does. go-ora
+committed it. `TestRollbackAtClose` holds it.
+
+## Advanced Queuing
+
+The `aq` package is that of go-ora. `CreateQueue` takes an `Execer`, which
+needs `ExecContext` alone, so that a `*sql.Conn` is one. go-ora asked for
+`Exec` and `Prepare`, which a `*sql.Conn` lacks, and a queue of a `*sql.DB`
+held a connection that the pool could give to another caller. A dequeue
+that finds no message returns none and no error, as python-oracledb does,
+where go-ora returned ORA-25228 and an empty message. The server breaks a
+dequeue of an array that finds no message and sends ORA-25228 after the
+reset, which the queue reads, where go-ora returned the reset as a timeout.
+A message writes its expiration as a signed number and its shard as four
+bytes, and an array asks for the ID of each message, as python-oracledb
+writes them, where go-ora wrote -1, the shard and the flags so that the
+server broke a dequeue of an array. A dequeue takes the delivery mode of its
+options, which go-ora took from the message that it had not read yet, and
+an array returns the messages that came back, each with its own ID.
+`TestAQRaw`, `TestAQBulk`, `TestAQObject` and `TestAQJSON` hold the cases of
+python-oracledb, which had no test here before.
 
 ## DSN
 
@@ -600,12 +630,28 @@ A sentinel error is a constant of the type `Error`, as in dbimp D6:
 `ErrCompilation`.
 
 An error from the server is a `*ServerError`, with the `ORA-` code, the message
-and the position in the statement. Its `Is` method makes ORA-01017 and
-ORA-28000 match `ErrAuthentication`, as dbimp D197 asks, and ORA-24344 match
-`ErrCompilation`. A statement that creates a unit that does not compile
+and the position in the statement. `Error` returns the message of the server
+alone, with no line feed at its end, and `ErrPos` the position. go-ora added a
+line with the position, which usql printed, and which held 0 for an error with
+no position. Its `Is` method makes ORA-01017 and
+ORA-01005, for no password, match `ErrAuthentication`, and ORA-24344 match
+`ErrCompilation`. An account that is locked, ORA-28000, or whose password
+expired, ORA-28001, does not match, since a new password does not help. This
+document said that ORA-28000 matched, as dbimp D197 asks, which the code never
+did. ORA-28041 matched until usql W66, but the driver raises it itself for
+logon data of the server that it cannot read. A statement that creates a unit that does not compile
 returns ORA-24344, and a warning of the server goes to the `Logger` (D32). A message is lower
 case, starts with a gerund and names what failed, such as
 `reading the accept packet: %w`.
+
+A `*ServerError` and an `Error` have the method `AuthenticationRefused() bool`,
+which usql asks an error for to decide that the server refused the
+credential, and so prompts for a password (usql W66). It is true where
+`errors.Is(err, ErrAuthentication)` is: ORA-01017 and ORA-01005, and
+`ErrAuthentication` itself, so that a new password can succeed. It is false
+for a lack of a permission, ORA-01031 or ORA-01045, and for ORA-28000,
+ORA-28001 and ORA-28041. usql declares the interface, so the driver imports nothing of
+it. `TestAuthenticationRefused` and `TestConnectRefused` hold it.
 
 `driver.ErrBadConn` is returned only when the statement did not reach the
 server, so that `database/sql` runs it again only when that is safe.
