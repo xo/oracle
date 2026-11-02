@@ -276,6 +276,7 @@ func (conn *Connection) OpenWithContext(ctx context.Context) error {
 	}
 	conn.connOption.ResetServerIndex()
 	conn.session = tns.NewSession(conn.connOption, conn.logger)
+	conn.session.Drain = conn.drainBreak
 	// the packets of the logon carry the encrypted session key and password,
 	// so the logger sees only their length until the logon ends (D14)
 	conn.session.HidePackets(true)
@@ -566,6 +567,22 @@ func (conn *Connection) freeTemporaryLobs() error {
 }
 
 // Close the connection by disconnect network session
+// drainBreak reads the answer of a break that came after the call that it
+// broke had ended: the marker, the reset, and ORA-01013, which it drops. A
+// read that fails makes the connection bad.
+func (conn *Connection) drainBreak() error {
+	err := conn.read()
+	if errors.Is(err, tns.ErrConnReset) {
+		err = conn.read()
+	}
+	var oerr *tns.OracleError
+	if err == nil || errors.As(err, &oerr) && oerr.ErrCode == 1013 {
+		return nil
+	}
+	conn.setBad()
+	return err
+}
+
 // eocsTxnInProgress is the flag of the end of a call that says that a
 // transaction is open.
 const eocsTxnInProgress = 0x2

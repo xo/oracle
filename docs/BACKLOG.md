@@ -34,15 +34,6 @@ in neither view. python-oracledb reads its type OID from
 `DBMS_PICKLER.GET_TYPE_SHAPE` and its attributes from `ALL_TAB_COLS`, and the
 driver can do the same.
 
-### Find why TestLobReader hangs on 11g
-
-On 2026-11-02, `TestLobReader` of the root package hung on 11g, in both LOB
-modes, waiting for the reply to a read of 3 characters at offset 1,296 of a
-CLOB. It hung at `898b212` too, which passed on 11g earlier that day, and
-after a restart of the server. The other releases pass it. Find whether the
-server or the driver stops, and whether a piece that ends inside a pair of
-UTF-16 surrogates has to do with it.
-
 ### Report batch errors and the count of each row
 
 A batch of DML stops at its first error, and returns the count of all its

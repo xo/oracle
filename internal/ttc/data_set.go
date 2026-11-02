@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"io"
 	"reflect"
-	"sync/atomic"
+	"sync"
 )
 
 // Compile time Sentinels for implemented Interfaces.
@@ -21,9 +21,9 @@ type DataSet struct {
 	index      int
 	// row is the current row of NextRow, which ScanColumn reads
 	row []driver.Value
-	// closed is true once Close ran. A LOB that ScanColumn returns reads
-	// until then (D22).
-	closed atomic.Bool
+	// guard is shared with the LOBs that ScanColumn returns, which read
+	// until Close ran (D22)
+	guard rowGuard
 	//columnCount     int
 	//rowCount        int
 	//uACBufferLength int
@@ -50,13 +50,29 @@ func (dataSet *DataSet) clear() {
 	dataSet.index = 0
 }
 
+// rowGuard is what the rows share with their LOBs (D22). closed is true once
+// the rows closed. A LOB call holds mu while it uses the connection, and
+// Close takes mu, so that a close of the rows from another goroutine, as
+// database/sql runs when the context of a query ends, waits for the call. A
+// close in the middle of a LOB read wrote the close of the cursor while the
+// read waited for its reply, which then answered the close, and the
+// connection waited for good.
+type rowGuard struct {
+	mu     sync.Mutex
+	closed bool
+}
+
 // Close closes each result set. A nil DataSet has nothing to close, where it
 // panicked, which was sijms/go-ora#762.
 func (dataSet *DataSet) Close() error {
 	if dataSet == nil {
 		return nil
 	}
-	dataSet.closed.Store(true)
+	// a LOB call of a row that runs holds the lock, so a close from another
+	// goroutine waits for it
+	dataSet.guard.mu.Lock()
+	dataSet.guard.closed = true
+	dataSet.guard.mu.Unlock()
 	var err error
 	for _, resultSet := range dataSet.resultSets {
 		err = resultSet.Close()

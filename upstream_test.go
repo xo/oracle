@@ -430,7 +430,10 @@ func TestNetworkEncryption(t *testing.T) {
 func TestLobReader(t *testing.T) {
 	db := openLive(t)
 	ctx := t.Context()
-	createTable(t, db, "xo_oracle_lob_reader", "c CLOB, b BLOB")
+	// the LOBs are CACHE. A LOB of 11g is NOCACHE otherwise, and each of the
+	// thousands of reads of pieces of 7 bytes went to a disk that took 140 ms
+	// at times, which looked like a hang
+	createTable(t, db, "xo_oracle_lob_reader", "c CLOB, b BLOB) LOB (c) STORE AS (CACHE) LOB (b) STORE AS (CACHE")
 	text := strings.Repeat("a😀한", 5000)
 	data := make([]byte, 300_000)
 	for i := range data {

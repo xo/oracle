@@ -298,7 +298,7 @@ these faults, which are fixed:
 - An OUT string of PL/SQL held 8,191 characters on AL32UTF8, where the size
   was 32,767.
 
-The twenty-sixth part of step 9 is done, and it finishes the tests of
+The twenty-sixth part of step 9 is done (`441787d`), and it finishes the tests of
 python-oracledb (D28). Ken asked for the rest in one part. The cases of
 `connection/test_1000_basic.py`, `aq/`, `ext/test_ext_2100_bfile_type.py`
 and `misc/test_1600_defaults.py` that test this driver are written, and the
@@ -326,4 +326,16 @@ code never did. usql waits for a release of this module. At its request,
 line of the position, which `ErrPos` still returns.
 `TestSessionPars` of go-ora checked its error the wrong way round, and
 passed only while `Error` added that line. It checks the message now.
-`TestLobReader` hangs on 11g, at `898b212` too, and is in the BACKLOG.
+`TestLobReader` hung on 11g, at `898b212` too.
+
+
+Ken asked for items 1 to 7 of the BACKLOG in one chain, with a commit for
+each and no push until he confirms. He chose the forms of D34 and D35 and the
+tag v0.1.0 at the start.
+
+1. `TestLobReader` did not hang. Each read of a NOCACHE LOB of 11g went to a
+   disk that took 140 ms at times, and pieces of 7 bytes made thousands of
+   them. The test stores its LOBs as CACHE. The search found two faults of
+   the break, which are fixed: a close of the rows from another goroutine
+   wrote in the middle of a LOB call, and the answer of a break that came
+   after its call ended went to the next call.

@@ -206,6 +206,13 @@ broken. `EndContext` waits for a break that started, so that the next call
 never meets it halfway. The flag of the break is read under the lock of the
 session, which was a data race in `go-ora`.
 
+A break can reach the server after the call that it broke has ended. The
+server then answers it at the start of the next call, with a marker and
+ORA-01013. The session marks a break pending until a marker answers it, and
+`ResetBuffer`, which starts each call, first reads and drops that answer.
+go-ora read it as the reply of the next call, which failed with ORA-01013, or
+which waited for good. `TestLobReadDeadline` holds it.
+
 A LOB that the driver reads while it fetches rows, or uploads while it binds a
 statement, runs inside a call that is watched already, or under `Next`, where
 `database/sql` gives no context. It reads with `Lob.Load`, which watches
@@ -226,9 +233,13 @@ loaded there instead, and only for a destination that is not an
 `NewReader` reads in pieces (D22). A NULL LOB scans as nil, and a LOB whose
 locator holds its value scans as the value with no round trip. Both went to
 the destination as the LOB itself after D22, until `TestBatchBlob` found it.
-A locator of a row holds the closed flag
-of its `DataSet`, and each operation of its `LobStream` fails with
-`ErrRowsClosed` once the flag is set.
+A locator of a row shares a guard with its `DataSet`: a flag that `Close`
+sets, after which each operation of its `LobStream` fails with
+`ErrRowsClosed`, and a lock that each operation holds while it uses the
+connection. `Close` takes the lock, so a close from another goroutine, which
+`database/sql` runs when the context of a query ends, waits for a LOB call
+in flight. It wrote the close of the cursor in the middle of the call
+before.
 A fetch that brings LOB or LONG values inside it, as `lob_fetch=inline`
 does, asks for one row first. Each later fetch asks for the rows that fill
 4 MiB with values the size of the last ones. A prefetch that the caller sets

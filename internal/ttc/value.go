@@ -155,7 +155,7 @@ func (dataSet *DataSet) lobValue(index int, dest any) (any, error) {
 // own makes the LOB of stream read only until the rows close (D22).
 func (dataSet *DataSet) own(stream types.LobStreamer) {
 	if s, ok := stream.(*LobStream); ok {
-		s.closed = &dataSet.closed
+		s.rows = &dataSet.guard
 	}
 }
 

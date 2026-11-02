@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/config"
@@ -30,21 +29,28 @@ type LobStream struct {
 	bNullO2U      bool
 	isNull        bool
 	sendSize      bool
-	// closed is true once the rows of the LOB closed. It is nil for a LOB
-	// that is not of a row.
-	closed *atomic.Bool
+	// rows is the guard of the rows of the LOB. It is nil for a LOB that is
+	// not of a row.
+	rows *rowGuard
 }
 
-// usable returns an error when the LOB has no locator, or when its rows
-// closed, after which the connection can serve another caller (D22).
-func (lob *LobStream) usable() error {
+// enter begins a call of the LOB, and returns the func that ends it. It
+// fails when the LOB has no locator, or when its rows closed, after which
+// the connection can serve another caller (D22). The call of a LOB of a row
+// holds the lock of its rows, so that the rows do not close in its middle.
+func (lob *LobStream) enter() (func(), error) {
 	if lob.sourceLocator == nil {
-		return errEmptyLocator
+		return nil, errEmptyLocator
 	}
-	if lob.closed != nil && lob.closed.Load() {
-		return tns.ErrRowsClosed
+	if lob.rows == nil {
+		return func() {}, nil
 	}
-	return nil
+	lob.rows.mu.Lock()
+	if lob.rows.closed {
+		lob.rows.mu.Unlock()
+		return nil, tns.ErrRowsClosed
+	}
+	return lob.rows.mu.Unlock, nil
 }
 
 func (lob *LobStream) initialize() {
@@ -75,9 +81,11 @@ func (lob *LobStream) StringCoder() charset.StringCoder {
 
 // getSize return lob size
 func (lob *LobStream) Size() (size int64, err error) {
-	if err := lob.usable(); err != nil {
+	leave, err := lob.enter()
+	if err != nil {
 		return 0, err
 	}
+	defer leave()
 	lob.initialize()
 	lob.sendSize = true
 	session := lob.conn.session
@@ -99,9 +107,11 @@ func (lob *LobStream) Size() (size int64, err error) {
 }
 
 func (lob *LobStream) Read(offset, count int64) (data []byte, err error) {
-	if err := lob.usable(); err != nil {
+	leave, err := lob.enter()
+	if err != nil {
 		return nil, err
 	}
+	defer leave()
 	if offset == 0 && count == 0 {
 		lob.conn.logger.Debug("read LOB data")
 	} else {
@@ -147,15 +157,17 @@ func (lob *LobStream) Write(data []byte) error {
 }
 
 func (lob *LobStream) Exists() (bool, error) {
-	if err := lob.usable(); err != nil {
+	leave, err := lob.enter()
+	if err != nil {
 		return false, err
 	}
+	defer leave()
 	lob.initialize()
 	lob.bNullO2U = true
 	session := lob.conn.session
 	session.ResetBuffer()
 	lob.writeOp(0x800)
-	err := session.Write()
+	err = session.Write()
 	if err != nil {
 		return false, err
 	}
@@ -236,9 +248,11 @@ func (lob *LobStream) CreateTemporaryLocator(charsetID, charsetForm int) (types.
 }
 
 func (lob *LobStream) Open(mode, opID int) error {
-	if err := lob.usable(); err != nil {
+	leave, err := lob.enter()
+	if err != nil {
 		return err
 	}
+	defer leave()
 	lob.conn.logger.Debug("open LOB", "mode", mode, "operation", opID)
 	if lob.sourceLocator.IsTemporary() {
 		if lob.sourceLocator[7]&8 == 8 {
@@ -255,7 +269,7 @@ func (lob *LobStream) Open(mode, opID int) error {
 	lob.sendSize = true
 	lob.conn.session.ResetBuffer()
 	lob.writeOp(opID)
-	err := lob.conn.session.Write()
+	err = lob.conn.session.Write()
 	if err != nil {
 		return err
 	}
@@ -264,14 +278,16 @@ func (lob *LobStream) Open(mode, opID int) error {
 }
 
 func (lob *LobStream) Close(opID int) error {
-	if err := lob.usable(); err != nil {
+	leave, err := lob.enter()
+	if err != nil {
 		return err
 	}
+	defer leave()
 	lob.conn.logger.Debug("close LOB")
 	lob.initialize()
 	lob.conn.session.ResetBuffer()
 	lob.writeOp(opID)
-	err := lob.conn.session.Write()
+	err = lob.conn.session.Write()
 	if err != nil {
 		return err
 	}

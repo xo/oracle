@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/xo/oracle"
 )
@@ -279,5 +281,63 @@ END;`,
 	}
 	if err := rows.Err(); err != nil || n != 1 {
 		t.Errorf("got %d rows, %v", n, err)
+	}
+}
+
+// TestLobReadDeadline reads a CLOB in small pieces under a short deadline, so
+// that the deadline ends the read in the middle of a call. database/sql then
+// closes the rows from another goroutine, while the LOB call waits for its
+// reply. The close waited for nothing, and wrote the close of the cursor in
+// the middle of the call, which then read the reply of the LOB as that of
+// the close, and the connection waited for good. The close now waits for the
+// call, and the connection serves the next query.
+func TestLobReadDeadline(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	db.Exec("DROP TABLE go_lob_deadline PURGE")
+	if err := execCmd(db, "CREATE TABLE go_lob_deadline (c CLOB)"); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DROP TABLE go_lob_deadline PURGE")
+	clob, err := oracle.CreateClob(t.Context(), db, strings.Repeat("abcdefgh", 1<<16), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), "INSERT INTO go_lob_deadline VALUES (:1)", clob); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 5 {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Duration(20+i*7)*time.Millisecond)
+		rows, err := db.QueryContext(ctx, "SELECT c FROM go_lob_deadline", oracle.WithLobFetch(oracle.LobFetchStream))
+		if err == nil && rows.Next() {
+			var c oracle.Clob
+			if err = rows.Scan(&c); err == nil {
+				_, err = io.ReadAll(c.NewReaderSize(ctx, 16))
+			}
+		}
+		if rows != nil {
+			rows.Close()
+		}
+		cancel()
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			t.Logf("read %d: %v", i, err)
+		}
+		done := make(chan error, 1)
+		go func() {
+			var n int
+			done <- db.QueryRowContext(t.Context(), "SELECT 1 FROM dual").Scan(&n)
+		}()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Errorf("a query after read %d: %v", i, err)
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatalf("a query after read %d did not return", i)
+		}
 	}
 }

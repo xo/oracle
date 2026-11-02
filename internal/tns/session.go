@@ -42,7 +42,14 @@ type Session struct {
 	breakMu sync.Mutex
 	// breakDeadline is the end of the grace of a break, in Unix nanoseconds,
 	// or zero
-	breakDeadline     atomic.Int64
+	breakDeadline atomic.Int64
+	// breakPending is true from a break until the server answers it. A break
+	// that comes after its call ended is answered at the start of the next
+	// call, which Drain reads and drops
+	breakPending atomic.Bool
+	// Drain reads the answer of a break that is pending, the reset and its
+	// ORA-01013. The connection sets it
+	Drain             func() error
 	conn              net.Conn
 	sslConn           *tls.Conn
 	reader            *bufio.Reader
@@ -172,8 +179,20 @@ func (session *Session) resetRead() {
 	}
 }
 
-// ResetBuffer empty in and out buffer and set read index to 0
+// ResetBuffer empty in and out buffer and set read index to 0. A call starts
+// with it, so it first drains the answer of a break that came after the call
+// that it broke had ended. go-ora read that answer as the reply of the next
+// call, which then failed with ORA-01013, or waited for good.
 func (session *Session) ResetBuffer() {
+	if session.breakPending.Load() && session.Drain != nil {
+		session.breakPending.Store(false)
+		session.ResetBreak()
+		session.breakDeadline.Store(time.Now().Add(breakGrace).UnixNano())
+		if err := session.Drain(); err != nil {
+			session.logger.Info("draining the answer of a break", "error", err)
+		}
+		session.breakDeadline.Store(0)
+	}
 	session.Summary = nil
 	session.resetWrite()
 	session.resetRead()
@@ -406,6 +425,7 @@ func (session *Session) BreakConnection() error {
 	session.mu.Lock()
 	session.breakConn = true
 	session.mu.Unlock()
+	session.breakPending.Store(true)
 	return nil
 }
 
@@ -633,6 +653,8 @@ func (session *Session) Write() error {
 
 func (session *Session) processMarker() error {
 	var err error
+	// the reset answers a break
+	session.breakPending.Store(false)
 	// send reset connection
 	session.resetWrite()
 	marker := newMarkerPacket(markerTypeReset, session.Context)
