@@ -416,7 +416,7 @@ its type for an object. `go-ora` gave none. `TestColumnType` holds it.
 | `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` at the same instant, in the time zone of the database | |
 | `INTERVAL YEAR TO MONTH` | `IntervalYM` | `string` |
 | `INTERVAL DAY TO SECOND` | `time.Duration` | `string` |
-| `RAW`, `LONG RAW`, `BLOB` | `[]byte` | `Blob` |
+| `RAW`, `LONG RAW`, `BLOB` | `[]byte` | `Blob`, and `uuid.UUID` for a `RAW(16)` |
 | `BOOLEAN` | `bool` | `sql.Null[bool]` |
 | `JSON` | `JSON`, which holds the document | `string`, any type that `encoding/json/v2` decodes |
 | `VECTOR` | the elements: `[]float32`, `[]float64`, `[]int8`, `[]byte` of `BINARY`, or `SparseVector` | `Vector` |
@@ -465,6 +465,13 @@ python-oracledb does. With the count that go-ora sent, an OUT of PL/SQL held
 32,767 bytes divided by the bytes of a character, 8,191 on AL32UTF8. 11g
 holds one to that size in any case. `TestVarTypes` holds a value and a NULL
 of each type, OUT and IN OUT, for the types of `test_2000_var.py`.
+
+A `uuid.UUID` of the standard library binds as a `RAW(16)`, which is how
+Oracle stores a UUID, and so do a `*uuid.UUID` and a `sql.Null[uuid.UUID]`.
+The driver took one, a `[16]byte`, for a PL/SQL array, which the server
+refused with ORA-01484. The `Value` method of a `sql.Null[uuid.UUID]` makes
+its text, so `types.OwnNull` reads it. An OUT of one takes 16 bytes. A
+`RAW(16)` scans into `*any` as a `[]byte` (D37). `TestUUIDs` holds it.
 
 A string longer than the longest `VARCHAR2` binds as a `LONG`. 11g and 18c
 convert one to the UTF-16 of a `CLOB` one packet at a time, and stored U+FFFD

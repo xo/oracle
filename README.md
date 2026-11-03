@@ -169,6 +169,7 @@ of a column decides the Go type that a scan into `*any` gets:
 | `BINARY_FLOAT`, `BINARY_DOUBLE` | `float64` |
 | `INTERVAL YEAR TO MONTH` | `oracle.IntervalYM` |
 | `INTERVAL DAY TO SECOND` | `time.Duration` |
+| `RAW`, `LONG RAW`, `BLOB` | `[]byte` |
 | `DATE`, `TIMESTAMP` | `time.Time` in UTC |
 | `TIMESTAMP WITH TIME ZONE` | `time.Time` in its zone |
 | `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` in the zone of the database |
@@ -178,6 +179,18 @@ of the value in UTC, whatever the zone of the server. To read one as the time
 in a zone, such as `Europe/Prague`, call `time.Date` with the fields of the
 value and that zone. A `time.Time` binds as its wall clock, and the server
 reads it in the zone of the session. `oracle.TimestampTZ` binds with its zone.
+
+Oracle stores a UUID as a `RAW(16)`. A `uuid.UUID` of the standard library
+binds as one, and a `RAW(16)` scans into a `*uuid.UUID`. A scan into `*any`
+gives a `[]byte`, because a `RAW(16)` can hold other things, such as a hash:
+
+```go
+id := uuid.NewV7()
+_, err := db.ExecContext(ctx, "INSERT INTO orders (id) VALUES (:1)", id)
+
+var got uuid.UUID
+err = db.QueryRowContext(ctx, "SELECT id FROM orders").Scan(&got)
+```
 
 A string or a `[]byte` longer than 32,767 bytes, or 4,000 on 11g, binds as a
 `LONG` or a `LONG RAW`. SQL takes one only as a value to insert or set. Where

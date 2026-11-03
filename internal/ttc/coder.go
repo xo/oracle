@@ -2,9 +2,10 @@ package ttc
 
 import (
 	"database/sql"
-	"github.com/cockroachdb/apd/v3"
 	"time"
+	"uuid"
 
+	"github.com/cockroachdb/apd/v3"
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/types"
 )
@@ -21,6 +22,10 @@ func builtinCoder(v any) codec.OracleParameterCoder {
 	case types.NVarChar, sql.Null[types.NVarChar]:
 		return &codec.StringParameter{National: true}
 	case []byte, types.Raw:
+		return &codec.RawParameter{}
+	case uuid.UUID, sql.Null[uuid.UUID]:
+		// a UUID is a RAW(16) by the convention of Oracle, which has no
+		// type of its own for one (D37)
 		return &codec.RawParameter{}
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64,
 		types.Number, *apd.Decimal, apd.Decimal,

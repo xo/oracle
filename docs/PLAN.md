@@ -45,6 +45,7 @@ conclusion.
 | [D34](#d34-batch-errors-and-the-count-of-each-row-are-options) | Decided |
 | [D35](#d35-a-returning-of-rows-fills-an-out-of-a-slice) | Decided |
 | [D36](#d36-the-first-tag-is-v010) | Decided |
+| [D37](#d37-a-uuid-binds-as-a-raw16-and-a-raw16-scans-as-bytes) | Decided |
 
 ## Purpose
 
@@ -530,6 +531,27 @@ and `usql` are told.
 
 Ken said so on 2026-11-02. v0.1.0 is the commit `c3ce25b`, and its release
 is on GitHub. The `dburl` and `usql` sessions were told the same day.
+
+## D37. A UUID binds as a RAW(16), and a RAW(16) scans as bytes
+
+Status: Decided.
+
+Oracle has no type for a UUID, and its convention is a `RAW(16)`, which
+`SYS_GUID()` fills. Ken decided on 2026-11-04 that a `uuid.UUID` of the
+standard library binds as a `RAW(16)`, and that a `RAW(16)` still scans into
+`*any` as a `[]byte`:
+
+- A `uuid.UUID`, a `*uuid.UUID` and a `sql.Null[uuid.UUID]` bind as a `RAW`,
+  and a nil pointer and a NULL as a NULL `RAW`. A `[]uuid.UUID` is a batch
+  of them. The driver took a `uuid.UUID`, a `[16]byte`, for a PL/SQL array,
+  and the server refused it with ORA-01484.
+- An OUT into a `uuid.UUID` or a `sql.Null[uuid.UUID]` takes its 16 bytes
+  with no size.
+- A `RAW(16)` scans into a `*uuid.UUID`, as it did before.
+- A scan into `*any` gives a `[]byte` for every `RAW`, a `RAW(16)` too. A
+  `RAW(16)` also holds hashes and keys that are no UUID, and a value of
+  `SYS_GUID()` has none of the version bits of RFC 9562. A `uuid.UUID` in
+  `*any` claims what the column does not hold, and changes what v0.1.x gives.
 
 ## Open questions for Ken
 

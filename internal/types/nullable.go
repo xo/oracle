@@ -5,12 +5,13 @@ import (
 	"database/sql/driver"
 	"reflect"
 	"time"
+	"uuid"
 )
 
 // OwnNull returns the value of a nullable type whose value the driver binds
 // itself, and reports whether v is one. The Value method of sql.Null[T]
-// converts a time.Duration to an int64 and refuses an IntervalYM, so the
-// driver reads these few itself.
+// converts a time.Duration to an int64, refuses an IntervalYM, and makes the
+// text of a uuid.UUID, so the driver reads these few itself.
 func OwnNull(v any) (any, bool) {
 	switch n := v.(type) {
 	case sql.Null[time.Duration]:
@@ -24,6 +25,10 @@ func OwnNull(v any) (any, bool) {
 	case sql.Null[TimestampTZ]:
 		return nullOf(n), true
 	case *sql.Null[TimestampTZ]:
+		return nullOf(*n), true
+	case sql.Null[uuid.UUID]:
+		return nullOf(n), true
+	case *sql.Null[uuid.UUID]:
 		return nullOf(*n), true
 	}
 	return nil, false

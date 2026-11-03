@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"uuid"
 )
 
 type Raw struct {
@@ -35,6 +36,12 @@ func (raw *Raw) SetValue(input any) error {
 		raw.bValue = []byte(data)
 	case *string:
 		raw.bValue = []byte(*data)
+	case uuid.UUID:
+		raw.bValue = data[:]
+	case *uuid.UUID:
+		if data != nil {
+			raw.bValue = data[:]
+		}
 	default:
 		return fmt.Errorf("cannot set value of type %T into Blob", input)
 	}

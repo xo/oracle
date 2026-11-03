@@ -5,10 +5,12 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/cockroachdb/apd/v3"
 	"reflect"
 	"strconv"
 	"time"
+	"uuid"
+
+	"github.com/cockroachdb/apd/v3"
 
 	"github.com/xo/oracle/internal/types"
 )
@@ -235,6 +237,10 @@ func ownValue(v any) bool {
 	case sql.Null[types.NVarChar]:
 		// database/sql made a string of the value, which binds as a
 		// VARCHAR2
+		return true
+	case sql.Null[uuid.UUID]:
+		// database/sql refuses the uuid.UUID that its Value returns, which
+		// is no driver.Value
 		return true
 	case sql.Null[bool], sql.NullBool:
 		// a NULL bool binds as a NULL BOOLEAN, which PL/SQL assigns to a

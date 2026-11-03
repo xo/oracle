@@ -1436,7 +1436,9 @@ func (stmt *Stmt) _exec(args []driver.NamedValue) (*QueryResult, error) {
 		if stmt.bulkExec {
 			tempType := reflect.TypeOf(args[x].Value)
 			tempVal := reflect.ValueOf(args[x].Value)
-			if args[x].Value != nil && tempType != reflect.TypeFor[[]byte]() && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
+			// a []byte and a uuid.UUID are one value each, and any other
+			// array or slice holds the rows of a batch
+			if args[x].Value != nil && builtinCoder(args[x].Value) == nil && (tempType.Kind() == reflect.Array || tempType.Kind() == reflect.Slice) {
 				// every array of a batch holds one value for each row. An
 				// empty array panicked, and a shorter one cut the others
 				// short, which was sijms/go-ora#695

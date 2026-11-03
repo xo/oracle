@@ -3,6 +3,7 @@ package ttc
 import (
 	"database/sql"
 	"reflect"
+	"uuid"
 
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
@@ -149,6 +150,12 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 	}
 	if par.MaxLen < size {
 		par.MaxLen = size
+	}
+	// an OUT of a UUID holds its 16 bytes with no size, where the length of
+	// a NULL destination gave the RAW none
+	if par.Direction != Input && par.MaxLen < 16 &&
+		(tempType == reflect.TypeFor[uuid.UUID]() || tempType == reflect.TypeFor[sql.Null[uuid.UUID]]()) {
+		par.MaxLen = 16
 	}
 	if par.Direction != Input && par.DataType == types.NCHAR {
 		// the size of an OUT string is in characters, and the server sizes
