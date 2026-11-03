@@ -1041,6 +1041,11 @@ and nothing else:
 - A JSON column scans into `*any` as a `jsontext.Value`, into a `*string`, a
   `*[]byte` or a `*jsontext.Value` as text, and into any other destination
   through `json.Unmarshal`.
+- A CLOB or a BLOB with an `IS JSON` check is a CLOB or a BLOB, and scans as
+  one. The server gives it the flag of JSON, as it gives a column of the JSON
+  and the VECTOR types. go-ora defined it as a locator in the inline mode and
+  then read the row as inline text, which failed with `TTC error: received
+  code 0`. `TestJSONCheckedLobs` holds it.
 
 The interfaces `JSONCoder`, `JSONEncoder` and `JSONDecoder`, the `Coder`
 field, the type `Oson`, the global map of field encoders and the `reflect` of

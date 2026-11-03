@@ -532,3 +532,66 @@ VALUES (:1, :2, :3, :4, :5, :6, :7, :8)`)
 		t.Fatal(err)
 	}
 }
+
+// TestJSONCheckedLobs reads a CLOB and a BLOB that have an IS JSON check, as
+// text and as bytes, in the LOB mode of the DSN. The server gives such a
+// column the flag of JSON, and go-ora defined it as a locator in the inline
+// mode and then read the row as inline text, which failed with "TTC error:
+// received code 0". A document of 40 KiB checks that the value comes whole.
+// IS JSON needs 12c.
+func TestJSONCheckedLobs(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	requireRelease(t, db, 12)
+	db.Exec("DROP TABLE go_json_lobs PURGE")
+	if err := execCmd(db, "CREATE TABLE go_json_lobs (id NUMBER, c CLOB CHECK (c IS JSON), b BLOB CHECK (b IS JSON))"); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DROP TABLE go_json_lobs PURGE")
+	long := `{"k":"` + strings.Repeat("x", 40<<10) + `"}`
+	docs := []string{`{"a":1}`, long}
+	for i, doc := range docs {
+		clob, err := oracle.CreateClob(t.Context(), db, doc, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		blob, err := oracle.CreateBlob(t.Context(), db, []byte(doc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(t.Context(), "INSERT INTO go_json_lobs VALUES (:1, :2, :3)", i, clob, blob); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(t.Context(), "INSERT INTO go_json_lobs VALUES (2, NULL, NULL)"); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.QueryContext(t.Context(), "SELECT id, c, b FROM go_json_lobs ORDER BY id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var id int
+		var c sql.Null[string]
+		var b []byte
+		if err := rows.Scan(&id, &c, &b); err != nil {
+			t.Fatal(err)
+		}
+		if id < len(docs) {
+			if !c.Valid || c.V != docs[id] || string(b) != docs[id] {
+				t.Errorf("row %d: got %d and %d bytes, want %d", id, len(c.V), len(b), len(docs[id]))
+			}
+		} else if c.Valid || b != nil {
+			t.Errorf("the NULL row: got %+v and %v", c, b)
+		}
+		n++
+	}
+	if err := rows.Err(); err != nil || n != 3 {
+		t.Errorf("got %d rows, %v", n, err)
+	}
+}

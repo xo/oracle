@@ -250,7 +250,13 @@ func (stmt *defaultStmt) writeDefine() error {
 		if col.isLobType() {
 			num = 0
 			// temp.ContFlag |= 0x2000000
-			if stmt.connection.connOption.Lob == config.INLINE && !col.IsJSON && col.DataType != types.OCIFileLocator {
+			// a column of the JSON or the VECTOR type comes with its
+			// locator, and has the flag of JSON. A CLOB or a BLOB with an
+			// IS JSON check has the same flag, and is defined as any other
+			// LOB, where go-ora defined it as a locator and then read the
+			// row as inline text
+			checked := col.DataType == types.OCIClobLocator || col.DataType == types.OCIBlobLocator
+			if stmt.connection.connOption.Lob == config.INLINE && (!col.IsJSON || checked) && col.DataType != types.OCIFileLocator {
 				num = 0x3FFFFFFF
 				if col.DataType == types.OCIBlobLocator || col.DataType == types.VECTOR || col.DataType == types.JSONType {
 					col.DataType = types.LongRaw
