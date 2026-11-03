@@ -393,3 +393,9 @@ database started.
 CI passed on every release with the fix (`9d845bb`), and Ken had it tagged
 v0.1.1 and released on GitHub the same day. The `dburl` and `usql` sessions
 were told to take v0.1.1.
+
+dbmeta found that a CLOB with an IS JSON check failed in the inline LOB
+mode on 19c (`7fd780a`). Ken then decided D37, and a `uuid.UUID` binds as a
+`RAW(16)` (`7a48c4c`). CI passed on both, and Ken had `7a48c4c` tagged
+v0.2.0 and released on GitHub on 2026-11-04. The `dbmeta` and `usql`
+sessions were told.
