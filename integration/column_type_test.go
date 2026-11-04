@@ -2,6 +2,7 @@ package integration
 
 import (
 	"database/sql"
+	"math"
 	"testing"
 )
 
@@ -74,6 +75,84 @@ func TestColumnType(t *testing.T) {
 	if got := types[0].DatabaseTypeName(); got != "ROWID" && got != "UROWID" {
 		t.Errorf("ROWID: got %q", got)
 	}
+}
+
+// TestColumnTypeLength checks the length that ColumnTypeLength gives a column
+// of each type, of a table and of an expression. A string gives its length in
+// characters and a RAW in bytes, so that a caller can tell a RAW(16), which
+// holds a GUID, from another RAW. A LOB gives math.MaxInt64, and a type of
+// fixed length gives none. go-ora gave a length for a string only.
+func TestColumnTypeLength(t *testing.T) {
+	db, err := getDB(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	ctx := t.Context()
+	type length struct {
+		n  int64
+		ok bool
+	}
+	columns := []struct {
+		def  string
+		want length
+	}{
+		{"VARCHAR2(10 BYTE)", length{10, true}},
+		{"VARCHAR2(10 CHAR)", length{10, true}},
+		{"NVARCHAR2(10)", length{10, true}},
+		{"CHAR(5)", length{5, true}},
+		{"NCHAR(5)", length{5, true}},
+		{"RAW(16)", length{16, true}},
+		{"RAW(2000)", length{2000, true}},
+		{"CLOB", length{math.MaxInt64, true}},
+		{"NCLOB", length{math.MaxInt64, true}},
+		{"BLOB", length{math.MaxInt64, true}},
+		{"NUMBER(5)", length{}},
+		{"DATE", length{}},
+		{"TIMESTAMP", length{}},
+	}
+	def := ""
+	for i, c := range columns {
+		if i > 0 {
+			def += ", "
+		}
+		def += "c" + string(rune('a'+i)) + " " + c.def
+	}
+	_, _ = db.ExecContext(ctx, "DROP TABLE TTB_COLUMN_LENGTH PURGE")
+	if _, err := db.ExecContext(ctx, "CREATE TABLE TTB_COLUMN_LENGTH ("+def+")"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec("DROP TABLE TTB_COLUMN_LENGTH PURGE") })
+	check := func(query string, want []length, names []string) {
+		t.Helper()
+		rows, err := db.QueryContext(ctx, query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		types, err := rows.ColumnTypes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, w := range want {
+			n, ok := types[i].Length()
+			if n != w.n || ok != w.ok {
+				t.Errorf("%s: got %d, %t, want %d, %t", names[i], n, ok, w.n, w.ok)
+			}
+		}
+	}
+	var want []length
+	var names []string
+	for _, c := range columns {
+		want = append(want, c.want)
+		names = append(names, c.def)
+	}
+	check("SELECT * FROM TTB_COLUMN_LENGTH", want, names)
+	check("SELECT SYS_GUID(), HEXTORAW('AB'), CAST(NULL AS RAW(16)), 'abc', CAST('x' AS VARCHAR2(20)) FROM dual",
+		[]length{{16, true}, {1, true}, {16, true}, {3, true}, {20, true}},
+		[]string{"SYS_GUID()", "HEXTORAW('AB')", "CAST(NULL AS RAW(16))", "'abc'", "CAST('x' AS VARCHAR2(20))"})
+	check("SELECT TEXT FROM ALL_VIEWS WHERE ROWNUM < 2",
+		[]length{{math.MaxInt64, true}}, []string{"LONG"})
 }
 
 // TestQueryAllColumnTypes queries a table with a column of each of 18 types,

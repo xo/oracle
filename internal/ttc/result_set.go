@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -119,13 +120,26 @@ func (resultSet *ResultSet) ColumnTypeDatabaseTypeName(index int) string {
 	return (*resultSet.cols)[index].databaseType
 }
 
-// ColumnTypeLength return length of column type
+// ColumnTypeLength returns the declared length of a column of a type of
+// variable length. A string gives its length in characters, and a RAW its
+// length in bytes. A LONG, a LONG RAW, a LOB and a BFILE have no limit, and
+// give math.MaxInt64. A type of fixed length, such as NUMBER or DATE, gives
+// false. It reads the name of the type, because the define of an inline LOB
+// changes the data type of the column.
 func (resultSet *ResultSet) ColumnTypeLength(index int) (int64, bool) {
-	switch (*resultSet.cols)[index].DataType {
-	case types.NCHAR, types.CHAR:
-		return int64((*resultSet.cols)[index].MaxCharLen), true
+	col := (*resultSet.cols)[index]
+	switch col.databaseType {
+	case "CHAR", "NCHAR", "VARCHAR2", "NVARCHAR2":
+		if col.MaxCharLen > 0 {
+			return col.MaxCharLen, true
+		}
+		return col.MaxLen, true
+	case "RAW":
+		return col.MaxLen, true
+	case "LONG", "LONG RAW", "CLOB", "NCLOB", "BLOB", "BFILE":
+		return math.MaxInt64, true
 	}
-	return int64(0), false
+	return 0, false
 }
 
 // ColumnTypeNullable return if column allow null or not

@@ -1,6 +1,7 @@
 package ttc
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -48,6 +49,37 @@ func TestColumnTypeScanTypeInlineLOB(t *testing.T) {
 			got := rs.ColumnTypeScanType(0)
 			if got != c.want {
 				t.Errorf("ColumnTypeScanType(%v) = %v, want %v", c.dataType, got, c.want)
+			}
+		})
+	}
+}
+
+// TestColumnTypeLength checks the length that each type gives. A CLOB and a
+// BLOB of an inline define have the data type of a LONG, and still give the
+// length of a LOB.
+func TestColumnTypeLength(t *testing.T) {
+	cases := []struct {
+		name       string
+		col        ParameterInfo
+		want       int64
+		wantLength bool
+	}{
+		{"VARCHAR2", ParameterInfo{DataType: types.NCHAR, databaseType: "VARCHAR2", MaxLen: 40, MaxCharLen: 10}, 10, true},
+		{"NCHAR", ParameterInfo{DataType: types.CHAR, databaseType: "NCHAR", MaxLen: 10, MaxCharLen: 5}, 5, true},
+		{"CHAR_no_char_length", ParameterInfo{DataType: types.CHAR, databaseType: "CHAR", MaxLen: 3}, 3, true},
+		{"RAW", ParameterInfo{DataType: types.RAW, databaseType: "RAW", MaxLen: 16}, 16, true},
+		{"CLOB_inline", ParameterInfo{DataType: types.LongVarChar, databaseType: "CLOB"}, math.MaxInt64, true},
+		{"BLOB_inline", ParameterInfo{DataType: types.LongRaw, databaseType: "BLOB"}, math.MaxInt64, true},
+		{"LONG", ParameterInfo{DataType: types.LONG, databaseType: "LONG"}, math.MaxInt64, true},
+		{"NUMBER", ParameterInfo{DataType: types.NUMBER, databaseType: "NUMBER", MaxLen: 22}, 0, false},
+		{"DATE", ParameterInfo{DataType: types.DATE, databaseType: "DATE", MaxLen: 11}, 0, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rs := ResultSet{cols: &[]ParameterInfo{c.col}}
+			got, ok := rs.ColumnTypeLength(0)
+			if got != c.want || ok != c.wantLength {
+				t.Errorf("got %d, %t, want %d, %t", got, ok, c.want, c.wantLength)
 			}
 		})
 	}

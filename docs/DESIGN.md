@@ -405,6 +405,15 @@ the caller with no copy through `any`.
 `VARCHAR2`, `NCHAR`, `FLOAT` or `TIMESTAMP WITH TIME ZONE`, and the name of
 its type for an object. `go-ora` gave none. `TestColumnType` holds it.
 
+`ColumnTypeLength` gives the declared length of a string in characters, and
+of a `RAW` in bytes. So a caller can tell a `RAW(16)`, which holds a GUID,
+from another `RAW`. A `LONG`, a `LONG RAW`, a LOB and a `BFILE` give
+`math.MaxInt64`, as `database/sql` asks for a type with no limit. A type of
+fixed length, such as `NUMBER` or `DATE`, gives none. The length comes from
+the name of the type, because the define of an inline LOB changes the data
+type of the column. `go-ora` gave a length for a string only.
+`TestColumnTypeLength` holds it.
+
 | Oracle | Go, for a scan into `*any` | Also scans into |
 | --- | --- | --- |
 | `VARCHAR2`, `CHAR`, `NVARCHAR2`, `NCHAR`, `LONG`, `CLOB`, `NCLOB` | `string` | `[]byte`, `Clob` |
