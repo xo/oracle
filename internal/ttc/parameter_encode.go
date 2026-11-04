@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"uuid"
 
+	"github.com/cockroachdb/apd/v3"
+
 	"github.com/xo/oracle/internal/charset"
 	"github.com/xo/oracle/internal/codec"
 	"github.com/xo/oracle/internal/types"
@@ -47,6 +49,15 @@ func (par *ParameterInfo) encodeValue(size int64, stmt *Stmt) error {
 	tempValue, err := getValue(par.Value)
 	if err != nil {
 		return err
+	}
+	// the destination of an OUT, which can be a decimal of another package,
+	// binds as an *apd.Decimal, and takes the value back through Compose
+	d, isDecimal, err := decimalArg(par.Value)
+	if err != nil {
+		return err
+	}
+	if isDecimal {
+		tempType, tempValue = reflect.TypeFor[apd.Decimal](), d
 	}
 
 	if p, ok := tempValue.(*types.Object); ok && p != nil {

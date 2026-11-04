@@ -174,6 +174,10 @@ of a column decides the Go type that a scan into `*any` gets:
 | `TIMESTAMP WITH TIME ZONE` | `time.Time` in its zone |
 | `TIMESTAMP WITH LOCAL TIME ZONE` | `time.Time` in the zone of the database |
 
+A decimal of another package binds as a `NUMBER`, and scans from one with
+every digit, when it has the `Decompose` and `Compose` methods that
+`database/sql` uses.
+
 A `DATE` and a `TIMESTAMP` hold no zone, so the driver returns the wall clock
 of the value in UTC, whatever the zone of the server. To read one as the time
 in a zone, such as `Europe/Prague`, call `time.Date` with the fields of the

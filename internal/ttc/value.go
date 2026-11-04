@@ -192,6 +192,13 @@ func assign(scanCtx driver.ScanContext, dest, src any) error {
 			return nil
 		}
 	}
+	// a decimal of another package takes a number as its parts, with every
+	// digit, as database/sql gives it
+	if d, ok := dest.(composer); ok {
+		if done, err := composeDecimal(d, src); done {
+			return err
+		}
+	}
 	if d, ok := src.(*apd.Decimal); ok {
 		src = d.Text('f')
 	}

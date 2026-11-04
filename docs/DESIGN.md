@@ -565,6 +565,17 @@ so it is an `*apd.Decimal`, and it scans into an `*int64`.
 is, and an `*apd.Decimal` receives a decimal. Every other pair goes to
 `sql.ConvertAssign`, and a decimal goes to it as text.
 
+`database/sql` passes a decimal between two packages as its parts, a form, a
+sign, a coefficient and an exponent, through the methods `Decompose` and
+`Compose`. It does not export the interfaces that hold them. A value with
+`Decompose` binds as an `*apd.Decimal`, as an argument, as an attribute of an
+object and as the destination of an OUT. A destination with `Compose`
+receives a `NUMBER`, an integer, a `BINARY_DOUBLE` or the text of a number
+through it. The driver takes `Compose` before `Scan`, as `sql.ConvertAssign`
+does. go-ora knew neither method, so a decimal with the two methods and no
+`Scan` or `Value` failed both ways. `TestDecimalArg`,
+`TestAssignDecimal` and `TestNumberDecimalParts` hold it.
+
 An interval is an `IntervalYM` or a `time.Duration`, and both bind as an
 argument. `go-ora` read an interval as a `time.Time`, so `+2021-10` came back
 as 2021-09-30, and it wrote the nanoseconds of a day to second interval as

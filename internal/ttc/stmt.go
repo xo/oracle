@@ -1781,6 +1781,12 @@ func (stmt *Stmt) CheckNamedValue(nv *driver.NamedValue) error {
 	if IsOption(nv.Value) {
 		return nil
 	}
+	// a decimal of another package binds as a NUMBER, with every digit,
+	// before its Value
+	if d, ok, err := decimalArg(nv.Value); ok || err != nil {
+		nv.Value = d
+		return err
+	}
 	// database/sql converts a driver.Valuer, such as sql.Null[T], to its
 	// value, except the few that the driver binds itself
 	if _, ok := nv.Value.(driver.Valuer); ok && !ownValue(nv.Value) {

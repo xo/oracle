@@ -302,3 +302,80 @@ func toFloat64(v any) (float64, error) {
 	}
 	return 0, fmt.Errorf("value %#v (%T) is not a real number", v, v)
 }
+
+// partsDecimal is a decimal of another package. It has the Decompose and the
+// Compose that database/sql uses to pass a decimal as its parts, and no Scan
+// or Value.
+type partsDecimal struct {
+	d apd.Decimal
+}
+
+func (p *partsDecimal) Decompose(buf []byte) (byte, bool, []byte, int32) {
+	return p.d.Decompose(buf)
+}
+
+func (p *partsDecimal) Compose(form byte, negative bool, coefficient []byte, exponent int32) error {
+	return p.d.Compose(form, negative, coefficient, exponent)
+}
+
+// TestNumberDecimalParts binds a decimal that has only Decompose and Compose,
+// and scans into one, with all 38 digits of a NUMBER. A nil one binds as a
+// NULL. A NUMBER(10), which scans as an int64, and a BINARY_DOUBLE scan into
+// one too, and so does an OUT and an IN OUT of PL/SQL. go-ora knew neither
+// method.
+func TestNumberDecimalParts(t *testing.T) {
+	db := numberDB(t)
+	createNumberTable(t, db, "test_decimal_parts", []string{"id", "n", "i", "b"},
+		[]string{"NUMBER(2)", "NUMBER", "NUMBER(10)", "BINARY_DOUBLE"})
+	in := new(partsDecimal)
+	if _, _, err := in.d.SetString("-1234567890123456789.0123456789012345678"); err != nil {
+		t.Fatal(err)
+	}
+	query := "INSERT INTO test_decimal_parts (id, n, i, b) VALUES (:1, :2, :3, :4)"
+	if _, err := db.ExecContext(t.Context(), query, 1, in, 1234567890, 1.5); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), query, 2, (*partsDecimal)(nil), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	var n, i, b partsDecimal
+	row := db.QueryRowContext(t.Context(), "SELECT n, i, b FROM test_decimal_parts WHERE id = 1")
+	if err := row.Scan(&n, &i, &b); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		got  *partsDecimal
+		want string
+	}{
+		{"NUMBER", &n, in.d.Text('f')},
+		{"NUMBER(10)", &i, "1234567890"},
+		{"BINARY_DOUBLE", &b, "1.5"},
+	} {
+		if s := c.got.d.Text('f'); s != c.want {
+			t.Errorf("%s: got %s, want %s", c.name, s, c.want)
+		}
+	}
+	var null sql.NullString
+	row = db.QueryRowContext(t.Context(), "SELECT TO_CHAR(n) FROM test_decimal_parts WHERE id = 2")
+	if err := row.Scan(&null); err != nil || null.Valid {
+		t.Errorf("a nil decimal: got %+v, %v, want a NULL", null, err)
+	}
+	var out partsDecimal
+	if _, err := db.ExecContext(t.Context(), "BEGIN :1 := 12345.6789; END;", sql.Out{Dest: &out}); err != nil {
+		t.Fatal(err)
+	}
+	if s := out.d.Text('f'); s != "12345.6789" {
+		t.Errorf("OUT: got %s, want 12345.6789", s)
+	}
+	inOut := new(partsDecimal)
+	if _, _, err := inOut.d.SetString("2.5"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), "BEGIN :1 := :1 * 2; END;", sql.Out{Dest: inOut, In: true}); err != nil {
+		t.Fatal(err)
+	}
+	if s := inOut.d.Text('f'); s != "5.0" && s != "5" {
+		t.Errorf("IN OUT: got %s, want 5", s)
+	}
+}
