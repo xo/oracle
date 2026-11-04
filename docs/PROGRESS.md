@@ -399,3 +399,11 @@ mode on 19c (`7fd780a`). Ken then decided D37, and a `uuid.UUID` binds as a
 `RAW(16)` (`7a48c4c`). CI passed on both, and Ken had `7a48c4c` tagged
 v0.2.0 and released on GitHub on 2026-11-04. The `dbmeta` and `usql`
 sessions were told.
+
+usql asked for the length of a `RAW`, so that it can show a `RAW(16)` as a
+UUID. `ColumnTypeLength` now gives it, and the length of a LOB (`6e9d3a9`).
+Ken then asked which interfaces of `database/sql` the driver lacks. It
+lacked only the decimal methods `Decompose` and `Compose`, which it now
+takes (`4354e03`). CI passed, and the suite passed on 26ai and 11g in every
+LOB mode. Ken had `4354e03` tagged v0.3.0 and released on GitHub on
+2026-11-04. The `usql` session was told.
