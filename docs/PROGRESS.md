@@ -407,3 +407,9 @@ lacked only the decimal methods `Decompose` and `Compose`, which it now
 takes (`4354e03`). CI passed, and the suite passed on 26ai and 11g in every
 LOB mode. Ken had `4354e03` tagged v0.3.0 and released on GitHub on
 2026-11-04. The `usql` session was told.
+
+usql added `\errverbose`, which finds the method `ErrVerbose` on an error
+with `errors.As`. A `*ServerError` now has it, and writes the error as
+SQL*Plus does (`5b5b1a3`). CI passed, and the suite passed on 26ai and 11g.
+Ken had `5b5b1a3` tagged v0.4.0 and released on GitHub on 2026-11-08. The
+`usql` session was told.
