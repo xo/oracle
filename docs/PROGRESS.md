@@ -413,3 +413,9 @@ with `errors.As`. A `*ServerError` now has it, and writes the error as
 SQL*Plus does (`5b5b1a3`). CI passed, and the suite passed on 26ai and 11g.
 Ken had `5b5b1a3` tagged v0.4.0 and released on GitHub on 2026-11-08. The
 `usql` session was told.
+
+Ken then asked that `\errverbose` look the same on every database, as psql
+writes it. `ErrVerbose` now writes the form of psql, with `LINE`, `^`,
+`DETAIL`, `HINT` and `CONTEXT` (`04d615c`). CI passed, and the suite passed
+on 26ai and 11g. Ken had `04d615c` tagged v0.4.1 and released on GitHub on
+2026-11-08. The `usql` session was told.
