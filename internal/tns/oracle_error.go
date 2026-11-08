@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Error is the type of a sentinel error. The root package names it Error too,
@@ -108,9 +109,50 @@ func (err *OracleError) Is(target error) bool {
 	return false
 }
 
-// ErrPos return sql error position。
+// ErrPos returns the position of the error in the statement that failed, as
+// the server sends it: an offset in bytes from 0. It is -1 for an error that
+// the driver makes, which the server did not send.
 func (err *OracleError) ErrPos() int {
 	return err.errPos
+}
+
+// ErrVerbose returns the error as SQL*Plus writes it: the line of query that
+// holds the position of the error, a * under the position, the number of the
+// line, and the message with each line of the error stack, such as the
+// ORA-06512 lines of PL/SQL. query is the statement that failed. usql asks an
+// error for the method, which it declares itself, for \errverbose. It returns
+// "" when the error has no position in query, so that usql prints the
+// message alone.
+//
+// The position is a byte offset in the charset of the database, which is the
+// UTF-8 of query for AL32UTF8 and UTF8.
+func (err *OracleError) ErrVerbose(query string) string {
+	pos := err.errPos
+	if query == "" || pos < 0 || pos > len(query) {
+		return ""
+	}
+	// an offset within a character marks the character
+	for pos > 0 && pos < len(query) && !utf8.RuneStart(query[pos]) {
+		pos--
+	}
+	start := strings.LastIndexByte(query[:pos], '\n') + 1
+	end := len(query)
+	if i := strings.IndexByte(query[pos:], '\n'); i != -1 {
+		end = pos + i
+	}
+	// a tab before the position stays a tab, so that the * stands under it
+	var mark strings.Builder
+	for _, r := range query[start:pos] {
+		if r == '\t' {
+			mark.WriteByte('\t')
+		} else {
+			mark.WriteByte(' ')
+		}
+	}
+	mark.WriteByte('*')
+	line := 1 + strings.Count(query[:start], "\n")
+	return fmt.Sprintf("%s\n%s\nERROR at line %d:\n%s",
+		strings.TrimRight(query[start:end], "\r"), mark.String(), line, err.Error())
 }
 
 func (err *OracleError) translate() {

@@ -703,6 +703,19 @@ for a lack of a permission, ORA-01031 or ORA-01045, and for ORA-28000,
 ORA-28001 and ORA-28041. usql declares the interface, so the driver imports
 nothing of it. `TestAuthenticationRefused` and `TestConnectRefused` hold it.
 
+A `*ServerError` has the method `ErrVerbose(query string) string`, which usql
+finds with `errors.As` for `\errverbose`. It writes the error as SQL*Plus
+does: the line of the statement that holds the position, a `*` under the
+position, `ERROR at line N:`, and the message with each line of its stack,
+such as the ORA-06512 lines of PL/SQL. The position is an offset in bytes in
+the charset of the database. For AL32UTF8 that is the UTF-8 of the
+statement, which the driver sends as the caller gave it. An error of PL/SQL
+at run time and ORA-00900 have the position 0, and SQL*Plus marks the first
+column of the first line for them too. It returns "" for an error with no
+statement or no position, and usql then prints the message. usql declares
+the interface. `TestErrVerbose` in `internal/tns` and in `integration` holds
+it.
+
 A batch of DML with `WithBatchErrors` sends the execute option 0x80000, and
 the server runs the rows that it can. It answers with a break, a reset, and
 the return parameters, which hold the count of each row, then ORA-24381 with
