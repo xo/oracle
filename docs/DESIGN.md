@@ -704,17 +704,26 @@ ORA-28001 and ORA-28041. usql declares the interface, so the driver imports
 nothing of it. `TestAuthenticationRefused` and `TestConnectRefused` hold it.
 
 A `*ServerError` has the method `ErrVerbose(query string) string`, which usql
-finds with `errors.As` for `\errverbose`. It writes the error as SQL*Plus
-does: the line of the statement that holds the position, a `*` under the
-position, `ERROR at line N:`, and the message with each line of its stack,
-such as the ORA-06512 lines of PL/SQL. The position is an offset in bytes in
-the charset of the database. For AL32UTF8 that is the UTF-8 of the
-statement, which the driver sends as the caller gave it. An error of PL/SQL
-at run time and ORA-00900 have the position 0, and SQL*Plus marks the first
-column of the first line for them too. It returns "" for an error with no
-statement or no position, and usql then prints the message. usql declares
-the interface. `TestErrVerbose` in `internal/tns` and in `integration` holds
-it.
+finds with `errors.As` for `\errverbose`. usql declares the interface. Ken
+asked that every database show its errors as psql shows an error of
+PostgreSQL, so the method writes the form of libpq. The first line is
+`ERROR:`, two spaces and the first error of the stack. A position gives
+`LINE n:` with the line of the statement, and a `^` under the character on
+the next line. Each other line of the message is a field of psql:
+
+- An ORA-06512 line of the PL/SQL call stack goes in `CONTEXT`, which holds
+  the whole stack, a line for each call, as psql writes a PL/pgSQL stack.
+- A `Help:` line of 23ai and later goes in `HINT`, with no `Help:`.
+- Any other line goes in `DETAIL`, a `DETAIL:` line for each, such as the
+  PLS-00201 line of an ORA-06550.
+
+The position is an offset in bytes in the charset of the database. For
+AL32UTF8 that is the UTF-8 of the statement, which the driver sends as the
+caller gave it. The server gives the position 0 to an error with none, such
+as an error of PL/SQL at run time, so 0 gives no `LINE`. The cost is that
+ORA-00900 at the first word of a statement gives no `LINE` either. v0.4.0
+wrote the form of SQL*Plus, with a `*` under the position and `ERROR at line
+n:`. `TestErrVerbose` in `internal/tns` and in `integration` holds it.
 
 A batch of DML with `WithBatchErrors` sends the execute option 0x80000, and
 the server runs the rows that it can. It answers with a break, a reset, and

@@ -14,9 +14,11 @@ type verboseError interface {
 	ErrVerbose(query string) string
 }
 
-// TestErrVerbose checks that an error of the server writes itself as SQL*Plus
-// does, with the line of the statement, a * under the position of the error,
-// and the error stack of PL/SQL, through the interface that usql asks for.
+// TestErrVerbose checks that an error of the server writes itself as psql's
+// \errverbose writes an error of PostgreSQL, with ERROR and the first error,
+// the line of the statement with a ^ under the position of the error, and
+// the rest of the stack in DETAIL, HINT and CONTEXT, through the interface
+// that usql asks for.
 func TestErrVerbose(t *testing.T) {
 	db, err := getDB(t)
 	if err != nil {
@@ -25,31 +27,32 @@ func TestErrVerbose(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 	for _, test := range []struct {
 		query string
-		// head is the line, the * and the number of the line
+		// head is the ERROR line up to its code, and the LINE and the ^
 		head string
-		// codes are the codes that start the lines of the message, whose
-		// text changes with the release
-		codes []string
+		// fields are the name and the code of each other line, whose text
+		// changes with the release. A line of help of 23ai and later is
+		// left out
+		fields []string
 	}{
 		{
 			"select * from nosuch",
-			"select * from nosuch\n              *\nERROR at line 1:",
-			[]string{"ORA-00942"},
+			"ERROR:  ORA-00942\nLINE 1: select * from nosuch\n                      ^",
+			nil,
 		},
 		{
 			"select 'éé', 1\nfrom dual where nosuch = 1",
-			"from dual where nosuch = 1\n                *\nERROR at line 2:",
-			[]string{"ORA-00904"},
+			"ERROR:  ORA-00904\nLINE 2: from dual where nosuch = 1\n                        ^",
+			nil,
 		},
 		{
 			"begin\n  raise_application_error(-20001, 'boom');\nend;",
-			"begin\n*\nERROR at line 1:",
-			[]string{"ORA-20001", "ORA-06512"},
+			"ERROR:  ORA-20001",
+			[]string{"CONTEXT:  ORA-06512"},
 		},
 		{
 			"begin\n  nosuch;\nend;",
-			"  nosuch;\n  *\nERROR at line 2:",
-			[]string{"ORA-06550", "PLS-00201", "ORA-06550", "PL/SQL"},
+			"ERROR:  ORA-06550\nLINE 2:   nosuch;\n          ^",
+			[]string{"DETAIL:  PLS-00201", "DETAIL:  ORA-06550", "DETAIL:  PL/SQL"},
 		},
 	} {
 		_, err := db.ExecContext(t.Context(), test.query)
@@ -59,17 +62,22 @@ func TestErrVerbose(t *testing.T) {
 			continue
 		}
 		got := v.ErrVerbose(test.query)
-		head, msg, _ := strings.Cut(got, ":\n")
-		var codes []string
-		for line := range strings.Lines(msg) {
-			// 23ai and later add a line of help to each error
-			if !strings.HasPrefix(line, "Help: ") {
-				code, _, _ := strings.Cut(line, ":")
-				codes = append(codes, code)
+		var head, fields []string
+		for i, line := range strings.Split(got, "\n") {
+			name, value, _ := strings.Cut(line, ":  ")
+			code, _, _ := strings.Cut(value, ":")
+			switch {
+			case i == 0:
+				head = append(head, name+":  "+code)
+			case strings.HasPrefix(line, "LINE ") || strings.TrimSpace(line) == "^":
+				head = append(head, line)
+			case name == "HINT":
+			default:
+				fields = append(fields, name+":  "+code)
 			}
 		}
-		if head+":" != test.head || !slices.Equal(codes, test.codes) {
-			t.Errorf("%q: got:\n%s\nwant:\n%s\nand the codes %v", test.query, got, test.head, test.codes)
+		if strings.Join(head, "\n") != test.head || !slices.Equal(fields, test.fields) {
+			t.Errorf("%q: got:\n%s\nwant:\n%s\nand the fields %v", test.query, got, test.head, test.fields)
 		}
 	}
 }

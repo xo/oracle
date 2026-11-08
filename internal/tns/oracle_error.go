@@ -116,21 +116,62 @@ func (err *OracleError) ErrPos() int {
 	return err.errPos
 }
 
-// ErrVerbose returns the error as SQL*Plus writes it: the line of query that
-// holds the position of the error, a * under the position, the number of the
-// line, and the message with each line of the error stack, such as the
-// ORA-06512 lines of PL/SQL. query is the statement that failed. usql asks an
-// error for the method, which it declares itself, for \errverbose. It returns
-// "" when the error has no position in query, so that usql prints the
-// message alone.
+// ErrVerbose returns the error as psql's \errverbose writes an error of
+// PostgreSQL, so that usql shows the errors of each database the same way.
+// usql asks an error for the method, which it declares itself. query is the
+// statement that failed. The first line is ERROR, two spaces and the first
+// error of the stack, such as "ERROR:  ORA-00904: "BLAH": invalid
+// identifier". A position after the start of query gives the line of query
+// that holds it, after "LINE n: ", and a ^ under the character on the next
+// line. Each other line of the message follows as a field of psql: an
+// ORA-06512 line of the PL/SQL call stack goes in CONTEXT, a "Help:" line of
+// 23ai and later in HINT, and any other line in DETAIL. The output has no
+// line feed at its end.
 //
-// The position is a byte offset in the charset of the database, which is the
-// UTF-8 of query for AL32UTF8 and UTF8.
+// The server gives a position of 0 to an error with none, such as an error
+// of PL/SQL at run time, so the position 0 gives no line. The position is a
+// byte offset in the charset of the database, which is the UTF-8 of query
+// for AL32UTF8 and UTF8.
 func (err *OracleError) ErrVerbose(query string) string {
-	pos := err.errPos
-	if query == "" || pos < 0 || pos > len(query) {
-		return ""
+	var head string
+	var detail, hint, context []string
+	for line := range strings.Lines(err.Error()) {
+		line = strings.TrimRight(line, "\r\n")
+		switch {
+		case strings.TrimSpace(line) == "":
+		case head == "":
+			head = line
+		case strings.HasPrefix(line, "Help: "):
+			hint = append(hint, strings.TrimPrefix(line, "Help: "))
+		case strings.HasPrefix(line, "ORA-06512:"):
+			context = append(context, line)
+		default:
+			detail = append(detail, line)
+		}
 	}
+	var b strings.Builder
+	b.WriteString("ERROR:  " + head)
+	if err.errPos > 0 && err.errPos <= len(query) {
+		b.WriteString(errorPosition(query, err.errPos))
+	}
+	for _, line := range detail {
+		b.WriteString("\nDETAIL:  " + line)
+	}
+	for _, line := range hint {
+		b.WriteString("\nHINT:  " + line)
+	}
+	// psql writes the call stack of PL/pgSQL as one CONTEXT, a line for each
+	// call
+	if len(context) > 0 {
+		b.WriteString("\nCONTEXT:  " + strings.Join(context, "\n"))
+	}
+	return b.String()
+}
+
+// errorPosition returns the line of query that holds the byte at offset pos,
+// after "LINE n: ", and a ^ under its character on the next line, each
+// after a line feed, as libpq writes them after the message.
+func errorPosition(query string, pos int) string {
 	// an offset within a character marks the character
 	for pos > 0 && pos < len(query) && !utf8.RuneStart(query[pos]) {
 		pos--
@@ -140,19 +181,10 @@ func (err *OracleError) ErrVerbose(query string) string {
 	if i := strings.IndexByte(query[pos:], '\n'); i != -1 {
 		end = pos + i
 	}
-	// a tab before the position stays a tab, so that the * stands under it
-	var mark strings.Builder
-	for _, r := range query[start:pos] {
-		if r == '\t' {
-			mark.WriteByte('\t')
-		} else {
-			mark.WriteByte(' ')
-		}
-	}
-	mark.WriteByte('*')
-	line := 1 + strings.Count(query[:start], "\n")
-	return fmt.Sprintf("%s\n%s\nERROR at line %d:\n%s",
-		strings.TrimRight(query[start:end], "\r"), mark.String(), line, err.Error())
+	prefix := "LINE " + strconv.Itoa(1+strings.Count(query[:start], "\n")) + ": "
+	col := utf8.RuneCountInString(query[start:pos])
+	return "\n" + prefix + strings.TrimSuffix(query[start:end], "\r") +
+		"\n" + strings.Repeat(" ", len(prefix)+col) + "^"
 }
 
 func (err *OracleError) translate() {
