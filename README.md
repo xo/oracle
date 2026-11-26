@@ -6,7 +6,8 @@
   <a href="#migration-from-go-ora" title="Migration from go-ora">Migration</a> |
   <a href="#related-projects" title="Related Projects">Related Projects</a> |
   <a href="https://pkg.go.dev/github.com/xo/oracle" title="Go Reference">Reference</a> |
-  <a href="CONTRIBUTING.md" title="Contributing">Contributing</a>
+  <a href="CONTRIBUTING.md" title="Contributing">Contributing</a> |
+  <a href="https://github.com/xo/oracle/discussions" title="Discussions">Discussions</a>
 </div>
 
 <br/>
@@ -15,6 +16,7 @@
 [![Go Reference][goref-oracle-status]][goref-oracle]
 [![Releases][release-status]][releases]
 [![Discord Discussion][discord-status]][discord]
+[![GitHub Discussions][discussions-status]][discussions]
 
 [oracle-ci]: https://github.com/xo/oracle/actions/workflows/test.yml "Test CI"
 [oracle-ci-status]: https://github.com/xo/oracle/actions/workflows/test.yml/badge.svg "Test CI"
@@ -24,6 +26,8 @@
 [releases]: https://github.com/xo/oracle/releases "Releases"
 [discord]: https://discord.gg/WDWAgXwJqN "Discord Discussion"
 [discord-status]: https://img.shields.io/discord/829150509658013727.svg?label=Discord&logo=Discord&colorB=7289da&style=flat-square "Discord Discussion"
+[discussions]: https://github.com/xo/oracle/discussions "GitHub Discussions"
+[discussions-status]: https://img.shields.io/github/discussions/xo/oracle?label=Discussions&logo=github&style=flat-square "GitHub Discussions"
 
 # oracle
 
@@ -522,6 +526,10 @@ The DSN is not compatible. See Connection options.
 [tblfmt]: https://github.com/xo/tblfmt "tblfmt"
 
 ## Contributing
+
+Ask a question or report a problem in
+[GitHub Discussions](https://github.com/xo/oracle/discussions). This
+repository takes no issues or pull requests.
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before you change anything, and
 [`AGENTS.md`](AGENTS.md) if you are a coding agent. Work that is known and not
